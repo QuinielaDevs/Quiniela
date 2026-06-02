@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Lint, typecheck & test suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Install Playwright browsers (chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local stack
+        run: supabase start
+
+      - name: Export Supabase local credentials
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          # Falla rápido si el CLI no devolvió alguna credencial obligatoria,
+          # en lugar de escribir variables vacías que romperían los tests más tarde.
+          : "${API_URL:?supabase status no devolvió API_URL}"
+          : "${ANON_KEY:?supabase status no devolvió ANON_KEY}"
+          : "${SERVICE_ROLE_KEY:?supabase status no devolvió SERVICE_ROLE_KEY}"
+          # PUBLISHABLE_KEY solo lo emiten versiones recientes del CLI; para el
+          # stack local la clave publishable equivale a la anon → usar como fallback.
+          PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-$ANON_KEY}"
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Run full test suite (unit + integration + e2e)
+        run: npm run test:ci
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Stop Supabase local stack
+        if: always()
+        run: supabase stop || true
