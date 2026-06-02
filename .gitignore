@@ -1,0 +1,16 @@
+# Local Agent workspace directories (not part of the codebase)
+.agent/
+.agents/
+.claude/
+
+# Personal / Local BMad configs
+_bmad/custom/config.user.toml
+
+# System files / OS metadata
+Thumbs.db
+.DS_Store
+
+# Node/development dependencies if any
+node_modules/
+dist/
+.env

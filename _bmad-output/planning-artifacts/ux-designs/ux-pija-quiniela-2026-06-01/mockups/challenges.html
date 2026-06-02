@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Duelos y Desafíos — Championship Gold</title>
+  <!-- Google Fonts: Outfit (headings) & Inter (UI) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0D1B2A;
+      --card: #1B263B;
+      --primary: #E63946;
+      --primary-foreground: #FFFFFF;
+      --accent: #E9C46A;
+      --accent-foreground: #1A1208;
+      --success: #10B981;
+      --border: #415A77;
+      --muted: #8D99AE;
+      --text: #F1FAEE;
+      --font-display: 'Outfit', sans-serif;
+      --font-ui: 'Inter', sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .mobile-container {
+      width: 100%;
+      max-width: 480px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    /* Header */
+    .app-header {
+      background-color: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .app-title {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+    .points-bar {
+      display: flex;
+      justify-content: space-around;
+      background-color: rgba(27, 38, 59, 0.6);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+    }
+    .points-bar {
+      display: flex;
+      justify-content: space-around;
+      background-color: rgba(27, 38, 59, 0.6);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+    }
+    .points-item {
+      text-align: center;
+    }
+    .points-val {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .points-val.avail { color: var(--accent); }
+    .points-val.escrow { color: var(--muted); }
+
+    /* Tab Bar Menu */
+    .tab-bar {
+      display: flex;
+      background-color: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-item {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .tab-item.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+    /* Main Content */
+    .content {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      color: var(--text);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    /* Challenge Card */
+    .challenge-card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .challenge-card.active-challenge {
+      border-color: var(--accent);
+    }
+    .challenge-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .badge {
+      padding: 2px 6px;
+      border-radius: 9999px;
+      font-weight: bold;
+      font-size: 0.65rem;
+    }
+    .badge-wager {
+      background-color: rgba(233, 196, 106, 0.15);
+      color: var(--accent);
+    }
+    .badge-pending {
+      background-color: rgba(141, 153, 174, 0.2);
+      color: var(--muted);
+    }
+    .badge-active {
+      background-color: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+    }
+    .challenge-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .match-banner {
+      font-weight: bold;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .duelists {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(13, 27, 42, 0.4);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+    .duelist {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .duelist-name {
+      font-weight: 500;
+    }
+    .duelist-score {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .challenge-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      border-top: 1px solid rgba(65, 90, 119, 0.4);
+      padding-top: 8px;
+    }
+    .btn-action {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.1s ease;
+    }
+    .btn-action.primary {
+      background-color: var(--primary);
+      color: var(--primary-foreground);
+    }
+    .btn-action.secondary {
+      background-color: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-action.share {
+      background-color: #25D366; /* WhatsApp Green */
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    /* Wager Form View */
+    .wager-form {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .form-select, .form-input {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      width: 100%;
+    }
+    .score-input-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 16px;
+    }
+    .score-adjuster {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-form-adjust {
+      width: 28px;
+      height: 28px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .form-score-val {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 800;
+      width: 16px;
+      text-align: center;
+    }
+    
+    /* Footer Nav */
+    .nav-bottom {
+      display: flex;
+      background-color: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 8px 0;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.65rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .nav-item.active {
+      color: var(--accent);
+    }
+    .nav-icon {
+      font-size: 1.2rem;
+    }
+    
+    /* Share Modal */
+    .modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(13, 27, 42, 0.85);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 10;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 340px;
+    }
+    .modal-header {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-bottom: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .banter-preview {
+      background-color: var(--bg);
+      border: 1px dashed var(--border);
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-family: var(--font-ui);
+      color: #9cd4ff;
+      margin-bottom: 16px;
+      word-break: break-word;
+    }
+    .btn-whatsapp-send {
+      width: 100%;
+      background-color: #25D366;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="mobile-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="app-title">PIJA QUNIELA</div>
+      <div class="user-profile">
+        <span style="font-size: 0.8rem; font-weight: 500;">Cris</span>
+        <div class="avatar">C</div>
+      </div>
+    </header>
+
+    <!-- Points Wagered Status Bar -->
+    <div class="points-bar">
+      <div class="points-item">
+        <div style="color: var(--muted); font-size: 0.65rem;">PUNTOS DISPONIBLES</div>
+        <div class="points-val avail" id="availPoints">54.5</div>
+      </div>
+      <div class="points-item">
+        <div style="color: var(--muted); font-size: 0.65rem;">RETENIDOS EN DUELOS (ESCROW)</div>
+        <div class="points-val escrow" id="escrowPoints">5.0</div>
+      </div>
+    </div>
+
+    <!-- Tab Bar Menu -->
+    <div class="tab-bar">
+      <div class="tab-item active" id="tabList" onclick="toggleView('list')">Mis Apuestas</div>
+      <div class="tab-item" id="tabCreate" onclick="toggleView('create')">+ Crear Reto</div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="content">
+      
+      <!-- List View -->
+      <div id="listView" style="display: flex; flex-direction: column;">
+        <div class="section-title">
+          <span>Duelos Activos y Pendientes</span>
+        </div>
+
+        <!-- Duel 1: Incoming pending challenge from Diego -->
+        <div class="challenge-card" id="duelDiego">
+          <div class="challenge-meta">
+            <span class="badge badge-wager">Apuesta: 5 pts</span>
+            <span class="badge badge-pending" id="statusDiego">Pendiente por Ti</span>
+          </div>
+          <div class="challenge-body">
+            <div class="match-banner">🇩🇪 GER vs ESP 🇪🇸</div>
+            <div class="duelists">
+              <div class="duelist">
+                <span style="opacity:0.7">Diego:</span>
+                <span class="duelist-score">2 - 1</span>
+              </div>
+              <div class="duelist">
+                <span style="opacity:0.7">Tú:</span>
+                <span class="duelist-score" id="myPredictionForDiego">? - ?</span>
+              </div>
+            </div>
+          </div>
+          <div class="challenge-footer" id="actionsDiego">
+            <button class="btn-action secondary" onclick="rejectDuel('duelDiego')">Rechazar</button>
+            <button class="btn-action primary" onclick="acceptDuel()">Aceptar Duelo</button>
+          </div>
+        </div>
+
+        <!-- Duel 2: Active duel with Laura -->
+        <div class="challenge-card active-challenge">
+          <div class="challenge-meta">
+            <span class="badge badge-wager">Apuesta: 5 pts</span>
+            <span class="badge badge-active">En Juego (Escrow)</span>
+          </div>
+          <div class="challenge-body">
+            <div class="match-banner">🇦🇷 ARG vs FRA 🇫🇷</div>
+            <div class="duelists">
+              <div class="duelist">
+                <span style="opacity:0.7">Tú:</span>
+                <span class="duelist-score">3 - 1</span>
+              </div>
+              <div class="duelist">
+                <span style="opacity:0.7">Laura:</span>
+                <span class="duelist-score">1 - 2</span>
+              </div>
+            </div>
+          </div>
+          <div class="challenge-footer">
+            <button class="btn-action share" onclick="shareExisting('Laura', 'ARG-FRA', '3-1')">
+              <span>💬 Banter</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create Form View -->
+      <div id="createView" class="wager-form">
+        <h2 class="section-title">Nuevo Desafío</h2>
+        
+        <!-- Select Match -->
+        <div class="form-group">
+          <label class="form-label">1. Selecciona el Partido</label>
+          <select class="form-select" id="formMatch">
+            <option value="ESP-GER">España vs Alemania (Jornada 1)</option>
+            <option value="BRA-MEX">Brasil vs México (Jornada 2)</option>
+            <option value="POR-ENG">Portugal vs Inglaterra (Jornada 2)</option>
+          </select>
+        </div>
+
+        <!-- Select Challenge Type -->
+        <div class="form-group">
+          <label class="form-label">2. Tipo de Desafío</label>
+          <select class="form-select" id="formType" onchange="toggleOpponentSelect()">
+            <option value="direct">Duelo Directo 1v1</option>
+            <option value="open">Pozo Grupal Abierto</option>
+          </select>
+        </div>
+
+        <!-- Select Opponent (Only for 1v1) -->
+        <div class="form-group" id="opponentGroup">
+          <label class="form-label">3. Selecciona tu Oponente</label>
+          <select class="form-select" id="formOpponent">
+            <option value="Diego">Diego (42.0 pts)</option>
+            <option value="Laura">Laura (49.0 pts)</option>
+            <option value="Pedro">Pedro (33.0 pts)</option>
+          </select>
+        </div>
+
+        <!-- Points to Bet -->
+        <div class="form-group">
+          <label class="form-label">4. Puntos a Apostar</label>
+          <input type="number" class="form-input" id="formWager" value="5" min="1" max="54">
+          <span style="font-size:0.7rem; color:var(--muted);">No puedes exceder tus 54.5 puntos disponibles.</span>
+        </div>
+
+        <!-- Predict Scores -->
+        <div class="form-group">
+          <label class="form-label">5. Registra tu Predicción para el Reto</label>
+          <div class="score-input-row">
+            <span style="font-weight:600;" id="labelTeamA">ESP</span>
+            <div class="score-adjuster">
+              <div class="btn-form-adjust" onclick="changeFormScore('home', -1)">-</div>
+              <span class="form-score-val" id="formScoreHome">2</span>
+              <div class="btn-form-adjust" onclick="changeFormScore('home', 1)">+</div>
+            </div>
+            <span style="opacity:0.5;">vs</span>
+            <div class="score-adjuster">
+              <div class="btn-form-adjust" onclick="changeFormScore('away', -1)">-</div>
+              <span class="form-score-val" id="formScoreAway">0</span>
+              <div class="btn-form-adjust" onclick="changeFormScore('away', 1)">+</div>
+            </div>
+            <span style="font-weight:600;" id="labelTeamB">GER</span>
+          </div>
+        </div>
+
+        <button class="btn-action primary" style="width:100%; padding:12px; border-radius:8px; font-size:0.9rem;" onclick="createChallenge()">Crear y Compartir Reto</button>
+      </div>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="nav-bottom">
+      <div class="nav-item">
+        <span class="nav-icon">⚽</span>
+        <span>Pronósticos</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">🏆</span>
+        <span>Posiciones</span>
+      </div>
+      <div class="nav-item active">
+        <span class="nav-icon">⚔️</span>
+        <span>Duelos</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">👤</span>
+        <span>Mi Cuenta</span>
+      </div>
+    </nav>
+
+    <!-- Share Banter Modal -->
+    <div class="modal-overlay" id="shareModal">
+      <div class="modal-content">
+        <div class="modal-header">🏆 Reto Creado Exitosamente</div>
+        <div class="modal-body">
+          <p>Se han retenido <strong id="modalBetVal">5</strong> puntos en garantía (escrow) de tu cuenta. Comparte este enlace en WhatsApp para que tu oponente pueda aceptar el duelo:</p>
+          <div class="banter-preview" id="banterText">
+            ¡Oye @Diego! Te reto en la Quiniela del Mundial. Apuesto 5 puntos a que ESP gana 2-0 a GER. ¿Aceptas el duelo? Entra aquí: pijaquiniela.app/desafio/xyz
+          </div>
+        </div>
+        <button class="btn-whatsapp-send" onclick="sendWhatsApp()">
+          <span>💬 Compartir en WhatsApp</span>
+        </button>
+        <button class="btn-action secondary" style="width:100%; padding:10px; border-radius:6px;" onclick="closeModal()">Cerrar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JavaScript for Interactive Mock -->
+  <script>
+    function toggleView(view) {
+      const tabList = document.getElementById('tabList');
+      const tabCreate = document.getElementById('tabCreate');
+      const listView = document.getElementById('listView');
+      const createView = document.getElementById('createView');
+      
+      if (view === 'list') {
+        tabList.classList.add('active');
+        tabCreate.classList.remove('active');
+        listView.style.display = 'flex';
+        createView.style.display = 'none';
+      } else {
+        tabList.classList.remove('active');
+        tabCreate.classList.add('active');
+        listView.style.display = 'none';
+        createView.style.display = 'flex';
+      }
+    }
+
+    function changeFormScore(team, delta) {
+      const scoreEl = document.getElementById(`formScore${team === 'home' ? 'Home' : 'Away'}`);
+      let currentVal = parseInt(scoreEl.innerText);
+      let newVal = currentVal + delta;
+      if (newVal >= 0) {
+        scoreEl.innerText = newVal;
+      }
+    }
+
+    function toggleOpponentSelect() {
+      const type = document.getElementById('formType').value;
+      const oppGroup = document.getElementById('opponentGroup');
+      if (type === 'open') {
+        oppGroup.style.display = 'none';
+      } else {
+        oppGroup.style.display = 'flex';
+      }
+    }
+
+    function acceptDuel() {
+      const availEl = document.getElementById('availPoints');
+      const escrowEl = document.getElementById('escrowPoints');
+      
+      let avail = parseFloat(availEl.innerText);
+      let escrow = parseFloat(escrowEl.innerText);
+      
+      // Update balance & escrow logic simulation
+      availEl.innerText = (avail - 5.0).toFixed(1);
+      escrowEl.innerText = (escrow + 5.0).toFixed(1);
+      
+      // Change card styling to active
+      const card = document.getElementById('duelDiego');
+      card.classList.add('active-challenge');
+      
+      const status = document.getElementById('statusDiego');
+      status.innerText = "En Juego (Escrow)";
+      status.classList.remove('badge-pending');
+      status.classList.add('badge-active');
+      
+      document.getElementById('myPredictionForDiego').innerText = "1 - 1"; // Mock my prediction
+      
+      // Remove buttons, add share button
+      const footer = document.getElementById('actionsDiego');
+      footer.innerHTML = `
+        <button class="btn-action share" onclick="shareExisting('Diego', 'GER-ESP', '1-1')">
+          <span>💬 Banter</span>
+        </button>
+      `;
+    }
+
+    function rejectDuel(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function createChallenge() {
+      const opponent = document.getElementById('formOpponent').value;
+      const match = document.getElementById('formMatch').value;
+      const wager = document.getElementById('formWager').value;
+      const scoreHome = document.getElementById('formScoreHome').innerText;
+      const scoreAway = document.getElementById('formScoreAway').innerText;
+      const type = document.getElementById('formType').value;
+
+      const availEl = document.getElementById('availPoints');
+      const escrowEl = document.getElementById('escrowPoints');
+      let avail = parseFloat(availEl.innerText);
+      let escrow = parseFloat(escrowEl.innerText);
+
+      // Deduct points from available balance for creation escrow
+      availEl.innerText = (avail - parseFloat(wager)).toFixed(1);
+      escrowEl.innerText = (escrow + parseFloat(wager)).toFixed(1);
+
+      // Set up Modal Text
+      document.getElementById('modalBetVal').innerText = wager;
+      
+      let banterText = "";
+      if (type === 'direct') {
+        banterText = `¡Oye @${opponent}! Te reto en la Quiniela del Mundial. Apuesto ${wager} puntos de mi clasificación a que ESP gana ${scoreHome}-${scoreAway} contra GER. ¿Aceptas el duelo? Entra aquí: pijaquiniela.app/desafio/xyz`;
+      } else {
+        banterText = `🔥 ¡Se ha abierto un Pozo Grupal en la Quiniela! Apuesta de ${wager} puntos en el partido ESP vs GER. Mis goles: ${scoreHome}-${scoreAway}. ¡Entren todos y aporten al pozo aquí: pijaquiniela.app/desafio/xyz!`;
+      }
+
+      document.getElementById('banterText').innerText = banterText;
+      document.getElementById('shareModal').classList.add('active');
+    }
+
+    function shareExisting(name, match, prediction) {
+      document.getElementById('modalBetVal').innerText = "5";
+      document.getElementById('banterText').innerText = `¡Oye @${name}! Ya tenemos el duelo en juego para el partido ${match} (Mi marcador: ${prediction}). ¡Que gane el mejor! 🏆`;
+      document.getElementById('shareModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('shareModal').classList.remove('active');
+      toggleView('list');
+    }
+
+    function sendWhatsApp() {
+      const text = encodeURIComponent(document.getElementById('banterText').innerText);
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+      closeModal();
+    }
+  </script>
+</body>
+</html>

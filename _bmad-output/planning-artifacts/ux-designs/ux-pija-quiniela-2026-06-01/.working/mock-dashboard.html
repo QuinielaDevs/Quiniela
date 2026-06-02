@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Quiniela — Championship Gold</title>
+  <!-- Google Fonts: Outfit (headings) & Inter (UI) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0D1B2A;
+      --card: #1B263B;
+      --primary: #E63946;
+      --primary-foreground: #FFFFFF;
+      --accent: #E9C46A;
+      --accent-foreground: #1A1208;
+      --success: #10B981;
+      --border: #415A77;
+      --muted: #8D99AE;
+      --text: #F1FAEE;
+      --font-display: 'Outfit', sans-serif;
+      --font-ui: 'Inter', sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .mobile-container {
+      width: 100%;
+      max-width: 480px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    /* Header */
+    .app-header {
+      background-color: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .app-title {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: var(--accent);
+      color: var(--accent-foreground);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
+    /* Payment Sticky Banner */
+    .payment-banner {
+      background-color: rgba(230, 57, 70, 0.15);
+      border-bottom: 1px solid var(--primary);
+      padding: 12px 16px;
+      font-size: 0.8rem;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .payment-banner strong {
+      color: var(--primary);
+    }
+    .btn-pay-details {
+      background-color: var(--primary);
+      color: var(--primary-foreground);
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Fase Filter Selector (Top Navigation Level 1) */
+    .fase-toggle {
+      display: flex;
+      background-color: rgba(13, 27, 42, 0.5);
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border);
+      gap: 8px;
+    }
+    .btn-fase {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      border-radius: 6px;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+    .btn-fase.active {
+      background-color: var(--card);
+      border-color: var(--border);
+      color: var(--accent);
+    }
+
+    /* Sub Tab Bar Menu (Top Navigation Level 2) */
+    .tab-bar {
+      display: flex;
+      background-color: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-item {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .tab-item.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Main Content */
+    .content {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    /* Date Headers */
+    .date-header {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      margin: 16px 0 8px 0;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-left: 2px solid var(--accent);
+      padding-left: 8px;
+    }
+    .date-header:first-of-type {
+      margin-top: 0;
+    }
+
+    /* Match Card */
+    .match-card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    .match-card.saving {
+      border-color: var(--muted);
+    }
+    .match-card.saved {
+      border-color: var(--success);
+    }
+    .match-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .multiplier-badge {
+      background-color: rgba(233, 196, 106, 0.15);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 9999px;
+      font-weight: 600;
+      font-size: 0.7rem;
+    }
+    .match-body {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .team-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 38%;
+    }
+    .team-section.left {
+      justify-content: flex-start;
+    }
+    .team-section.right {
+      justify-content: flex-end;
+    }
+    .flag {
+      font-size: 1.6rem;
+    }
+    .team-code {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    /* Score Controls */
+    .score-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-adjust {
+      width: 32px;
+      height: 32px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--accent);
+      font-size: 1.1rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.1s ease;
+    }
+    .btn-adjust:active {
+      transform: scale(0.9);
+      background-color: var(--border);
+    }
+    .btn-adjust.disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .score-display {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 800;
+      width: 20px;
+      text-align: center;
+      color: var(--text);
+    }
+    .vs-text {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    /* Match Footer */
+    .match-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      border-top: 1px solid rgba(65, 90, 119, 0.4);
+      padding-top: 8px;
+    }
+    .save-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+      color: var(--muted);
+      transition: color 0.3s ease;
+    }
+    .save-status.active {
+      color: var(--success);
+    }
+    .glow-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 10px;
+      box-shadow: inset 0 0 15px var(--success);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .match-card.flash-success .glow-overlay {
+      opacity: 1;
+    }
+
+    /* Special Awards Dashboard View */
+    .awards-list {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .award-card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.3s ease;
+    }
+    .award-card:active {
+      background-color: rgba(27, 38, 59, 0.8);
+    }
+    .award-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+    }
+    .award-phase {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .award-title {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    .award-selector-trigger {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .award-value {
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    /* Nav bar bottom */
+    .nav-bottom {
+      display: flex;
+      background-color: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 8px 0;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.65rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .nav-item.active {
+      color: var(--accent);
+    }
+    .nav-icon {
+      font-size: 1.2rem;
+    }
+
+    /* Modal payment instructions */
+    .modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(13, 27, 42, 0.85);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 10;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 320px;
+    }
+    .modal-header {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+    .modal-body {
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+    .modal-body p {
+      margin-bottom: 8px;
+    }
+    .btn-close-modal {
+      width: 100%;
+      background-color: var(--primary);
+      color: var(--primary-foreground);
+      border: none;
+      padding: 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Drawer/Modal Selector for Candidates */
+    .drawer-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(13, 27, 42, 0.7);
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 15;
+    }
+    .drawer-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .drawer-content {
+      background-color: var(--card);
+      border-top: 1px solid var(--border);
+      border-radius: 16px 16px 0 0;
+      padding: 20px;
+      width: 100%;
+      max-height: 70%;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s ease;
+      transform: translateY(100%);
+    }
+    .drawer-overlay.active .drawer-content {
+      transform: translateY(0);
+    }
+    .drawer-header {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+    .candidate-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      flex: 1;
+      max-height: 250px;
+    }
+    .candidate-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .candidate-row:active {
+      border-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="mobile-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="app-title">PIJA QUNIELA</div>
+      <div class="user-profile">
+        <span style="font-size: 0.8rem; font-weight: 500;">Cris</span>
+        <div class="avatar">C</div>
+      </div>
+    </header>
+
+    <!-- Payment Alert Banner -->
+    <div class="payment-banner" id="paymentBanner">
+      <span>Tienes un pago <strong>Pendiente ($10 USD)</strong></span>
+      <button class="btn-pay-details" onclick="toggleModal(true)">Ver Datos</button>
+    </div>
+
+    <!-- Fase Filter (Level 1 Nav) -->
+    <div class="fase-toggle">
+      <button class="btn-fase active" id="fase-grupos" onclick="toggleFase('grupos')">Grupos</button>
+      <button class="btn-fase" id="fase-elims" onclick="toggleFase('elims')">Eliminatorias</button>
+      <button class="btn-fase" id="fase-premios" onclick="toggleFase('premios')">Premios 🏆</button>
+    </div>
+
+    <!-- Sub Tab Bar Menu (Level 2 Nav) -->
+    <div class="tab-bar" id="subTabBar">
+      <div class="tab-item active" id="sub-tab-1">Jornada 1</div>
+      <div class="tab-item" id="sub-tab-2">Jornada 2</div>
+      <div class="tab-item" id="sub-tab-3">Jornada 3</div>
+    </div>
+
+    <!-- Main Predictions Area -->
+    <main class="content">
+      
+      <!-- Group/Elims Matches View -->
+      <div id="matchesView">
+        
+        <!-- Date Header 1 -->
+        <div class="date-header" id="date-h-1">
+          <span>Jueves 11 de Junio</span>
+          <span style="font-size: 0.6rem; color: var(--muted);">Auto-scroll activo</span>
+        </div>
+
+        <!-- Match 1: Argentina vs Francia -->
+        <div class="match-card" id="match1">
+          <div class="glow-overlay"></div>
+          <div class="match-meta">
+            <span>Grupo C • Hoy, 18:00 UTC</span>
+            <span class="multiplier-badge" id="mult1">Multiplicador: 2.0x</span>
+          </div>
+          <div class="match-body">
+            <div class="team-section left">
+              <span class="flag">🇦🇷</span>
+              <span class="team-code">ARG</span>
+            </div>
+            <div class="score-controls">
+              <div class="btn-adjust" onclick="changeScore('match1', 'home', -1)">-</div>
+              <span class="score-display" id="match1-home">3</span>
+              <div class="btn-adjust" onclick="changeScore('match1', 'home', 1)">+</div>
+            </div>
+            <span class="vs-text">VS</span>
+            <div class="score-controls">
+              <div class="btn-adjust" onclick="changeScore('match1', 'away', -1)">-</div>
+              <span class="score-display" id="match1-away">1</span>
+              <div class="btn-adjust" onclick="changeScore('match1', 'away', 1)">+</div>
+            </div>
+            <div class="team-section right">
+              <span class="team-code">FRA</span>
+              <span class="flag">🇫🇷</span>
+            </div>
+          </div>
+          <div class="match-footer">
+            <span>Pronóstico anticipado (35d de antelación)</span>
+            <div class="save-status" id="match1-status">Guardado ✓</div>
+          </div>
+        </div>
+
+        <!-- Date Header 2 -->
+        <div class="date-header" id="date-h-2">
+          <span>Viernes 12 de Junio</span>
+        </div>
+
+        <!-- Match 2: España vs Alemania -->
+        <div class="match-card" id="match2">
+          <div class="glow-overlay"></div>
+          <div class="match-meta">
+            <span>Grupo A • Mañana, 15:00 UTC</span>
+            <span class="multiplier-badge" id="mult2">Multiplicador: 1.8x</span>
+          </div>
+          <div class="match-body">
+            <div class="team-section left">
+              <span class="flag">🇪🇸</span>
+              <span class="team-code">ESP</span>
+            </div>
+            <div class="score-controls">
+              <div class="btn-adjust" onclick="changeScore('match2', 'home', -1)">-</div>
+              <span class="score-display" id="match2-home">0</span>
+              <div class="btn-adjust" onclick="changeScore('match2', 'home', 1)">+</div>
+            </div>
+            <span class="vs-text">VS</span>
+            <div class="score-controls">
+              <div class="btn-adjust" onclick="changeScore('match2', 'away', -1)">-</div>
+              <span class="score-display" id="match2-away">0</span>
+              <div class="btn-adjust" onclick="changeScore('match2', 'away', 1)">+</div>
+            </div>
+            <div class="team-section right">
+              <span class="team-code">GER</span>
+              <span class="flag">🇩🇪</span>
+            </div>
+          </div>
+          <div class="match-footer">
+            <span>Pronóstico anticipado (29d de antelación)</span>
+            <div class="save-status" id="match2-status">Sin cambios</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Special Awards View -->
+      <div id="awardsView" class="awards-list">
+        <h2 class="section-title">Premios de la Copa 🏆</h2>
+        
+        <!-- Champion Card -->
+        <div class="award-card" onclick="openDrawer('champ')">
+          <div class="award-meta">
+            <span class="award-phase">Fase de Grupos Activa</span>
+            <span class="multiplier-badge">Bono: 50 pts</span>
+          </div>
+          <div class="award-title">Campeón del Mundo</div>
+          <div class="award-selector-trigger">
+            <span class="award-value" id="val-champ">
+              <span style="opacity:0.5;">Seleccionar equipo...</span>
+            </span>
+            <span>▼</span>
+          </div>
+        </div>
+
+        <!-- Golden Boot Card -->
+        <div class="award-card" onclick="openDrawer('boot')">
+          <div class="award-meta">
+            <span class="award-phase">Fase de Grupos Activa</span>
+            <span class="multiplier-badge">Bono: 50 pts</span>
+          </div>
+          <div class="award-title">Máximo Goleador (Bota de Oro)</div>
+          <div class="award-selector-trigger">
+            <span class="award-value" id="val-boot">
+              <span style="opacity:0.5;">Seleccionar jugador...</span>
+            </span>
+            <span>▼</span>
+          </div>
+        </div>
+
+        <!-- Golden Ball Card -->
+        <div class="award-card" onclick="openDrawer('ball')">
+          <div class="award-meta">
+            <span class="award-phase">Fase de Grupos Activa</span>
+            <span class="multiplier-badge">Bono: 50 pts</span>
+          </div>
+          <div class="award-title">Mejor Jugador (Balón de Oro)</div>
+          <div class="award-selector-trigger">
+            <span class="award-value" id="val-ball">
+              <span style="opacity:0.5;">Seleccionar jugador...</span>
+            </span>
+            <span>▼</span>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="nav-bottom">
+      <div class="nav-item active">
+        <span class="nav-icon">⚽</span>
+        <span>Pronósticos</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">🏆</span>
+        <span>Posiciones</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">⚔️</span>
+        <span>Duelos</span>
+      </div>
+      <div class="nav-item">
+        <span class="nav-icon">👤</span>
+        <span>Mi Cuenta</span>
+      </div>
+    </nav>
+
+    <!-- Modal Zelle Instructions -->
+    <div class="modal-overlay" id="paymentModal">
+      <div class="modal-content">
+        <div class="modal-header">Instrucciones de Pago</div>
+        <div class="modal-body">
+          <p>Para confirmar tu participación y activar tu estatus en la tabla de posiciones, realiza el depósito:</p>
+          <p><strong>Monto:</strong> $10.00 USD</p>
+          <p><strong>Zelle:</strong> cris@pijaquiniela.com</p>
+          <p><strong>Concepto:</strong> Nombre de usuario en la app (Cris)</p>
+        </div>
+        <button class="btn-close-modal" onclick="toggleModal(false)">Entendido</button>
+      </div>
+    </div>
+
+    <!-- Candidate Bottom Drawer -->
+    <div class="drawer-overlay" id="candidateDrawer" onclick="closeDrawer()">
+      <div class="drawer-content" onclick="event.stopPropagation()">
+        <div class="drawer-header" id="drawerTitle">Selecciona tu Candidato</div>
+        <div class="candidate-list" id="drawerList">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JavaScript for Navigation & Selection -->
+  <script>
+    let saveTimers = {};
+    let activeAwardKey = null;
+
+    const candidates = {
+      champ: [
+        { label: "🇦🇷 Argentina", code: "ARG" },
+        { label: "🇧🇷 Brasil", code: "BRA" },
+        { label: "🇫🇷 Francia", code: "FRA" },
+        { label: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra", code: "ENG" },
+        { label: "🇪🇸 España", code: "ESP" }
+      ],
+      boot: [
+        { label: "🇫🇷 Kylian Mbappé", code: "MBP" },
+        { label: "🇳🇴 Erling Haaland", code: "HAA" },
+        { label: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Harry Kane", code: "KAN" },
+        { label: "🇧🇷 Vinícius Júnior", code: "VIN" },
+        { label: "🇦🇷 Lionel Messi", code: "MES" }
+      ],
+      ball: [
+        { label: "🇧🇷 Vinícius Júnior", code: "VIN" },
+        { label: "🇫🇷 Kylian Mbappé", code: "MBP" },
+        { label: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Jude Bellingham", code: "BEL" },
+        { label: "🇪🇸 Lamine Yamal", code: "YAM" },
+        { label: "🇩🇪 Florian Wirtz", code: "WIR" }
+      ]
+    };
+
+    function toggleFase(fase) {
+      // Clear active states
+      document.getElementById('fase-grupos').classList.remove('active');
+      document.getElementById('fase-elims').classList.remove('active');
+      document.getElementById('fase-premios').classList.remove('active');
+      
+      const subTabBar = document.getElementById('subTabBar');
+      const matchesView = document.getElementById('matchesView');
+      const awardsView = document.getElementById('awardsView');
+
+      document.getElementById(`fase-${fase}`).classList.add('active');
+
+      if (fase === 'grupos') {
+        subTabBar.style.display = 'flex';
+        matchesView.style.display = 'block';
+        awardsView.style.display = 'none';
+        
+        // Restore groups subtabs
+        document.getElementById('sub-tab-1').innerText = "Jornada 1";
+        document.getElementById('sub-tab-2').innerText = "Jornada 2";
+        document.getElementById('sub-tab-3').innerText = "Jornada 3";
+        
+        // Show group match info
+        document.getElementById('date-h-1').style.display = 'flex';
+        document.getElementById('match1').style.display = 'block';
+        document.getElementById('date-h-2').innerText = "Viernes 12 de Junio";
+        document.getElementById('match2').style.display = 'block';
+      } 
+      else if (fase === 'elims') {
+        subTabBar.style.display = 'flex';
+        matchesView.style.display = 'block';
+        awardsView.style.display = 'none';
+        
+        // Setup elims subtabs
+        document.getElementById('sub-tab-1').innerText = "1/32 Final";
+        document.getElementById('sub-tab-2').innerText = "Octavos (1/16)";
+        document.getElementById('sub-tab-3').innerText = "Semis & Final";
+        
+        // Hide group cards, show placeholder elims match info
+        document.getElementById('date-h-1').style.display = 'none';
+        document.getElementById('match1').style.display = 'none';
+        
+        document.getElementById('date-h-2').innerText = "Miércoles 1 de Julio • Ronda 32";
+        document.getElementById('match2').style.display = 'block';
+        // Mock team name change for elims display
+        document.getElementById('match2-home').innerText = "0";
+        document.getElementById('match2-away').innerText = "0";
+      } 
+      else { // Premios
+        subTabBar.style.display = 'none';
+        matchesView.style.display = 'none';
+        awardsView.style.display = 'flex';
+      }
+    }
+
+    function openDrawer(key) {
+      activeAwardKey = key;
+      const drawer = document.getElementById('candidateDrawer');
+      const listEl = document.getElementById('drawerList');
+      const titleEl = document.getElementById('drawerTitle');
+      
+      const titles = { champ: "Selecciona el Campeón", boot: "Selecciona la Bota de Oro", ball: "Selecciona el Balón de Oro (MVP)" };
+      titleEl.innerText = titles[key];
+      
+      // Populate drawer options
+      listEl.innerHTML = "";
+      candidates[key].forEach(cand => {
+        const row = document.createElement('div');
+        row.className = "candidate-row";
+        row.innerHTML = `<span>${cand.label}</span>`;
+        row.onclick = () => selectCandidate(cand.label);
+        listEl.appendChild(row);
+      });
+      
+      drawer.classList.add('active');
+    }
+
+    function selectCandidate(label) {
+      const valEl = document.getElementById(`val-${activeAwardKey}`);
+      valEl.innerHTML = `<span style="color: var(--success); font-weight: 600;">✓ ${label}</span>`;
+      
+      // Close drawer
+      closeDrawer();
+      
+      // Trigger save indicator banner in header (mock)
+      const banner = document.getElementById('paymentBanner');
+      const oldHtml = banner.innerHTML;
+      banner.style.backgroundColor = "rgba(16, 185, 129, 0.2)";
+      banner.style.borderBottomColor = "var(--success)";
+      banner.innerHTML = `<span style="color: var(--success); font-weight:600;">✓ Predicción de premio guardada con éxito (Bono: 50 pts)</span>`;
+      
+      setTimeout(() => {
+        banner.style.backgroundColor = "rgba(230, 57, 70, 0.15)";
+        banner.style.borderBottomColor = "var(--primary)";
+        banner.innerHTML = oldHtml;
+      }, 3000);
+    }
+
+    function closeDrawer(event) {
+      document.getElementById('candidateDrawer').classList.remove('active');
+      activeAwardKey = null;
+    }
+
+    function changeScore(matchId, team, delta) {
+      const scoreElement = document.getElementById(`${matchId}-${team}`);
+      let currentScore = parseInt(scoreElement.innerText);
+      let newScore = currentScore + delta;
+      
+      if (newScore < 0) return; 
+      
+      scoreElement.innerText = newScore;
+      
+      const statusElement = document.getElementById(`${matchId}-status`);
+      statusElement.innerText = "Editando...";
+      statusElement.style.color = "var(--accent)";
+      
+      const card = document.getElementById(matchId);
+      card.classList.remove('saved');
+      card.classList.add('saving');
+
+      if (saveTimers[matchId]) {
+        clearTimeout(saveTimers[matchId]);
+      }
+
+      saveTimers[matchId] = setTimeout(() => {
+        savePrediction(matchId);
+      }, 500);
+    }
+
+    function savePrediction(matchId) {
+      const card = document.getElementById(matchId);
+      const statusElement = document.getElementById(`${matchId}-status`);
+      card.classList.remove('saving');
+      card.classList.add('flash-success');
+      statusElement.innerText = "Guardado ✓";
+      statusElement.style.color = "var(--success)";
+      
+      setTimeout(() => {
+        card.classList.remove('flash-success');
+        card.classList.add('saved');
+      }, 300);
+    }
+
+    function toggleModal(show) {
+      const modal = document.getElementById('paymentModal');
+      if (show) {
+        modal.classList.add('active');
+      } else {
+        modal.classList.remove('active');
+      }
+    }
+  </script>
+</body>
+</html>

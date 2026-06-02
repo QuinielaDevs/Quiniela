@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Propuestas de Temas Visuales — Quiniela Mundial FIFA 2026</title>
+  <style>
+    :root {
+      --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      font-family: var(--font-family);
+      margin: 0;
+      padding: 24px;
+      background-color: #0f172a;
+      color: #f1f5f9;
+      line-height: 1.5;
+    }
+    header {
+      margin-bottom: 32px;
+      text-align: center;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 24px;
+    }
+    header h1 {
+      font-size: 2.2rem;
+      margin: 0 0 8px 0;
+      color: #38bdf8;
+    }
+    header p {
+      font-size: 1.1rem;
+      color: #94a3b8;
+      margin: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    .theme-card {
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .theme-header {
+      margin-bottom: 16px;
+    }
+    .theme-name {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin: 0 0 4px 0;
+    }
+    .theme-desc {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin: 0;
+      opacity: 0.8;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .chip {
+      display: flex;
+      align-items: center;
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      border: 1px solid rgba(0,0,0,0.2);
+    }
+    .mockup-container {
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+    }
+    .match-card {
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .match-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+      opacity: 0.75;
+    }
+    .match-teams {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .team-col {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 40%;
+    }
+    .team-flag {
+      font-size: 1.2rem;
+    }
+    .team-name {
+      font-weight: 600;
+    }
+    .score-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-inc {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+    }
+    .score-val {
+      font-size: 1.1rem;
+      font-weight: 700;
+      width: 14px;
+      text-align: center;
+    }
+    .vs-separator {
+      font-size: 0.75rem;
+      opacity: 0.5;
+    }
+    .match-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 0.7rem;
+    }
+    .badge {
+      padding: 2px 6px;
+      border-radius: 9999px;
+      font-weight: bold;
+      font-size: 0.65rem;
+    }
+    .leaderboard-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.03);
+      margin-bottom: 6px;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .user-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: bold;
+    }
+    .user-points {
+      font-weight: bold;
+    }
+    
+    /* VARIANT 1: Stadium Lights */
+    .theme-1 {
+      background-color: #0A0E17;
+      color: #F8FAFC;
+    }
+    .theme-1 .theme-name { color: #10B981; }
+    .theme-1 .mockup-container { background-color: #0A0E17; }
+    .theme-1 .match-card { background-color: #151C2C; border-color: #1E293B; }
+    .theme-1 .btn-inc { background-color: #151C2C; border-color: #1E293B; color: #10B981; }
+    .theme-1 .badge-multiplier { background-color: rgba(245, 158, 11, 0.15); color: #F59E0B; }
+    .theme-1 .badge-status { color: #10B981; }
+    .theme-1 .badge-paid { background-color: rgba(16, 185, 129, 0.15); color: #10B981; }
+    .theme-1 .badge-unpaid { background-color: rgba(239, 68, 68, 0.15); color: #EF4444; }
+    .theme-1 .user-points { color: #F59E0B; }
+
+    /* VARIANT 2: Neon Turf */
+    .theme-2 {
+      background-color: #070A0F;
+      color: #FFFFFF;
+    }
+    .theme-2 .theme-name { color: #39FF14; }
+    .theme-2 .mockup-container { background-color: #070A0F; }
+    .theme-2 .match-card { background-color: #111823; border-color: #1F2E3E; }
+    .theme-2 .btn-inc { background-color: #111823; border-color: #39FF14; color: #39FF14; }
+    .theme-2 .badge-multiplier { background-color: rgba(0, 229, 255, 0.15); color: #00E5FF; }
+    .theme-2 .badge-status { color: #39FF14; }
+    .theme-2 .badge-paid { background-color: rgba(57, 255, 20, 0.15); color: #39FF14; }
+    .theme-2 .badge-unpaid { background-color: rgba(239, 68, 68, 0.2); color: #FF4A4A; }
+    .theme-2 .user-points { color: #00E5FF; }
+
+    /* VARIANT 3: Championship Gold & Crimson */
+    .theme-3 {
+      background-color: #0D1B2A;
+      color: #F1FAEE;
+    }
+    .theme-3 .theme-name { color: #E9C46A; }
+    .theme-3 .mockup-container { background-color: #0D1B2A; }
+    .theme-3 .match-card { background-color: #1B263B; border-color: #415A77; }
+    .theme-3 .btn-inc { background-color: #1B263B; border-color: #E63946; color: #E63946; }
+    .theme-3 .badge-multiplier { background-color: rgba(233, 196, 106, 0.15); color: #E9C46A; }
+    .theme-3 .badge-status { color: #E63946; }
+    .theme-3 .badge-paid { background-color: rgba(233, 196, 106, 0.15); color: #E9C46A; }
+    .theme-3 .badge-unpaid { background-color: rgba(230, 57, 70, 0.15); color: #E63946; }
+    .theme-3 .user-points { color: #E9C46A; }
+
+    /* VARIANT 4: Retro Sage & Leather */
+    .theme-4 {
+      background-color: #162C21;
+      color: #E9D8A6;
+    }
+    .theme-4 .theme-name { color: #EE9B00; }
+    .theme-4 .mockup-container { background-color: #162C21; }
+    .theme-4 .match-card { background-color: #204130; border-color: #2D5A40; }
+    .theme-4 .btn-inc { background-color: #204130; border-color: #8C6239; color: #E9D8A6; }
+    .theme-4 .badge-multiplier { background-color: rgba(140, 98, 57, 0.25); color: #CA6702; }
+    .theme-4 .badge-status { color: #EE9B00; }
+    .theme-4 .badge-paid { background-color: rgba(155, 34, 38, 0.15); color: #E9D8A6; }
+    .theme-4 .badge-unpaid { background-color: rgba(155, 34, 38, 0.25); color: #AE2012; }
+    .theme-4 .user-points { color: #EE9B00; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Quiniela Mundial FIFA 2026</h1>
+    <p>Opciones de Identidad Visual y Registro Emocional para el Coaching Path</p>
+  </header>
+
+  <div class="grid">
+
+    <!-- THEME 1: Stadium Lights -->
+    <div class="theme-card theme-1">
+      <div class="theme-header">
+        <h3 class="theme-name">1. Stadium Lights</h3>
+        <p class="theme-desc">Modo oscuro premium. Atmósfera deportiva de partido nocturno. Sobrio, elegante y enfocado.</p>
+      </div>
+      
+      <div class="chips">
+        <div class="chip"><div class="color-dot" style="background:#0A0E17"></div>#0A0E17 (Fondo)</div>
+        <div class="chip"><div class="color-dot" style="background:#151C2C"></div>#151C2C (Card)</div>
+        <div class="chip"><div class="color-dot" style="background:#10B981"></div>#10B981 (Turf)</div>
+        <div class="chip"><div class="color-dot" style="background:#F59E0B"></div>#F59E0B (Gold)</div>
+      </div>
+
+      <div class="mockup-container">
+        <div class="match-card">
+          <div class="match-header">
+            <span>Mundial 2026 • Grupo C</span>
+            <span class="badge badge-multiplier">Bono 2.0x</span>
+          </div>
+          <div class="match-teams">
+            <div class="team-col">
+              <span class="team-flag">🇦🇷</span>
+              <span class="team-name">ARG</span>
+            </div>
+            <div class="score-controls">
+              <div class="btn-inc">-</div>
+              <span class="score-val">3</span>
+              <div class="btn-inc">+</div>
+            </div>
+            <span class="vs-separator">vs</span>
+            <div class="score-controls">
+              <div class="btn-inc">-</div>
+              <span class="score-val">1</span>
+              <div class="btn-inc">+</div>
+            </div>
+            <div class="team-col" style="justify-content: flex-end;">
+              <span class="team-name">FRA</span>
+              <span class="team-flag">🇫🇷</span>
+            </div>
+          </div>
+          <div class="match-footer">
+            <span>Antelación: 38 días</span>
+            <span class="badge-status">Guardado ✓</span>
+          </div>
+        </div>
+
+        <div class="leaderboard-row">
+          <div class="user-info">
+            <div class="user-avatar" style="background:#10B981; color:#fff">C</div>
+            <span>Cris (Tú)</span>
+            <span class="badge badge-paid">Pagado</span>
+          </div>
+          <span class="user-points">54.5 pts</span>
+        </div>
+        
+        <div class="leaderboard-row">
+          <div class="user-info">
+            <div class="user-avatar">D</div>
+            <span>Diego</span>
+            <span class="badge badge-unpaid">Pendiente</span>
+          </div>
+          <span class="user-points">42.0 pts</span>
+        </div>
+      </div>
+      
+      <p style="font-size: 0.75rem; text-align: center; color: #94a3b8; margin: 0;">Selección recomendada. Hereda directamente de shadcn/ui dark.</p>
+    </div>
+
+    <!-- THEME 2: Neon Turf -->
+    <div class="theme-card theme-2">
+      <div class="theme-header">
+        <h3 class="theme-name">2. Neon Turf</h3>
+        <p class="theme-desc">Ciber-atlético de alta energía. Contrastes eléctricos vibrantes y estética cyberpunk de consola.</p>
+      </div>
+      
+      <div class="chips">
+        <div class="chip"><div class="color-dot" style="background:#070A0F"></div>#070A0F (Fondo)</div>
+        <div class="chip"><div class="color-dot" style="background:#111823"></div>#111823 (Card)</div>
+        <div class="chip"><div class="color-dot" style="background:#39FF14"></div>#39FF14 (Neon)</div>
+        <div class="chip"><div class="color-dot" style="background:#00E5FF"></div>#00E5FF (Cyan)</div>
+      </div>
+
+      <div class="mockup-container">
+        <div class="match-card">
+          <div class="match-header">
+            <span>Mundial 2026 • Grupo C</span>
+            <span class="badge badge-multiplier">Bono 2.0x</span>
+          </div>
+          <div class="match-teams">
+            <div class="team-col">
+              <span class="team-flag">🇦🇷</span>
+              <span class="team-name">ARG</span>
+            </div>
+            <div class="score-controls">
+              <div class="btn-inc">-</div>
+              <span class="score-val">3</span>
+              <div class="btn-inc">+</div>
+            </div>
+            <span class="vs-separator">vs</span>
+            <div class="score-controls">
+              <div class="btn-inc">-</div>
+              <span class="score-val">1</span>
+              <div class="btn-inc">+</div>
+            </div>
+            <div class="team-col" style="justify-content: flex-end;">
+              <span class="team-name">FRA</span>
+              <span class="team-flag">🇫🇷</span>
+            </div>
+          </div>
+          <div class="match-footer">
+            <span>Antelación: 38 días</span>
+            <span class="badge-status">Guardado ✓</span>
+          </div>
+        </div>
+
+        <div class="leaderboard-row">
+          <div class="user-info">
+            <div class="user-avatar" style="background:#39FF14; color:#000">C</div>
+            <span>Cris (Tú)</span>
+            <span class="badge badge-paid">Pagado</span>
+          </div>
+          <span class="user-points">54.5 pts</span>
+        </div>
+        
+        <div class="leaderboard-row">
+          <div class="user-info">
+            <div class="user-avatar">D</div>
+            <span>Diego</span>
+            <span class="badge badge-unpaid">Pendiente</span>
+          </div>
+          <span class="user-points">42.0 pts</span>
+        </div>
+      </div>
+      
+      <p style="font-size: 0.75rem; text-align: center; color: #94a3b8; margin: 0;">Orientado a grupos jóvenes o entusiastas de la gamificación radical.</p>
+    </div>
+
+    <!-- THEME 3: Championship Gold & Crimson -->
+    <div class="theme-card theme-3">
+      <div class="theme-header">
+        <h3 class="theme-name">3. Championship Gold</h3>
+        <p class="theme-desc">Herencia FIFA clásica. Elegancia institucional con azul profundo, rojo escarlata y dorados.</p>
+      </div>
+      
+      <div class="chips">
+        <div class="chip"><div class="color-dot" style="background:#0D1B2A"></div>#0D1B2A (Fondo)</div>
+        <div class="chip"><div class="color-dot" style="background:#1B263B"></div>#1B263B (Card)</div>
+        <div class="chip"><div class="color-dot" style="background:#E63946"></div>#E63946 (Crimson)</div>
+        <div class="chip"><div class="color-dot" style="background:#E9C46A"></div>#E9C46A (Gold)</div>
+      </div>
+
+      <div class="mockup-container">
+        <div class="match-card">
+          <div class="match-header">
+            <span>Mundial 2026 • Grupo C</span>
+            <span class="badge badge-multiplier">Bono 2.0x</span>
+          </div>
+          <div class="match-teams">
+            <div class="team-col">
+              <span class="team-flag">🇦🇷</span>
+              <span class="team-name">ARG</span>
+            </div>
+            <div class="score-controls">
+              <div class="btn-inc">-</div>
+              <span class="score-val">3</span>
+              <div class="btn-inc">+</div>
+            </div>
+            <span class="vs-separator">vs</span>
+            <div class="score-controls">
+              <div class="btn-inc">-</div>
+              <span class="score-val">1</span>
+              <div class="btn-inc">+</div>
+            </div>
+            <div class="team-col" style="justify-content: flex-end;">
+              <span class="team-name">FRA</span>
+              <span class="team-flag">🇫🇷</span>
+            </div>
+          </div>
+          <div class="match-footer">
+            <span>Antelación: 38 días</span>
+            <span class="badge-status">Guardado ✓</span>
+          </div>
+        </div>
+
+        <div class="leaderboard-row">
+          <div class="user-info">
+            <div class="user-avatar" style="background:#E9C46A; color:#0D1B2A">C</div>
+            <span>Cris (Tú)</span>
+            <span class="badge badge-paid">Pagado</span>
+          </div>
+          <span class="user-points">54.5 pts</span>
+        </div>
+        
+        <div class="leaderboard-row">
+          <div class="user-info">
+            <div class="user-avatar">D</div>
+            <span>Diego</span>
+            <span class="badge badge-unpaid">Pendiente</span>
+          </div>
+          <span class="user-points">42.0 pts</span>
+        </div>
+      </div>
+      
+      <p style="font-size: 0.75rem; text-align: center; color: #94a3b8; margin: 0;">Un look tradicional, corporativo y de prestigio televisivo.</p>
+    </div>
+
+    <!-- THEME 4: Retro Sage & Leather -->
+    <div class="theme-card theme-4">
+      <div class="theme-header">
+        <h3 class="theme-name">4. Retro Sage & Leather</h3>
+        <p class="theme-desc">Nostalgia vintage de fútbol clásico. Verde salvia oscuro, cuero marrón y texto color hueso.</p>
+      </div>
+      
+      <div class="chips">
+        <div class="chip"><div class="color-dot" style="background:#162C21"></div>#162C21 (Fondo)</div>
+        <div class="chip"><div class="color-dot" style="background:#204130"></div>#204130 (Card)</div>
+        <div class="chip"><div class="color-dot" style="background:#8C6239"></div>#8C6239 (Leather)</div>
+        <div class="chip"><div class="color-dot" style="background:#E9D8A6"></div>#E9D8A6 (Bone)</div>
+      </div>
+
+      <div class="mockup-container">
+        <div class="match-card">
+          <div class="match-header">
+            <span>Mundial 2026 • Grupo C</span>
+            <span class="badge badge-multiplier">Bono 2.0x</span>
+          </div>
+          <div class="match-teams">
+            <div class="team-col">
+              <span class="team-flag">🇦🇷</span>
+              <span class="team-name">ARG</span>
+            </div>
+            <div class="score-controls">
+              <div class="btn-inc">-</div>
+              <span class="score-val">3</span>
+              <div class="btn-inc">+</div>
+            </div>
+            <span class="vs-separator">vs</span>
+            <div class="score-controls">
+              <div class="btn-inc">-</div>
+              <span class="score-val">1</span>
+              <div class="btn-inc">+</div>
+            </div>
+            <div class="team-col" style="justify-content: flex-end;">
+              <span class="team-name">FRA</span>
+              <span class="team-flag">🇫🇷</span>
+            </div>
+          </div>
+          <div class="match-footer">
+            <span>Antelación: 38 días</span>
+            <span class="badge-status">Guardado ✓</span>
+          </div>
+        </div>
+
+        <div class="leaderboard-row">
+          <div class="user-info">
+            <div class="user-avatar" style="background:#8C6239; color:#E9D8A6">C</div>
+            <span>Cris (Tú)</span>
+            <span class="badge badge-paid">Pagado</span>
+          </div>
+          <span class="user-points">54.5 pts</span>
+        </div>
+        
+        <div class="leaderboard-row">
+          <div class="user-info">
+            <div class="user-avatar">D</div>
+            <span>Diego</span>
+            <span class="badge badge-unpaid">Pendiente</span>
+          </div>
+          <span class="user-points">42.0 pts</span>
+        </div>
+      </div>
+      
+      <p style="font-size: 0.75rem; text-align: center; color: #94a3b8; margin: 0;">Para un ambiente nostálgico que recuerda a los álbumes e historia del fútbol.</p>
+    </div>
+
+  </div>
+
+</body>
+</html>
