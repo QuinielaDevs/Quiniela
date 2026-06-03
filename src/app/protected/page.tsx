@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/utils/supabase/server";
-import { InfoIcon } from "lucide-react";
+import { InfoIcon, TrophyIcon } from "lucide-react";
 import { FetchDataSteps } from "@/components/tutorial/fetch-data-steps";
 import { Suspense } from "react";
 
@@ -33,6 +34,15 @@ export default function ProtectedPage() {
             <UserDetails />
           </Suspense>
         </pre>
+      </div>
+      <div>
+        <Link
+          href="/awards"
+          className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          <TrophyIcon size="16" strokeWidth={2} />
+          Premios Especiales de la Copa
+        </Link>
       </div>
       <div>
         <h2 className="font-bold text-2xl mb-4">Next steps</h2>
