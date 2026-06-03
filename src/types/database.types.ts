@@ -34,6 +34,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      award_candidates: {
+        Row: {
+          category: string
+          created_at: string
+          display_order: number
+          flag_code: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          name: string
+          team_name: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          display_order?: number
+          flag_code?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          name: string
+          team_name?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          display_order?: number
+          flag_code?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          name?: string
+          team_name?: string | null
+        }
+        Relationships: []
+      }
       league_members: {
         Row: {
           id: string
@@ -143,6 +179,58 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      special_predictions: {
+        Row: {
+          candidate_id: string
+          category: string
+          created_at: string
+          id: string
+          league_id: string
+          predicted_at: string
+          user_id: string
+        }
+        Insert: {
+          candidate_id: string
+          category: string
+          created_at?: string
+          id?: string
+          league_id: string
+          predicted_at?: string
+          user_id: string
+        }
+        Update: {
+          candidate_id?: string
+          category?: string
+          created_at?: string
+          id?: string
+          league_id?: string
+          predicted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_predictions_candidate_id_category_fkey"
+            columns: ["candidate_id", "category"]
+            isOneToOne: false
+            referencedRelation: "award_candidates"
+            referencedColumns: ["id", "category"]
+          },
+          {
+            foreignKeyName: "special_predictions_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_predictions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -285,4 +373,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
