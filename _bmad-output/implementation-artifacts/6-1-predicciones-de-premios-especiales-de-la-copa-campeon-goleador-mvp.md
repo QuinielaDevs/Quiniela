@@ -4,7 +4,7 @@ baseline_commit: ed6ff77
 
 # Story 6.1: Predicciones de Premios Especiales de la Copa (Campeón, Goleador, MVP)
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -32,9 +32,9 @@ so that **aspirar a puntos masivos al final del torneo de forma ágil desde el m
 
 ## Tasks / Subtasks
 
-- [ ] **Tarea 1 — Migración del esquema de premios especiales** (AC: #1, #2, #3, #4)
-  - [ ] Generar la migración con timestamp **autogenerado por la CLI** (NO hardcodear): `npx supabase migration new special_awards_schema`.
-  - [ ] Tabla `award_candidates` (catálogo precargado por el admin de plataforma):
+- [x] **Tarea 1 — Migración del esquema de premios especiales** (AC: #1, #2, #3, #4)
+  - [x] Generar la migración con timestamp **autogenerado por la CLI** (NO hardcodear): `npx supabase migration new special_awards_schema`.
+  - [x] Tabla `award_candidates` (catálogo precargado por el admin de plataforma):
     - `id uuid primary key default gen_random_uuid()`
     - `category text not null check (category in ('champion','top_scorer','mvp'))`
     - `name text not null` _(nombre del equipo nacional para `champion`; nombre del jugador para `top_scorer`/`mvp`)_
@@ -45,7 +45,7 @@ so that **aspirar a puntos masivos al final del torneo de forma ágil desde el m
     - `is_active boolean not null default true` _(permite ocultar candidatos sin borrarlos)_
     - `created_at timestamptz not null default now()`
     - **CONSTRAINT clave para la FK compuesta:** `unique (id, category)` _(habilita la integridad referencial compuesta de la Tarea, ver AC #2)_.
-  - [ ] Tabla `special_predictions`:
+  - [x] Tabla `special_predictions`:
     - `id uuid primary key default gen_random_uuid()`
     - `user_id uuid not null references public.profiles(id) on delete cascade`
     - `category text not null check (category in ('champion','top_scorer','mvp'))`
@@ -54,18 +54,18 @@ so that **aspirar a puntos masivos al final del torneo de forma ágil desde el m
     - `created_at timestamptz not null default now()`
     - `unique (user_id, category)` _(una predicción por galardón por usuario; clave para el upsert `on conflict`)_
     - **FK compuesta:** `foreign key (candidate_id, category) references public.award_candidates(id, category) on delete restrict` _(garantiza que el candidato pertenece a la categoría pronosticada — AC #2; `restrict` evita borrar un candidato con predicciones)_.
-  - [ ] Índices de apoyo: `idx_special_predictions_user_id (user_id)`, `idx_award_candidates_category (category)`. _(`unique(user_id,category)` y `unique(id,category)` ya crean sus índices.)_
-  - [ ] `comment on table` en ambas tablas describiendo su propósito y a qué story pertenece la lógica de puntuación (6.2).
+  - [x] Índices de apoyo: `idx_special_predictions_user_id (user_id)`, `idx_award_candidates_category (category)`. _(`unique(user_id,category)` y `unique(id,category)` ya crean sus índices.)_
+  - [x] `comment on table` en ambas tablas describiendo su propósito y a qué story pertenece la lógica de puntuación (6.2).
 
-- [ ] **Tarea 2 — RLS, trigger de timestamp y feed de candidatos** (AC: #3, #4)
-  - [ ] En la **misma migración** (o una segunda `special_awards_rls` si prefieres separar como en 1.2): `alter table ... enable row level security` en `award_candidates` y `special_predictions`.
-  - [ ] Políticas `award_candidates`: **solo** `select` para `authenticated` (`using (is_active = true)` para no exponer candidatos desactivados). **Sin** políticas `insert/update/delete` → deny-by-default: el catálogo lo gestiona `service_role`/seed, nunca el cliente.
-  - [ ] Políticas `special_predictions`: `insert` `with check (user_id = (select auth.uid()))`; `select` `using (user_id = (select auth.uid()))`; `update` `using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))`. **Sin** `select` cruzado (la predicción es privada; la visibilidad para rivales se decide en una historia futura — fuera de alcance). Usar `(select auth.uid())` (patrón ya usado en 1.2 para que el planner cachee el valor).
-  - [ ] Trigger de refresco de `predicted_at` (snippet canónico abajo): función `public.fn_touch_special_prediction()` `SECURITY DEFINER set search_path=''`, `before update on public.special_predictions`; si `new.candidate_id is distinct from old.candidate_id` ⇒ `new.predicted_at = now()`. Trigger `tr_touch_special_prediction`.
-  - [ ] **Sembrar candidatos demo** en `supabase/seed.sql` (append; el archivo ya existe y está intencionadamente mínimo). Insertar un pequeño set ilustrativo por categoría (p. ej. 4-5 selecciones para `champion`; 4-5 jugadores para `top_scorer` y `mvp`) con `display_order`. Marcar con comentario que en producción los carga el admin de plataforma vía `service_role`. **No** sembrar usuarios ni predicciones.
+- [x] **Tarea 2 — RLS, trigger de timestamp y feed de candidatos** (AC: #3, #4)
+  - [x] En la **misma migración** (o una segunda `special_awards_rls` si prefieres separar como en 1.2): `alter table ... enable row level security` en `award_candidates` y `special_predictions`.
+  - [x] Políticas `award_candidates`: **solo** `select` para `authenticated` (`using (is_active = true)` para no exponer candidatos desactivados). **Sin** políticas `insert/update/delete` → deny-by-default: el catálogo lo gestiona `service_role`/seed, nunca el cliente.
+  - [x] Políticas `special_predictions`: `insert` `with check (user_id = (select auth.uid()))`; `select` `using (user_id = (select auth.uid()))`; `update` `using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))`. **Sin** `select` cruzado (la predicción es privada; la visibilidad para rivales se decide en una historia futura — fuera de alcance). Usar `(select auth.uid())` (patrón ya usado en 1.2 para que el planner cachee el valor).
+  - [x] Trigger de refresco de `predicted_at` (snippet canónico abajo): función `public.fn_touch_special_prediction()` `SECURITY DEFINER set search_path=''`, `before update on public.special_predictions`; si `new.candidate_id is distinct from old.candidate_id` ⇒ `new.predicted_at = now()`. Trigger `tr_touch_special_prediction`.
+  - [x] **Sembrar candidatos demo** en `supabase/seed.sql` (append; el archivo ya existe y está intencionadamente mínimo). Insertar un pequeño set ilustrativo por categoría (p. ej. 4-5 selecciones para `champion`; 4-5 jugadores para `top_scorer` y `mvp`) con `display_order`. Marcar con comentario que en producción los carga el admin de plataforma vía `service_role`. **No** sembrar usuarios ni predicciones.
 
-- [ ] **Tarea 3 — `ServerActionResult` y Server Action de upsert** (AC: #5)
-  - [ ] Definir el tipo canónico `ServerActionResult<T>` en `src/types/index.ts` (es la **primera** Server Action del proyecto; este tipo es reutilizable por 1.3/1.4/2.x/5.x):
+- [x] **Tarea 3 — `ServerActionResult` y Server Action de upsert** (AC: #5)
+  - [x] Definir el tipo canónico `ServerActionResult<T>` en `src/types/index.ts` (es la **primera** Server Action del proyecto; este tipo es reutilizable por 1.3/1.4/2.x/5.x):
     ```typescript
     export type ServerActionResult<T> = {
       success: boolean;
@@ -73,31 +73,31 @@ so that **aspirar a puntos masivos al final del torneo de forma ágil desde el m
       error: string | null;
     };
     ```
-  - [ ] Crear `src/app/actions/special-predictions.actions.ts` con `"use server"`. Exportar `saveSpecialPrediction(category: AwardCategory, candidateId: string): Promise<ServerActionResult<SpecialPrediction>>`:
+  - [x] Crear `src/app/actions/special-predictions.actions.ts` con `"use server"`. Exportar `saveSpecialPrediction(category: AwardCategory, candidateId: string): Promise<ServerActionResult<SpecialPrediction>>`:
     - Obtener cliente SSR con `createClient()` de `src/utils/supabase/server.ts` (NO el de browser).
     - `const { data: { user } } = await supabase.auth.getUser()`; si no hay usuario ⇒ `{ success:false, data:null, error:'No autenticado' }`.
     - `upsert({ user_id: user.id, category, candidate_id: candidateId }, { onConflict: 'user_id,category' })` sobre `special_predictions`, `.select().single()`. **NO** enviar `predicted_at` (lo controla el servidor; el trigger lo refresca en cambios).
     - Envolver en `try/catch`; en error retornar `{ success:false, data:null, error: error.message }`. En éxito `{ success:true, data, error:null }`.
     - `revalidatePath('/awards')` tras un upsert exitoso.
-  - [ ] Exportar en `src/types/index.ts` los tipos de dominio nuevos: `AwardCandidate`, `SpecialPrediction` (+ `Insert`/`Update`) y `AwardCategory = 'champion' | 'top_scorer' | 'mvp'` (espeja el CHECK; documentar el riesgo de drift como en 1.2).
+  - [x] Exportar en `src/types/index.ts` los tipos de dominio nuevos: `AwardCandidate`, `SpecialPrediction` (+ `Insert`/`Update`) y `AwardCategory = 'champion' | 'top_scorer' | 'mvp'` (espeja el CHECK; documentar el riesgo de drift como en 1.2).
 
-- [ ] **Tarea 4 — UI "Premios Especiales" (`/awards`)** (AC: #5)
-  - [ ] Crear `src/app/awards/page.tsx` como **Server Component protegido** (mismo patrón que `src/app/protected/page.tsx`): obtener usuario con el cliente SSR y `redirect('/auth/login')` si no hay sesión. Cargar `award_candidates` activos (ordenados por `category, display_order`) y las `special_predictions` del usuario; pasar ambos al componente cliente.
-  - [ ] Crear `src/components/awards/AwardsBoard.tsx` (`"use client"`): recibe candidatos agrupados por categoría y las selecciones actuales. Renderiza tres bloques (Campeón / Goleador / MVP). Al tap en un candidato: marca selección optimista, llama `saveSpecialPrediction` dentro de `useTransition` (deshabilitando taps mientras corre), y muestra el indicador de éxito verde turf `✓` al resolver; si `result.success === false`, revierte y muestra el error.
-  - [ ] Crear `src/components/awards/CandidatePicker.tsx` (presentacional): lista de candidatos de una categoría; cada item es un control táctil ≥ `48x48px`, resalta el seleccionado con borde `accent` (`#E9C46A`), usa tipografía Outfit para el nombre y muestra bandera/`team_name` cuando exista.
-  - [ ] Aplicar tokens **Championship Gold**: contenedor `max-w-md`, fondo `#0D1B2A`, tarjetas `#1B263B`, acento dorado `#E9C46A` solo para selección/puntos, éxito `#10B981`. Reutilizar primitivos `shadcn/ui` existentes (`card`, `button`, `badge`) — NO reinventar. `aria-label` descriptivos por candidato.
-  - [ ] Empty state si una categoría no tiene candidatos activos: *"Aún no hay favoritos disponibles."*
-  - [ ] Añadir un punto de entrada navegable hacia `/awards` desde una superficie existente (p. ej. enlace en `src/app/protected/page.tsx` o en el dashboard). **NO** rediseñar la bottom-nav (llega en historias de navegación/Mi Cuenta).
+- [x] **Tarea 4 — UI "Premios Especiales" (`/awards`)** (AC: #5)
+  - [x] Crear `src/app/awards/page.tsx` como **Server Component protegido** (mismo patrón que `src/app/protected/page.tsx`): obtener usuario con el cliente SSR y `redirect('/auth/login')` si no hay sesión. Cargar `award_candidates` activos (ordenados por `category, display_order`) y las `special_predictions` del usuario; pasar ambos al componente cliente.
+  - [x] Crear `src/components/awards/AwardsBoard.tsx` (`"use client"`): recibe candidatos agrupados por categoría y las selecciones actuales. Renderiza tres bloques (Campeón / Goleador / MVP). Al tap en un candidato: marca selección optimista, llama `saveSpecialPrediction` dentro de `useTransition` (deshabilitando taps mientras corre), y muestra el indicador de éxito verde turf `✓` al resolver; si `result.success === false`, revierte y muestra el error.
+  - [x] Crear `src/components/awards/CandidatePicker.tsx` (presentacional): lista de candidatos de una categoría; cada item es un control táctil ≥ `48x48px`, resalta el seleccionado con borde `accent` (`#E9C46A`), usa tipografía Outfit para el nombre y muestra bandera/`team_name` cuando exista.
+  - [x] Aplicar tokens **Championship Gold**: contenedor `max-w-md`, fondo `#0D1B2A`, tarjetas `#1B263B`, acento dorado `#E9C46A` solo para selección/puntos, éxito `#10B981`. Reutilizar primitivos `shadcn/ui` existentes (`card`, `button`, `badge`) — NO reinventar. `aria-label` descriptivos por candidato.
+  - [x] Empty state si una categoría no tiene candidatos activos: *"Aún no hay favoritos disponibles."*
+  - [x] Añadir un punto de entrada navegable hacia `/awards` desde una superficie existente (p. ej. enlace en `src/app/protected/page.tsx` o en el dashboard). **NO** rediseñar la bottom-nav (llega en historias de navegación/Mi Cuenta).
 
-- [ ] **Tarea 5 — Tipos, pruebas de integración y verificación** (AC: #6)
-  - [ ] `npx supabase db reset` (aplica migraciones + seed sin errores, idempotente) y `npm run db:types` (regenerar `src/types/database.types.ts`).
-  - [ ] `tests/integration/special-predictions-rls.test.ts` (proyecto Vitest `integration`, node), reutilizando `createServiceRoleClient/createAnonClient/createAuthedClient` y el patrón `createAuthedUser()` de `schema-rls.test.ts` (NO recrear helpers):
+- [x] **Tarea 5 — Tipos, pruebas de integración y verificación** (AC: #6)
+  - [x] `npx supabase db reset` (aplica migraciones + seed sin errores, idempotente) y `npm run db:types` (regenerar `src/types/database.types.ts`).
+  - [x] `tests/integration/special-predictions-rls.test.ts` (proyecto Vitest `integration`, node), reutilizando `createServiceRoleClient/createAnonClient/createAuthedClient` y el patrón `createAuthedUser()` de `schema-rls.test.ts` (NO recrear helpers):
     - `authenticated` puede `select` candidatos activos; un `insert`/`update` de candidato por `authenticated` falla con `42501`.
     - Un usuario hace `upsert` de su predicción (`champion`) y la lee; **no** puede leer la predicción de otro usuario (0 filas) ni insertar con `user_id` ajeno (`42501`).
     - Insertar `special_predictions` con un `candidate_id` cuya `category` NO coincide ⇒ falla por la FK compuesta (violación de FK, **no** `42501`).
     - Cambiar el `candidate_id` de una predicción existente ⇒ `predicted_at` cambia a un valor posterior (trigger). _(Para observar el cambio, sembrar/crear candidatos vía `service_role`.)_
-  - [ ] (Opcional) Unit test puro en `tests/unit/` o co-localizado para una utilidad de agrupar candidatos por categoría, si extraes una.
-  - [ ] Verde de extremo a extremo: `npm run test:integration`, `npm run test:unit`, `npm run lint`, `npm run typecheck`. Idealmente `npm run test:ci` con Supabase local arriba.
+  - [x] (Opcional) Unit test puro en `tests/unit/` o co-localizado para una utilidad de agrupar candidatos por categoría, si extraes una.
+  - [x] Verde de extremo a extremo: `npm run test:integration`, `npm run test:unit`, `npm run lint`, `npm run typecheck`. Idealmente `npm run test:ci` con Supabase local arriba.
 
 ### Trigger de refresco de `predicted_at` (snippet canónico — usar tal cual, adaptando)
 
@@ -189,12 +189,55 @@ Lee esto para no romper ni duplicar lo montado: [Source: 1-2-...-google-oauth.md
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-opus-4-8 (Opus 4.8, 1M context) — bmad-dev-story workflow
 
 ### Debug Log References
+
+- `npx supabase db reset` → migraciones + seed aplicadas sin errores (idempotente).
+- `npm run test:unit` → 6 tests verdes (incl. 4 de groupCandidatesByCategory).
+- `npm run test:integration` → 17 tests verdes (8 nuevos de premios + 9 previos).
+- `npm run typecheck` y `npm run lint` → sin errores.
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
+- ✅ Esquema, RLS, trigger, seed, tipos, Server Action, UI `/awards` y tests implementados y verdes.
+- **DESVIACIÓN confirmada con el dueño del producto — predicciones POR LIGA (no globales por perfil):**
+  - `special_predictions` añade `league_id uuid not null references public.leagues(id) on delete cascade`.
+  - La clave única es `(user_id, league_id, category)` y el upsert usa `onConflict: 'user_id,league_id,category'`.
+  - La Server Action es `saveSpecialPrediction(leagueId, category, candidateId)`.
+  - La página `/awards` resuelve la liga activa (searchParam `?league=`, default = primera liga) y muestra un selector de liga cuando el usuario pertenece a varias; empty state si no pertenece a ninguna.
+  - **RLS de escritura reforzada:** además de `user_id = auth.uid()`, `insert`/`update` exigen `public.fn_user_in_league(league_id)` (helper de 1.2) para impedir pronosticar en ligas ajenas. El `select` sigue siendo solo de filas propias.
+- **predicted_at:** se mantiene el trigger `tr_touch_special_prediction` (refresca a `now()` al cambiar de candidato), opción recomendada y confirmada.
+- **Índices:** se añadió `idx_special_predictions_league_id`; se omitió `idx_special_predictions_user_id` por ser redundante (el índice de `unique(user_id, league_id, category)` ya cubre las búsquedas con prefijo `user_id`). `idx_award_candidates_category` creado.
+- **Decisiones de entorno (no afectan al código de producción):**
+  - El repo no tenía `node_modules` ni `.env.test.local`; se ejecutó `npm install` y se generó `.env.test.local` (gitignored) desde `npx supabase status -o env`.
+  - El script `db:types` invoca `supabase` (no en PATH); los tipos se regeneraron con `npx supabase gen types typescript --local` (contenido idéntico). Considerar cambiar el script a `npx supabase` en una historia futura.
+- Tests de integración cubren AC #6: (a) lectura de candidatos por authenticated y bloqueo de escritura (42501); (b) upsert propio + aislamiento entre usuarios + bloqueo de user_id ajeno (42501); (c) rechazo por FK compuesta de categoría incorrecta (23503, NO 42501); (d) refresco de `predicted_at` por el trigger.
 
 ### File List
+
+**Nuevos:**
+- `supabase/migrations/20260603015739_special_awards_schema.sql`
+- `supabase/migrations/20260603015757_special_awards_rls.sql`
+- `src/app/awards/page.tsx`
+- `src/app/actions/special-predictions.actions.ts`
+- `src/components/awards/AwardsBoard.tsx`
+- `src/components/awards/CandidatePicker.tsx`
+- `src/utils/awards.ts`
+- `tests/integration/special-predictions-rls.test.ts`
+- `tests/unit/awards.test.ts`
+- `.env.test.local` _(gitignored; credenciales del Supabase local para tests)_
+
+**Modificados:**
+- `supabase/seed.sql` _(catálogo demo de candidatos)_
+- `src/types/index.ts` _(ServerActionResult, AwardCandidate, SpecialPrediction (+Insert/Update), AwardCategory)_
+- `src/types/database.types.ts` _(regenerado: award_candidates, special_predictions)_
+- `src/app/protected/page.tsx` _(enlace de entrada a /awards)_
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` _(estado 6.1 → review)_
+
+## Change Log
+
+| Fecha | Cambio |
+| --- | --- |
+| 2026-06-02 | Story 6.1 implementada: esquema de premios especiales (por liga), RLS + trigger predicted_at, seed, ServerActionResult + Server Action de upsert, UI `/awards` con selección de un tap y selector de liga, tipos y tests (8 integración + 4 unit). Status → review. |
