@@ -16,9 +16,23 @@ async function UserDetails() {
   return JSON.stringify(data.claims, null, 2);
 }
 
-export default function ProtectedPage() {
+type ProtectedPageProps = {
+  searchParams?: Promise<{ joined?: string; league?: string }>;
+};
+
+export default async function ProtectedPage({ searchParams }: ProtectedPageProps) {
+  const params = searchParams ? await searchParams : undefined;
+  const joinedLeague = params?.joined === "1";
+
   return (
     <div className="flex-1 w-full flex flex-col gap-12">
+      {joinedLeague && (
+        <div className="w-full">
+          <div className="rounded-md border border-success bg-success/15 p-3 px-5 text-sm font-medium text-success">
+            ¡Te has unido con éxito! Ya puedes registrar tus pronósticos.
+          </div>
+        </div>
+      )}
       <div className="w-full">
         <div className="bg-accent text-sm p-3 px-5 rounded-md text-foreground flex gap-3 items-center">
           <InfoIcon size="16" strokeWidth={2} />

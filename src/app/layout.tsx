@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Inter, Outfit } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -9,12 +9,20 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Next.js and Supabase Starter Kit",
-  description: "The fastest way to build apps with Next.js and Supabase",
+  title: "PIJA Quiniela",
+  description: "La quiniela privada de tu grupo, modo campeonato.",
 };
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Championship Gold (Story 1.3): Outft para títulos, Inter para el cuerpo/UI.
+// Se exponen como variables CSS que tailwind.config mapea a font-display/font-sans.
+const outfit = Outfit({
+  variable: "--font-outfit",
+  display: "swap",
+  subsets: ["latin"],
+});
+
+const inter = Inter({
+  variable: "--font-inter",
   display: "swap",
   subsets: ["latin"],
 });
@@ -25,12 +33,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
+    <html lang="es" className="dark" suppressHydrationWarning>
+      <body
+        className={`${outfit.variable} ${inter.variable} font-sans antialiased`}
+      >
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="dark"
+          forcedTheme="dark"
           disableTransitionOnChange
         >
           {children}

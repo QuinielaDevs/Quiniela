@@ -149,6 +149,62 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fn_create_league: {
+        Args: {
+          p_invite_code: string
+          p_name: string
+          p_payment_amount?: number
+          p_payment_instructions?: string
+          p_prediction_mode: string
+          p_requires_payment?: boolean
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          id: string
+          invite_code: string
+          name: string
+          payment_amount: number | null
+          payment_instructions: string | null
+          requires_payment: boolean
+          rules: Json
+        }
+        SetofOptions: {
+          from: "*"
+          to: "leagues"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      fn_get_invite_landing: {
+        Args: { p_invite_code: string }
+        Returns: {
+          creator_avatar_url: string
+          creator_display_name: string
+          invite_code: string
+          league_name: string
+          payment_amount: number
+          payment_instructions: string
+          requires_payment: boolean
+        }[]
+      }
+      fn_join_league_by_invite: {
+        Args: { p_invite_code: string }
+        Returns: {
+          id: string
+          joined_at: string
+          league_id: string
+          payment_status: string
+          role: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "league_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
     }
     Enums: {

@@ -33,6 +33,10 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
@@ -49,9 +53,13 @@ export default {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "calc(var(--radius) + 6px)", /* ≈16px tarjetas/contenedores */
+        md: "var(--radius)", /* 10px base */
+        sm: "calc(var(--radius) - 4px)", /* ≈6px inputs/controles */
+      },
+      fontFamily: {
+        display: ["var(--font-outfit)"], /* Outfit: títulos/headers */
+        sans: ["var(--font-inter)"], /* Inter: cuerpo/labels/botones */
       },
     },
   },

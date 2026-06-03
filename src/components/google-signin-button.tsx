@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
+import { getSafeNextPath } from "@/utils/redirect";
 import { useState } from "react";
 
 /**
@@ -21,9 +22,10 @@ export function GoogleSignInButton({ next = "/protected" }: { next?: string }) {
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
+    const safeNext = getSafeNextPath(next);
 
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(
-      next,
+      safeNext,
     )}`;
 
     const { error } = await supabase.auth.signInWithOAuth({
@@ -43,6 +45,7 @@ export function GoogleSignInButton({ next = "/protected" }: { next?: string }) {
       <Button
         type="button"
         variant="outline"
+        size="xl"
         className="w-full"
         onClick={handleGoogleSignIn}
         disabled={isLoading}

@@ -13,19 +13,22 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getSafeNextPath } from "@/utils/redirect";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function LoginForm({
+  next = "/protected",
   className,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & { next?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const safeNext = getSafeNextPath(next);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,8 +42,7 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/protected");
+      router.push(safeNext);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -99,7 +101,7 @@ export function LoginForm({
                 </span>
                 <div className="absolute inset-0 top-1/2 -z-0 border-t" />
               </div>
-              <GoogleSignInButton next="/protected" />
+              <GoogleSignInButton next={safeNext} />
             </div>
             <div className="mt-4 text-center text-sm">
               Don&apos;t have an account?{" "}
