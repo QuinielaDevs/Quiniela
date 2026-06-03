@@ -1,14 +1,16 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/utils/supabase/server";
 import { LeagueCreateForm } from "@/components/leagues/LeagueCreateForm";
 
 /**
- * Panel de creación de liga (Story 1.3). Server Component: verifica sesión
- * antes de renderizar y, si no hay, redirige al login. El formulario en sí es
- * un client component. Contenedor mobile-first `max-w-md` centrado (UX-DR-1).
+ * Verifica la sesión y renderiza el formulario. Vive en un componente async
+ * separado porque `getClaims()` lee cookies (dato dinámico): con
+ * `cacheComponents` (Next 16) ese acceso debe ocurrir dentro de un <Suspense>,
+ * o el prerender estático falla con "Uncached data accessed outside <Suspense>".
  */
-export default async function NewLeaguePage() {
+async function NewLeagueContent() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
 
@@ -16,6 +18,15 @@ export default async function NewLeaguePage() {
     redirect("/auth/login");
   }
 
+  return <LeagueCreateForm />;
+}
+
+/**
+ * Panel de creación de liga (Story 1.3). Contenedor mobile-first `max-w-md`
+ * centrado (UX-DR-1). El header es estático; la parte dinámica (sesión +
+ * formulario) se aísla tras un <Suspense>.
+ */
+export default function NewLeaguePage() {
   return (
     <main className="flex min-h-screen justify-center px-4 py-6">
       <div className="w-full max-w-md">
@@ -28,7 +39,13 @@ export default async function NewLeaguePage() {
             administrador.
           </p>
         </header>
-        <LeagueCreateForm />
+        <Suspense
+          fallback={
+            <div className="h-12 animate-pulse rounded-sm bg-muted" />
+          }
+        >
+          <NewLeagueContent />
+        </Suspense>
       </div>
     </main>
   );

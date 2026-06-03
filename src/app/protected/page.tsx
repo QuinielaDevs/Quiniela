@@ -20,19 +20,28 @@ type ProtectedPageProps = {
   searchParams?: Promise<{ joined?: string; league?: string }>;
 };
 
-export default async function ProtectedPage({ searchParams }: ProtectedPageProps) {
+// `searchParams` es un dato dinámico (uncached): con `cacheComponents` (Next 16)
+// debe consumirse dentro de un <Suspense>, no en el cuerpo de la página, o el
+// prerender estático falla. Por eso el banner vive en este hijo async.
+async function JoinedBanner({ searchParams }: ProtectedPageProps) {
   const params = searchParams ? await searchParams : undefined;
-  const joinedLeague = params?.joined === "1";
+  if (params?.joined !== "1") return null;
 
   return (
+    <div className="w-full">
+      <div className="rounded-md border border-success bg-success/15 p-3 px-5 text-sm font-medium text-success">
+        ¡Te has unido con éxito! Ya puedes registrar tus pronósticos.
+      </div>
+    </div>
+  );
+}
+
+export default function ProtectedPage({ searchParams }: ProtectedPageProps) {
+  return (
     <div className="flex-1 w-full flex flex-col gap-12">
-      {joinedLeague && (
-        <div className="w-full">
-          <div className="rounded-md border border-success bg-success/15 p-3 px-5 text-sm font-medium text-success">
-            ¡Te has unido con éxito! Ya puedes registrar tus pronósticos.
-          </div>
-        </div>
-      )}
+      <Suspense fallback={null}>
+        <JoinedBanner searchParams={searchParams} />
+      </Suspense>
       <div className="w-full">
         <div className="bg-accent text-sm p-3 px-5 rounded-md text-foreground flex gap-3 items-center">
           <InfoIcon size="16" strokeWidth={2} />
