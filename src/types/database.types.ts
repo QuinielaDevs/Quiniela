@@ -120,6 +120,118 @@ export type Database = {
           },
         ]
       }
+      matches: {
+        Row: {
+          away_score: number | null
+          away_team: string
+          away_team_code: string | null
+          created_at: string
+          external_ref: string | null
+          home_score: number | null
+          home_team: string
+          home_team_code: string | null
+          id: string
+          match_time: string
+          matchday: number | null
+          stage: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          away_score?: number | null
+          away_team: string
+          away_team_code?: string | null
+          created_at?: string
+          external_ref?: string | null
+          home_score?: number | null
+          home_team: string
+          home_team_code?: string | null
+          id?: string
+          match_time: string
+          matchday?: number | null
+          stage?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          away_score?: number | null
+          away_team?: string
+          away_team_code?: string | null
+          created_at?: string
+          external_ref?: string | null
+          home_score?: number | null
+          home_team?: string
+          home_team_code?: string | null
+          id?: string
+          match_time?: string
+          matchday?: number | null
+          stage?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      predictions: {
+        Row: {
+          away_score_pred: number
+          created_at: string
+          home_score_pred: number
+          id: string
+          league_id: string
+          match_id: string
+          multiplier: number
+          points_earned: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          away_score_pred: number
+          created_at?: string
+          home_score_pred: number
+          id?: string
+          league_id: string
+          match_id: string
+          multiplier?: number
+          points_earned?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          away_score_pred?: number
+          created_at?: string
+          home_score_pred?: number
+          id?: string
+          league_id?: string
+          match_id?: string
+          multiplier?: number
+          points_earned?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "predictions_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "predictions_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "predictions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string
@@ -205,6 +317,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fn_match_unlocked: { Args: { p_match_id: string }; Returns: boolean }
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
     }
     Enums: {

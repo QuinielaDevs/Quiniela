@@ -28,6 +28,28 @@ export type LeagueMember = TableRow<"league_members">;
 export type LeagueMemberInsert = TableInsert<"league_members">;
 export type LeagueMemberUpdate = TableUpdate<"league_members">;
 
+// --- matches ---
+export type Match = TableRow<"matches">;
+export type MatchInsert = TableInsert<"matches">;
+export type MatchUpdate = TableUpdate<"matches">;
+
+// --- predictions ---
+export type Prediction = TableRow<"predictions">;
+export type PredictionInsert = TableInsert<"predictions">;
+export type PredictionUpdate = TableUpdate<"predictions">;
+
+/**
+ * Estados válidos de un partido (espeja el CHECK de `matches.status`). Los tipos
+ * generados lo tipan como `string`; mantener sincronizado con la migración
+ * matches_and_predictions.sql y con `MatchStatus` en src/utils/scoring.ts.
+ */
+export type MatchStatus =
+  | "scheduled"
+  | "live"
+  | "finished"
+  | "suspended"
+  | "canceled";
+
 /** Roles válidos de un miembro de liga (espeja el CHECK de la tabla). */
 export type LeagueRole = "admin" | "member";
 /** Estados de pago de un miembro (espeja el CHECK de la tabla). */

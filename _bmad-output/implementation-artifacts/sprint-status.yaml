@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-01T19:12:28-04:00"
-last_updated: "2026-06-03T08:00:00-04:00"
+last_updated: "2026-06-03T16:30:00-04:00"
 project: "pija-quiniela"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -48,8 +48,8 @@ development_status:
   1-3-formulario-de-creacion-y-configuracion-de-liga-admin: done
   1-4-enlaces-de-invitacion-inteligentes-y-registro-express-smart-deep-linking: done
   epic-1-retrospective: optional
-  epic-2: backlog
-  2-1-modelos-de-partidos-predicciones-y-motor-de-puntuacion-scoring: backlog
+  epic-2: in-progress
+  2-1-modelos-de-partidos-predicciones-y-motor-de-puntuacion-scoring: done
   2-2-componente-goalpicker-tactil-mobile-viewport: backlog
   2-3-auto-guardado-debounced-con-feedback-y-manejo-de-conexion-offline: backlog
   2-4-multiplicador-tactico-por-antelacion-y-bloqueo-de-kickoff: backlog
