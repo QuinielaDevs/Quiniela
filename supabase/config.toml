@@ -334,6 +334,18 @@ skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
 
+# Google OAuth (Story 1.2). Credenciales vía variables de entorno (gitignored).
+# El flujo real requiere GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET reales; en local
+# sin credenciales el proveedor queda definido pero el login devolverá error.
+# La validación automatizada del trigger se hace vía auth.admin.createUser (tests).
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
+# Requerido para sign in local con Google.
+skip_nonce_check = false
+
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
 [auth.web3.solana]

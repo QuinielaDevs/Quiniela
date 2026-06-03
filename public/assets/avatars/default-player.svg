@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Jugador anónimo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f7a4d"/>
+      <stop offset="1" stop-color="#145c39"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="64" fill="url(#bg)"/>
+  <!-- Balón de fútbol estilizado (coste cero, SVG ligero) -->
+  <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linejoin="round">
+    <circle cx="64" cy="64" r="34" fill="#ffffff"/>
+    <polygon points="64,48 78,58 73,75 55,75 50,58" fill="#0f3d26" stroke="#0f3d26"/>
+    <path d="M64 30 L64 48 M94 56 L78 58 M82 92 L73 75 M46 92 L55 75 M34 56 L50 58"/>
+  </g>
+</svg>

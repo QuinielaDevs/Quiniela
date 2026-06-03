@@ -3,6 +3,7 @@
 import { cn } from "@/utils/utils";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
+import { GoogleSignInButton } from "@/components/google-signin-button";
 import {
   Card,
   CardContent,
@@ -92,6 +93,13 @@ export function LoginForm({
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Logging in..." : "Login"}
               </Button>
+              <div className="relative text-center text-sm">
+                <span className="bg-card text-muted-foreground relative z-10 px-2">
+                  o
+                </span>
+                <div className="absolute inset-0 top-1/2 -z-0 border-t" />
+              </div>
+              <GoogleSignInButton next="/protected" />
             </div>
             <div className="mt-4 text-center text-sm">
               Don&apos;t have an account?{" "}

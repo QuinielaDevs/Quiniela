@@ -1,0 +1,8 @@
+-- Seed de desarrollo local (Story 1.2).
+-- Resuelve [db.seed] enabled=true → ./seed.sql, evitando warnings en `db reset`.
+--
+-- Intencionadamente vacío de datos por ahora: NO se siembran usuarios/perfiles
+-- (los crea el trigger desde auth.users) ni partidos (llegan en Story 2.1).
+-- Las pruebas de integración crean sus propios fixtures de forma aislada.
+--
+-- Añade aquí ligas/usuarios demo si quieres datos para desarrollo manual.
