@@ -16,3 +16,9 @@
 - `profiles.email` no se re-sincroniza: el trigger es solo `AFTER INSERT` (`...20260602041455_rls_and_triggers.sql:139`). Añadir un trigger `AFTER UPDATE OF email ON auth.users` si se requiere email fresco en `profiles`.
 - `payment_amount numeric(10,2)` sin `check (payment_amount >= 0)` ni coherencia `requires_payment=true ⇒ payment_amount not null` (`supabase/migrations/20260602041410_init_schema.sql`) — endurecer al implementar pagos en Story 1.3.
 - `LeagueRole`/`PaymentStatus` en `src/types/index.ts` duplican manualmente los CHECK de la BD — riesgo de divergencia silenciosa; considerar derivarlos o añadir un test que valide los tipos contra los CHECK.
+
+## Deferred from: code review of story-1.3 (2026-06-03)
+
+- Validación a nivel de BD ausente en `fn_create_league` (`supabase/migrations/20260603014645_add_create_league_fn.sql`): no valida `payment_amount >= 0`, ni `prediction_mode ∈ {dual,jornada,grupos}`, ni `name` no vacío. Cualquier usuario `authenticated` puede invocar el RPC directo por PostgREST y saltarse la validación zod de la Server Action. Endurecer con CHECKs/validación dentro de la función (relacionado con la deuda de `payment_amount` diferida en 1.2).
+- La guardia de sesión de `/leagues/new` (`src/app/leagues/new/page.tsx`) solo comprueba `getClaims()`; un usuario autenticado sin fila en `public.profiles` (p. ej. por fallo del trigger `fn_handle_new_user`) pasa la guardia y, al enviar, el INSERT del RPC viola la FK `created_by → profiles(id)` (Postgres 23503) mostrando un error crudo. Caso raro; mapear el error o garantizar la materialización del perfil.
+- Código de Story 1.4 mezclado en el módulo 1.3 `src/app/actions/leagues.actions.ts` (`joinLeagueByInvite`, `normalizeInviteCode`) y RPCs 1.4 en `src/types/database.types.ts`. Auditar bajo Story 1.4 la superficie `fn_get_invite_landing` concedida a `anon` (posible enumeración de ligas/datos del creador con un `invite_code` de 8 chars).
