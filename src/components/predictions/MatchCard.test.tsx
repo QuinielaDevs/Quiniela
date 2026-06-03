@@ -1,0 +1,392 @@
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { MatchCard } from "@/components/predictions/MatchCard";
+import { savePrediction } from "@/app/actions/predictions.actions";
+import {
+  MAX_PREDICTION_SCORE,
+  TRANSIENT_SAVE_ERROR,
+} from "@/app/actions/predictions.constants";
+
+vi.mock("@/app/actions/predictions.actions", () => ({
+  savePrediction: vi.fn(),
+}));
+
+const MATCH = {
+  id: "22222222-2222-4222-8222-222222222222",
+  home_team: "Argentina",
+  away_team: "Mexico",
+  home_team_code: "ARG",
+  away_team_code: "MEX",
+  match_time: "2026-06-11T20:00:00.000Z",
+  status: "scheduled",
+  stage: "group",
+  matchday: 1,
+};
+
+const LEAGUE_ID = "11111111-1111-4111-8111-111111111111";
+
+const SAVED_PREDICTION = {
+  id: "44444444-4444-4444-8444-444444444444",
+  league_id: LEAGUE_ID,
+  match_id: MATCH.id,
+  user_id: "33333333-3333-4333-8333-333333333333",
+  home_score_pred: 1,
+  away_score_pred: 0,
+  multiplier: 1,
+  points_earned: null,
+  created_at: "2026-06-03T18:00:00.000Z",
+  updated_at: "2026-06-03T18:00:00.000Z",
+};
+
+function setOnline(value: boolean) {
+  Object.defineProperty(window.navigator, "onLine", {
+    configurable: true,
+    value,
+  });
+}
+
+function renderMatchCard(
+  props: Partial<ComponentProps<typeof MatchCard>> = {},
+) {
+  return render(
+    <MatchCard
+      leagueId={LEAGUE_ID}
+      match={MATCH}
+      initialPrediction={{ homeScorePred: 0, awayScorePred: 0 }}
+      {...props}
+    />,
+  );
+}
+
+async function flushPromises() {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
+describe("MatchCard", () => {
+  beforeEach(() => {
+    cleanup();
+    vi.useFakeTimers();
+    vi.mocked(savePrediction).mockReset();
+    setOnline(true);
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("actualiza la UI inmediatamente y guarda una vez tras 500ms", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: SAVED_PREDICTION,
+      error: null,
+    });
+    renderMatchCard();
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(savePrediction).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(499);
+    });
+    expect(savePrediction).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+
+    await flushPromises();
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+    expect(savePrediction).toHaveBeenCalledWith({
+      leagueId: LEAGUE_ID,
+      matchId: MATCH.id,
+      homeScorePred: 1,
+      awayScorePred: 0,
+    });
+  });
+
+  it("no guarda automaticamente en el primer render", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: SAVED_PREDICTION,
+      error: null,
+    });
+
+    renderMatchCard();
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    await flushPromises();
+
+    expect(savePrediction).not.toHaveBeenCalled();
+  });
+
+  it("cancela el timer anterior y guarda solo el ultimo marcador", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: SAVED_PREDICTION,
+      error: null,
+    });
+    renderMatchCard();
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(499);
+    });
+
+    expect(savePrediction).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+
+    await flushPromises();
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+    expect(savePrediction).toHaveBeenCalledWith(
+      expect.objectContaining({ homeScorePred: 2, awayScorePred: 0 }),
+    );
+  });
+
+  it("guarda una prediccion nueva 0-0 si el usuario edita y vuelve al marcador inicial", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: { ...SAVED_PREDICTION, home_score_pred: 0, away_score_pred: 0 },
+      error: null,
+    });
+    renderMatchCard({ initialPrediction: null });
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    fireEvent.click(screen.getByLabelText("Disminuir goles de Argentina"));
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    await flushPromises();
+
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+    expect(savePrediction).toHaveBeenCalledWith(
+      expect.objectContaining({ homeScorePred: 0, awayScorePred: 0 }),
+    );
+  });
+
+  it("muestra Guardando y luego Guardado con check al completar", async () => {
+    let resolveSave: (value: Awaited<ReturnType<typeof savePrediction>>) => void;
+    vi.mocked(savePrediction).mockReturnValue(
+      new Promise((resolve) => {
+        resolveSave = resolve;
+      }),
+    );
+    renderMatchCard();
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.getByText("Guardando...")).toBeInTheDocument();
+    expect(screen.getByLabelText("Incrementar goles de Argentina")).toBeDisabled();
+
+    await act(async () => {
+      resolveSave!({ success: true, data: SAVED_PREDICTION, error: null });
+    });
+
+    await flushPromises();
+    expect(screen.getByText("Guardado ✓")).toBeInTheDocument();
+    expect(screen.getByLabelText("Incrementar goles de Argentina")).not.toBeDisabled();
+  });
+
+  it("marca pendiente offline y reintenta al volver online", async () => {
+    setOnline(false);
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: SAVED_PREDICTION,
+      error: null,
+    });
+    renderMatchCard();
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(savePrediction).not.toHaveBeenCalled();
+    expect(screen.getByText("Sin conexion - Pendiente")).toBeInTheDocument();
+    expect(screen.getByLabelText("Incrementar goles de Argentina")).toBeDisabled();
+
+    setOnline(true);
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await flushPromises();
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Guardado ✓")).toBeInTheDocument();
+  });
+
+  it("trata una promesa rechazada como pendiente offline", async () => {
+    vi.mocked(savePrediction).mockRejectedValueOnce(new Error("network down"));
+    renderMatchCard();
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    await flushPromises();
+
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Sin conexion - Pendiente")).toBeInTheDocument();
+  });
+
+  it("trata un fallo transitorio retornado por la accion como pendiente offline y reintenta", async () => {
+    vi.mocked(savePrediction)
+      .mockResolvedValueOnce({
+        success: false,
+        data: null,
+        error: TRANSIENT_SAVE_ERROR,
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: SAVED_PREDICTION,
+        error: null,
+      });
+    renderMatchCard();
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    await flushPromises();
+
+    expect(screen.getByText("Sin conexion - Pendiente")).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await flushPromises();
+
+    expect(savePrediction).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Guardado ✓")).toBeInTheDocument();
+  });
+
+  it("no reintenta automaticamente errores definitivos", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: false,
+      data: null,
+      error: "No pudimos guardar tu prediccion. Intenta de nuevo.",
+    });
+    renderMatchCard();
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    await flushPromises();
+    expect(
+      screen.getByText("No pudimos guardar tu prediccion. Intenta de nuevo."),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+  });
+
+  it("limpia un error definitivo cuando el usuario vuelve al ultimo valor guardado", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: false,
+      data: null,
+      error: "No pudimos guardar tu prediccion. Intenta de nuevo.",
+    });
+    renderMatchCard({ initialPrediction: { homeScorePred: 1, awayScorePred: 0 } });
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    await flushPromises();
+
+    expect(
+      screen.getByText("No pudimos guardar tu prediccion. Intenta de nuevo."),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Disminuir goles de Argentina"));
+
+    expect(
+      screen.queryByText("No pudimos guardar tu prediccion. Intenta de nuevo."),
+    ).toBeNull();
+  });
+
+  it("sincroniza el estado si cambia el partido en la misma instancia", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: SAVED_PREDICTION,
+      error: null,
+    });
+    const nextMatch = {
+      ...MATCH,
+      id: "55555555-5555-4555-8555-555555555555",
+      home_team: "Brasil",
+      away_team: "Canada",
+      home_team_code: "BRA",
+      away_team_code: "CAN",
+      matchday: 2,
+    };
+    const { rerender } = renderMatchCard({
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0 },
+    });
+
+    rerender(
+      <MatchCard
+        leagueId={LEAGUE_ID}
+        match={nextMatch}
+        initialPrediction={{ homeScorePred: 2, awayScorePred: 1 }}
+      />,
+    );
+
+    expect(screen.getByText("Brasil")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    await flushPromises();
+
+    expect(savePrediction).not.toHaveBeenCalled();
+  });
+
+  it("no permite incrementar por encima del marcador maximo compartido", () => {
+    renderMatchCard({
+      initialPrediction: {
+        homeScorePred: MAX_PREDICTION_SCORE,
+        awayScorePred: 0,
+      },
+    });
+
+    expect(screen.getByLabelText("Incrementar goles de Argentina")).toBeDisabled();
+  });
+
+  it("mantiene el contrato anti-teclado: no introduce inputs", () => {
+    renderMatchCard();
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("spinbutton")).toBeNull();
+    expect(document.querySelector("input")).toBeNull();
+  });
+});
