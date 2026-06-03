@@ -143,8 +143,26 @@ describe("resolvePhase & scoreAward", () => {
 
   it("lanza un error ruidoso si hay un hueco en la configuración", () => {
     const gapPhases = [
-      { code: "A" as const, rewardPoints: 50 as const, startsAt: null, endsAt: "2026-06-10T18:00:00Z", editsLocked: false, label: "A" },
-      { code: "B" as const, rewardPoints: 25 as const, startsAt: "2026-06-12T18:00:00Z", endsAt: null, editsLocked: false, label: "B" },
+      {
+        code: "A" as const,
+        rewardPoints: 50 as const,
+        startsAt: null,
+        endsAt: "2026-06-10T18:00:00Z",
+        editsLocked: false,
+        label: "A",
+        startsAtTime: -Infinity,
+        endsAtTime: Date.parse("2026-06-10T18:00:00Z"),
+      },
+      {
+        code: "B" as const,
+        rewardPoints: 25 as const,
+        startsAt: "2026-06-12T18:00:00Z",
+        endsAt: null,
+        editsLocked: false,
+        label: "B",
+        startsAtTime: Date.parse("2026-06-12T18:00:00Z"),
+        endsAtTime: Infinity,
+      },
     ];
     const insideGap = new Date("2026-06-11T12:00:00Z");
     expect(() => resolvePhase(insideGap, gapPhases)).toThrow("resolvePhase: no phase covers");

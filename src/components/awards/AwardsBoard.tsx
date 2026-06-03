@@ -21,6 +21,7 @@ interface AwardsBoardProps {
   candidatesByCategory: Record<AwardCategory, AwardCandidate[]>;
   initialSelections: Selections;
   isLocked?: boolean;
+  activePhaseLabel?: string;
 }
 
 /**
@@ -34,6 +35,7 @@ export function AwardsBoard({
   candidatesByCategory,
   initialSelections,
   isLocked = false,
+  activePhaseLabel = "Semifinales en adelante",
 }: AwardsBoardProps) {
   const [selections, setSelections] = useState<Selections>(initialSelections);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -75,7 +77,7 @@ export function AwardsBoard({
           <div>
             <p className="font-semibold">Predicciones bloqueadas</p>
             <p className="text-xs text-yellow-200/80">
-              Las predicciones están bloqueadas por fase del torneo (Semifinales en adelante).
+              Las predicciones están bloqueadas por fase del torneo ({activePhaseLabel}).
             </p>
           </div>
         </div>

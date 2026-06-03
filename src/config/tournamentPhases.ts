@@ -24,6 +24,8 @@ export interface TournamentPhaseConfig {
   /** Whether edits to predictions are locked during this phase (FR-16, Fase D). */
   readonly editsLocked: boolean;
   readonly label: string;
+  readonly startsAtTime: number;
+  readonly endsAtTime: number;
 }
 
 // TBD-CONFIRM placeholders — see header.
@@ -31,13 +33,28 @@ const INAUGURAL_KICKOFF = '2026-06-11T18:00:00Z';   // Fase A → B boundary
 const KNOCKOUT_START    = '2026-06-28T16:00:00Z';   // Fase B → C boundary (= first Round-of-32 kickoff)
 const SEMIFINAL_START   = '2026-07-14T18:00:00Z';   // Fase C → D boundary
 
+const parseTime = (s: string | null, def: number): number => {
+  if (s === null) return def;
+  const t = Date.parse(s);
+  if (isNaN(t)) {
+    throw new Error(`Invalid date string in configuration: "${s}"`);
+  }
+  return t;
+};
+
+const rawPhases = [
+  { code: 'A' as const, rewardPoints: 50 as const, startsAt: null,              endsAt: INAUGURAL_KICKOFF, editsLocked: false, label: 'Before inaugural match' },
+  { code: 'B' as const, rewardPoints: 25 as const, startsAt: INAUGURAL_KICKOFF, endsAt: KNOCKOUT_START,    editsLocked: false, label: 'Group stage' },
+  { code: 'C' as const, rewardPoints: 10 as const, startsAt: KNOCKOUT_START,    endsAt: SEMIFINAL_START,   editsLocked: false, label: 'Round of 32 + Round of 16 + Quarterfinals' },
+  { code: 'D' as const, rewardPoints: 0 as const,  startsAt: SEMIFINAL_START,   endsAt: null,              editsLocked: true,  label: 'Semifinals onward' },
+] as const;
+
 /**
  * Ordered, non-overlapping, gapless. resolvePhase relies on this order.
  * Boundary convention: [startsAt, endsAt) — start inclusive, end exclusive.
  */
-export const TOURNAMENT_PHASES_2026: readonly TournamentPhaseConfig[] = [
-  { code: 'A', rewardPoints: 50, startsAt: null,              endsAt: INAUGURAL_KICKOFF, editsLocked: false, label: 'Before inaugural match' },
-  { code: 'B', rewardPoints: 25, startsAt: INAUGURAL_KICKOFF, endsAt: KNOCKOUT_START,    editsLocked: false, label: 'Group stage' },
-  { code: 'C', rewardPoints: 10, startsAt: KNOCKOUT_START,    endsAt: SEMIFINAL_START,   editsLocked: false, label: 'Round of 32 + Round of 16 + Quarterfinals' },
-  { code: 'D', rewardPoints: 0,  startsAt: SEMIFINAL_START,   endsAt: null,              editsLocked: true,  label: 'Semifinals onward' },
-] as const;
+export const TOURNAMENT_PHASES_2026: readonly TournamentPhaseConfig[] = rawPhases.map((p) => ({
+  ...p,
+  startsAtTime: parseTime(p.startsAt, -Infinity),
+  endsAtTime: parseTime(p.endsAt, Infinity),
+}));

@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -311,6 +311,31 @@ export type Database = {
       }
     }
     Functions: {
+      fn_are_special_predictions_locked: { Args: never; Returns: boolean }
+      fn_get_active_tournament_phase: {
+        Args: never
+        Returns: {
+          created_at: string
+          edits_locked: boolean
+          ends_at: string | null
+          id: string
+          label: string
+          phase_code: string
+          reward_points: number
+          sort_order: number
+          starts_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "tournament_phases"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      fn_sync_tournament_phases_from_matches: {
+        Args: never
+        Returns: undefined
+      }
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
     }
     Enums: {

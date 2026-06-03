@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-01T19:12:28-04:00"
-last_updated: "2026-06-03T12:42:00-04:00"
+last_updated: "2026-06-03T14:12:00-04:00"
 project: "pija-quiniela"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -69,7 +69,7 @@ development_status:
   5-3-resolucion-y-reparto-automatizado-del-pozo-de-puntos: backlog
   5-4-compartir-de-forma-viral-por-whatsapp-y-landing-page-banter-preview: backlog
   epic-5-retrospective: optional
-  epic-6: in-progress
+  epic-6: done
   6-1-predicciones-de-premios-especiales-de-la-copa-campeon-goleador-mvp: done
   6-2-system-de-puntuacion-decreciente-y-cierre-por-semifinales: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done

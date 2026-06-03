@@ -222,6 +222,46 @@ describe("special_predictions: privadas, por usuario y por liga", () => {
     expect(error).not.toBeNull();
     expect(error?.code).toBe(RLS_VIOLATION);
   });
+
+  it("al abandonar o ser expulsado de una liga (delete de league_members), se eliminan automáticamente sus special_predictions asociadas (trigger)", async () => {
+    const user = await createAuthedUser();
+    const leagueId = await createLeagueWithMembership(user);
+    const candidateId = await createCandidate("champion", "Campeón Test Limpieza");
+    const client = createAuthedClient(user.token);
+
+    // 1. Insertamos la predicción
+    const { error: insErr } = await client.from("special_predictions").insert({
+      user_id: user.id,
+      league_id: leagueId,
+      category: "champion",
+      candidate_id: candidateId,
+    });
+    expect(insErr).toBeNull();
+
+    // Confirmamos que existe
+    const { data: beforeDel } = await admin
+      .from("special_predictions")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("league_id", leagueId);
+    expect(beforeDel).toHaveLength(1);
+
+    // 2. Eliminamos al miembro de la liga (simula abandono o expulsión)
+    const { error: delErr } = await admin
+      .from("league_members")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("league_id", leagueId);
+    expect(delErr).toBeNull();
+
+    // 3. Confirmamos que la predicción fue eliminada en cascada por el trigger
+    const { data: afterDel } = await admin
+      .from("special_predictions")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("league_id", leagueId);
+    expect(afterDel).toHaveLength(0);
+  });
 });
 
 describe("integridad de categoría (FK compuesta) y trigger de predicted_at", () => {
@@ -316,6 +356,51 @@ describe("bloqueo de predicciones por fase de torneo (trigger)", () => {
       expect(insertErr).not.toBeNull();
       expect(insertErr?.code).toBe("P0001");
       expect(insertErr?.message).toContain("bloqueadas");
+    } finally {
+      // 4. Restauramos los bloqueos a su estado original (solo Fase D está bloqueada)
+      await admin
+        .from("tournament_phases")
+        .update({ edits_locked: false })
+        .neq("phase_code", "D");
+      await admin
+        .from("tournament_phases")
+        .update({ edits_locked: true })
+        .eq("phase_code", "D");
+    }
+  });
+
+  it("permite eliminaciones (DELETE) incluso si edits_locked = true", async () => {
+    const user = await createAuthedUser();
+    const leagueId = await createLeagueWithMembership(user);
+    const candidateId = await createCandidate("champion", "Candidato a Borrar");
+    const client = createAuthedClient(user.token);
+
+    // 1. Insertamos primero en estado desbloqueado
+    const { error: insErr } = await client.from("special_predictions").insert({
+      user_id: user.id,
+      league_id: leagueId,
+      category: "champion",
+      candidate_id: candidateId,
+    });
+    expect(insErr).toBeNull();
+
+    // 2. Bloqueamos todas las fases de manera temporal
+    const { error: lockErr } = await admin
+      .from("tournament_phases")
+      .update({ edits_locked: true })
+      .neq("phase_code", "");
+    expect(lockErr).toBeNull();
+
+    try {
+      // 3. Intentamos eliminar como admin (service role) para no fallar por RLS de delete
+      const { error: delErr } = await admin
+        .from("special_predictions")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("league_id", leagueId)
+        .eq("category", "champion");
+
+      expect(delErr).toBeNull();
     } finally {
       // 4. Restauramos los bloqueos a su estado original (solo Fase D está bloqueada)
       await admin
