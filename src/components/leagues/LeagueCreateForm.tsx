@@ -61,7 +61,7 @@ export function LeagueCreateForm() {
 
       // Éxito (AC #6): redirección directa. isPending mantiene el botón en
       // estado "Creando…" hasta que la navegación toma el control.
-      router.push("/protected");
+      router.push("/predictions");
     });
   }
 

@@ -116,7 +116,7 @@ describe("/join/[invite_code]", () => {
       JoinPageContent({
         params: Promise.resolve({ invite_code: "abcdn234" }),
       }),
-    ).rejects.toThrow("NEXT_REDIRECT:/protected?joined=1&league=league-1");
+    ).rejects.toThrow("NEXT_REDIRECT:/predictions?joined=1&league=league-1");
 
     expect(rpc).toHaveBeenCalledWith("fn_join_league_by_invite", {
       p_invite_code: "ABCDN234",

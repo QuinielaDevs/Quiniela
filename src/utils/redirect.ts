@@ -1,4 +1,4 @@
-const DEFAULT_AUTH_REDIRECT = "/protected";
+const DEFAULT_AUTH_REDIRECT = "/predictions";
 const LOCAL_ORIGIN = "https://local.pija";
 
 export function getSafeNextPath(

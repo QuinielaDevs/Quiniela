@@ -127,7 +127,7 @@ export async function JoinPageContent({ params }: JoinPageProps) {
     );
 
     if (!error && membership?.league_id) {
-      redirect(`/protected?joined=1&league=${membership.league_id}`);
+      redirect(`/predictions?joined=1&league=${membership.league_id}`);
     }
 
     joinError = getJoinLeagueErrorMessage(error);

@@ -15,7 +15,7 @@ async function HomeEntry() {
   const { data } = await supabase.auth.getClaims();
 
   if (data?.claims) {
-    redirect("/protected");
+    redirect("/predictions");
   }
 
   return <LoginForm next="/protected" />;

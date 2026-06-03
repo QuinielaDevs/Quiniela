@@ -61,7 +61,7 @@ export function JoinLeagueCard({
         return;
       }
 
-      router.push(`/protected?joined=1&league=${result.data.league_id}`);
+      router.push(`/predictions?joined=1&league=${result.data.league_id}`);
     });
   };
 

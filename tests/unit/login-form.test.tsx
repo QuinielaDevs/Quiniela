@@ -55,8 +55,8 @@ describe("LoginForm", () => {
     await userEvent.click(screen.getByRole("button", { name: "Login" }));
 
     await waitFor(() => {
-      expect(push).toHaveBeenCalledWith("/protected");
+      expect(push).toHaveBeenCalledWith("/predictions");
     });
-    expect(screen.getByText("Google next: /protected")).toBeInTheDocument();
+    expect(screen.getByText("Google next: /predictions")).toBeInTheDocument();
   });
 });
