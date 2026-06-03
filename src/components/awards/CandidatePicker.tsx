@@ -24,7 +24,11 @@ export function CandidatePicker({
   disabled,
   onSelect,
 }: CandidatePickerProps) {
-  if (candidates.length === 0) {
+  const visibleCandidates = candidates.filter(
+    (c) => c.is_active || c.id === selectedId,
+  );
+
+  if (visibleCandidates.length === 0) {
     return (
       <p className="px-1 py-3 text-sm text-white/60">
         Aún no hay favoritos disponibles.
@@ -34,7 +38,7 @@ export function CandidatePicker({
 
   return (
     <ul className="flex flex-col gap-2">
-      {candidates.map((candidate) => {
+      {visibleCandidates.map((candidate) => {
         const isSelected = candidate.id === selectedId;
         const isPending = candidate.id === pendingId;
 
@@ -49,11 +53,11 @@ export function CandidatePicker({
                 candidate.team_name ? ` (${candidate.team_name})` : ""
               }`}
               className={cn(
-                "flex min-h-[48px] w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
+                "flex min-h-[48px] w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all duration-300",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9C46A]",
                 "disabled:cursor-not-allowed disabled:opacity-60",
                 isSelected
-                  ? "border-[#E9C46A] bg-[#E9C46A]/10"
+                  ? "border-[#E9C46A] bg-[#E9C46A]/10 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
                   : "border-white/10 bg-[#1B263B] hover:border-white/30",
               )}
             >
@@ -67,8 +71,13 @@ export function CandidatePicker({
               ) : null}
 
               <span className="flex min-w-0 flex-col">
-                <span className="truncate font-medium text-white">
+                <span className="truncate font-medium text-white flex items-center gap-1.5">
                   {candidate.name}
+                  {!candidate.is_active && (
+                    <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wider text-red-400">
+                      No disponible
+                    </span>
+                  )}
                 </span>
                 {candidate.team_name ? (
                   <span className="truncate text-xs text-white/60">

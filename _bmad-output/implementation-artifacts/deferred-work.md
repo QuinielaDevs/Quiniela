@@ -16,3 +16,8 @@
 - `profiles.email` no se re-sincroniza: el trigger es solo `AFTER INSERT` (`...20260602041455_rls_and_triggers.sql:139`). Añadir un trigger `AFTER UPDATE OF email ON auth.users` si se requiere email fresco en `profiles`.
 - `payment_amount numeric(10,2)` sin `check (payment_amount >= 0)` ni coherencia `requires_payment=true ⇒ payment_amount not null` (`supabase/migrations/20260602041410_init_schema.sql`) — endurecer al implementar pagos en Story 1.3.
 - `LeagueRole`/`PaymentStatus` en `src/types/index.ts` duplican manualmente los CHECK de la BD — riesgo de divergencia silenciosa; considerar derivarlos o añadir un test que valide los tipos contra los CHECK.
+
+## Deferred from: code review of 6-1-predicciones-de-premios-especiales-de-la-copa-campeon-goleador-mvp (2026-06-03)
+
+- Fuga de datos de predicciones tras abandonar una liga (`supabase/migrations/20260603015757_special_awards_rls.sql:1439-1460`) — No existe limpieza automática ni restricción en RLS que evite que un usuario lea sus predicciones de una liga de la que ya no forma parte.
+- Parseo repetitivo e ineficiente de fechas en `resolvePhase` (`src/utils/awardsScoring.ts:454-467`) — `TOURNAMENT_PHASES_2026` parsea cadenas de fecha dinámicamente en el bucle de clasificación de fase en cada invocación, lo cual es ineficiente al ser valores constantes.

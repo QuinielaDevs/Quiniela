@@ -4,7 +4,7 @@ baseline_commit: ed6ff77
 
 # Story 6.1: Predicciones de Premios Especiales de la Copa (Campeón, Goleador, MVP)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -98,6 +98,18 @@ so that **aspirar a puntos masivos al final del torneo de forma ágil desde el m
     - Cambiar el `candidate_id` de una predicción existente ⇒ `predicted_at` cambia a un valor posterior (trigger). _(Para observar el cambio, sembrar/crear candidatos vía `service_role`.)_
   - [x] (Opcional) Unit test puro en `tests/unit/` o co-localizado para una utilidad de agrupar candidatos por categoría, si extraes una.
   - [x] Verde de extremo a extremo: `npm run test:integration`, `npm run test:unit`, `npm run lint`, `npm run typecheck`. Idealmente `npm run test:ci` con Supabase local arriba.
+
+### Review Findings
+
+- [x] [Review][Decision] Contradicción en el borrado físico de candidatos — El criterio de aceptación 1 define que ambas tablas deben usar `on delete cascade`, pero la migración implementa `on delete restrict` sobre la FK compuesta del candidato en `special_predictions` para evitar dejar apuestas huérfanas. (Decisión: Mantener ON DELETE RESTRICT por integridad de negocio)
+- [x] [Review][Patch] Vulnerabilidad de alteración/suplantación de `predicted_at` [supabase/migrations/20260603015739_special_awards_schema.sql] (Resuelto)
+- [x] [Review][Patch] Riesgo de error Postgres en trigger por registro `OLD` no definido en INSERT [supabase/migrations/20260603015757_special_awards_rls.sql] (Resuelto)
+- [x] [Review][Patch] Caída de UI y RLS restrictivo con candidatos inactivos [supabase/migrations/20260603015757_special_awards_rls.sql] (Resuelto)
+- [x] [Review][Patch] Falta de efecto visual de "destello" (glow/flash) en el feedback de éxito de la UI [src/components/awards/CandidatePicker.tsx] (Resuelto)
+- [x] [Review][Patch] Caída potencial por `RangeError` al registrar fecha inválida en `resolvePhase` [src/utils/awardsScoring.ts] (Resuelto)
+- [x] [Review][Patch] Falta de validación y sanitización en la Server Action `saveSpecialPrediction` [src/app/actions/special-predictions.actions.ts] (Resuelto)
+- [x] [Review][Defer] Fuga de datos de predicciones tras abandonar una liga [supabase/migrations/20260603015757_special_awards_rls.sql:1439-1460] — deferred, pre-existing
+- [x] [Review][Defer] Parseo repetitivo e ineficiente de fechas en `resolvePhase` [src/utils/awardsScoring.ts:454-467] — deferred, pre-existing
 
 ### Trigger de refresco de `predicted_at` (snippet canónico — usar tal cual, adaptando)
 

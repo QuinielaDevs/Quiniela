@@ -201,6 +201,9 @@ export function resolvePhase(
   phases: readonly TournamentPhaseConfig[] = TOURNAMENT_PHASES_2026,
 ): ResolvedPhase {
   const t = at.getTime();
+  if (isNaN(t)) {
+    throw new Error("resolvePhase: invalid date passed");
+  }
   for (const p of phases) {
     const lo = p.startsAt === null ? -Infinity : Date.parse(p.startsAt);
     const hi = p.endsAt   === null ?  Infinity : Date.parse(p.endsAt);
@@ -274,7 +277,7 @@ describe('contract: tournament_phases ↔ config', () => {
       .select('phase_code, reward_points, starts_at, ends_at, edits_locked')
       .order('sort_order', { ascending: true });
     expect(error).toBeNull();
-    const norm = (s: string | null) => (s === null ? null : new Date(s).toISOString());
+    const norm = (s: string | null) => (s === null || isNaN(Date.parse(s)) ? null : new Date(s).toISOString());
     const rows = (data ?? []).map((r) => ({
       code: r.phase_code, rewardPoints: r.reward_points,
       startsAt: norm(r.starts_at), endsAt: norm(r.ends_at), editsLocked: r.edits_locked,

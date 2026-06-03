@@ -113,7 +113,6 @@ async function AwardsForLeague({
     supabase
       .from("award_candidates")
       .select("*")
-      .eq("is_active", true)
       .order("category", { ascending: true })
       .order("display_order", { ascending: true }),
     supabase

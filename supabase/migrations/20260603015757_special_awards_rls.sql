@@ -17,10 +17,10 @@ alter table public.special_predictions enable row level security;
 --    * SIN insert/update/delete → deny-by-default: el catálogo lo gestiona
 --      service_role/seed, nunca el cliente (anon ni authenticated).
 -- ============================================================
-create policy "award_candidates_select_active_authenticated"
+create policy "award_candidates_select_authenticated"
   on public.award_candidates for select
   to authenticated
-  using (is_active = true);
+  using (true);
 
 -- ============================================================
 -- 3) Políticas de special_predictions (privadas por usuario y por liga).
@@ -66,16 +66,23 @@ security definer
 set search_path = ''
 as $$
 begin
-  if new.candidate_id is distinct from old.candidate_id then
+  if TG_OP = 'INSERT' then
     new.predicted_at = now();
+  elseif TG_OP = 'UPDATE' then
+    if new.candidate_id is distinct from old.candidate_id then
+      new.predicted_at = now();
+    else
+      -- Si el candidato no cambia, no permitimos al cliente manipular la fecha
+      new.predicted_at = old.predicted_at;
+    end if;
   end if;
   return new;
 end;
 $$;
 
 comment on function public.fn_touch_special_prediction() is
-  'Refresca special_predictions.predicted_at a now() cuando cambia el candidato. Base del cálculo de fase de Story 6.2.';
+  'Refresca o fuerza special_predictions.predicted_at a now() en inserts o cambios de candidato, impidiendo manipulación del cliente. Base del cálculo de fase de Story 6.2.';
 
 create trigger tr_touch_special_prediction
-  before update on public.special_predictions
+  before insert or update on public.special_predictions
   for each row execute function public.fn_touch_special_prediction();

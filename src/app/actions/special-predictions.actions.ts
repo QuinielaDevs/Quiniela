@@ -26,6 +26,17 @@ export async function saveSpecialPrediction(
   category: AwardCategory,
   candidateId: string,
 ): Promise<ServerActionResult<SpecialPrediction>> {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(leagueId)) {
+    return { success: false, data: null, error: "ID de liga inválido" };
+  }
+  if (!uuidRegex.test(candidateId)) {
+    return { success: false, data: null, error: "ID de candidato inválido" };
+  }
+  if (category !== "champion" && category !== "top_scorer" && category !== "mvp") {
+    return { success: false, data: null, error: "Categoría de premio inválida" };
+  }
+
   try {
     const supabase = await createClient();
 
