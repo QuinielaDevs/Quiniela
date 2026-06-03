@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { resolvePhase } from "@/utils/awardsScoring";
 import { createClient } from "@/utils/supabase/server";
 import type {
   AwardCategory,
@@ -35,6 +36,21 @@ export async function saveSpecialPrediction(
   }
   if (category !== "champion" && category !== "top_scorer" && category !== "mvp") {
     return { success: false, data: null, error: "Categoría de premio inválida" };
+  }
+
+  // Comprobación de tiempo en el servidor: si editsLocked = true, rechazar
+  try {
+    const currentPhase = resolvePhase(new Date());
+    if (currentPhase.editsLocked) {
+      return {
+        success: false,
+        data: null,
+        error: "Las predicciones de premios especiales están bloqueadas en esta fase del torneo.",
+      };
+    }
+  } catch (phaseErr) {
+    const phaseMsg = phaseErr instanceof Error ? phaseErr.message : "Error al validar la fase del torneo";
+    return { success: false, data: null, error: phaseMsg };
   }
 
   try {

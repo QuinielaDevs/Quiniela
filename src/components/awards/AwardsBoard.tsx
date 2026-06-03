@@ -20,6 +20,7 @@ interface AwardsBoardProps {
   leagueId: string;
   candidatesByCategory: Record<AwardCategory, AwardCandidate[]>;
   initialSelections: Selections;
+  isLocked?: boolean;
 }
 
 /**
@@ -32,6 +33,7 @@ export function AwardsBoard({
   leagueId,
   candidatesByCategory,
   initialSelections,
+  isLocked = false,
 }: AwardsBoardProps) {
   const [selections, setSelections] = useState<Selections>(initialSelections);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -39,6 +41,7 @@ export function AwardsBoard({
   const [isPending, startTransition] = useTransition();
 
   function handleSelect(category: AwardCategory, candidateId: string) {
+    if (isLocked) return;
     // Tap sobre el ya seleccionado: no-op (evita un upsert sin cambios).
     if (selections[category] === candidateId) return;
 
@@ -66,6 +69,18 @@ export function AwardsBoard({
 
   return (
     <div className="flex flex-col gap-5">
+      {isLocked && (
+        <div className="flex items-center gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+          <span className="text-xl" aria-hidden="true">🔒</span>
+          <div>
+            <p className="font-semibold">Predicciones bloqueadas</p>
+            <p className="text-xs text-yellow-200/80">
+              Las predicciones están bloqueadas por fase del torneo (Semifinales en adelante).
+            </p>
+          </div>
+        </div>
+      )}
+
       {error ? (
         <p
           role="alert"
@@ -86,7 +101,7 @@ export function AwardsBoard({
               candidates={candidatesByCategory[category]}
               selectedId={selections[category]}
               pendingId={isPending ? pendingId : null}
-              disabled={isPending}
+              disabled={isPending || isLocked}
               onSelect={(candidateId) => handleSelect(category, candidateId)}
             />
           </CardContent>

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createAnonClient,
   createAuthedClient,
@@ -274,5 +274,58 @@ describe("integridad de categoría (FK compuesta) y trigger de predicted_at", ()
     const after = new Date(updated!.predicted_at).getTime();
 
     expect(after).toBeGreaterThan(before);
+  });
+});
+
+describe("bloqueo de predicciones por fase de torneo (trigger)", () => {
+  beforeAll(async () => {
+    // Aseguramos estado inicial limpio en caso de aborto previo
+    await admin
+      .from("tournament_phases")
+      .update({ edits_locked: false })
+      .neq("phase_code", "D");
+    await admin
+      .from("tournament_phases")
+      .update({ edits_locked: true })
+      .eq("phase_code", "D");
+  });
+
+  it("bloquea inserciones y actualizaciones si la fase actual tiene edits_locked = true", async () => {
+    const user = await createAuthedUser();
+    const leagueId = await createLeagueWithMembership(user);
+    const candidateId = await createCandidate("champion", "Candidato de Bloqueo");
+    const client = createAuthedClient(user.token);
+
+    // 1. Bloqueamos todas las fases de manera temporal
+    const { error: lockErr } = await admin
+      .from("tournament_phases")
+      .update({ edits_locked: true })
+      .neq("phase_code", "");
+    expect(lockErr).toBeNull();
+
+    try {
+      // 2. Intentamos insertar
+      const { error: insertErr } = await client.from("special_predictions").insert({
+        user_id: user.id,
+        league_id: leagueId,
+        category: "champion",
+        candidate_id: candidateId,
+      });
+
+      // 3. Debe fallar por el trigger
+      expect(insertErr).not.toBeNull();
+      expect(insertErr?.code).toBe("P0001");
+      expect(insertErr?.message).toContain("bloqueadas");
+    } finally {
+      // 4. Restauramos los bloqueos a su estado original (solo Fase D está bloqueada)
+      await admin
+        .from("tournament_phases")
+        .update({ edits_locked: false })
+        .neq("phase_code", "D");
+      await admin
+        .from("tournament_phases")
+        .update({ edits_locked: true })
+        .eq("phase_code", "D");
+    }
   });
 });

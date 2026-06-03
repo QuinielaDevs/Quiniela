@@ -4,6 +4,7 @@ import { Outfit } from "next/font/google";
 
 import { createClient } from "@/utils/supabase/server";
 import { groupCandidatesByCategory } from "@/utils/awards";
+import { resolvePhase } from "@/utils/awardsScoring";
 import { cn } from "@/utils/utils";
 import type {
   AwardCandidate,
@@ -138,6 +139,15 @@ async function AwardsForLeague({
     initialSelections[p.category as AwardCategory] = p.candidate_id;
   }
 
+  let isLocked = false;
+  try {
+    const currentPhase = resolvePhase(new Date());
+    isLocked = currentPhase.editsLocked;
+  } catch (err) {
+    console.error("Error resolving tournament phase on server:", err);
+    isLocked = true; // Fail closed for security
+  }
+
   return (
     <>
       {leagues.length > 1 ? (
@@ -175,6 +185,7 @@ async function AwardsForLeague({
         leagueId={activeLeague.id}
         candidatesByCategory={candidatesByCategory}
         initialSelections={initialSelections}
+        isLocked={isLocked}
       />
     </>
   );

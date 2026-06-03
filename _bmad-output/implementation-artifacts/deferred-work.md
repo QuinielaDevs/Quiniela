@@ -21,3 +21,11 @@
 
 - Fuga de datos de predicciones tras abandonar una liga (`supabase/migrations/20260603015757_special_awards_rls.sql:1439-1460`) — No existe limpieza automática ni restricción en RLS que evite que un usuario lea sus predicciones de una liga de la que ya no forma parte.
 - Parseo repetitivo e ineficiente de fechas en `resolvePhase` (`src/utils/awardsScoring.ts:454-467`) — `TOURNAMENT_PHASES_2026` parsea cadenas de fecha dinámicamente en el bucle de clasificación de fase en cada invocación, lo cual es ineficiente al ser valores constantes.
+
+## Deferred from: code review of 6-2-system-de-puntuacion-decreciente-y-cierre-por-semifinales (2026-06-03)
+
+- Double Source of Truth for Phase Configuration (`src/config/tournamentPhases.ts:1`) — The server action and UI check hardcoded TypeScript dates instead of querying the `tournament_phases` table from the database.
+- Inconsistent Time Resolution between Node.js and PostgreSQL (`src/app/actions/special-predictions.actions.ts:41`) — Node's `new Date()` vs. database `now()` can cause edge-case inconsistencies due to server clock drift.
+- View Silently Drops Predictions on Candidate Deletion/Deactivation (`supabase/migrations/20260603155843_tournament_phases_schema.sql:460`) — The inner join on `award_candidates` silently excludes predictions for deleted/inactive candidates instead of showing them as orphaned.
+- Hardcoded Lock Message in `AwardsBoard` (`src/components/awards/AwardsBoard.tsx:127`) — The UI locks predictions with a hardcoded warning message stating "Semifinales en adelante", which will become misleading if the locking logic changes.
+

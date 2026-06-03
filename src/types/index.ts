@@ -61,3 +61,12 @@ export type ServerActionResult<T> = {
   data: T | null;
   error: string | null;
 };
+
+// Re-export AwardPhase from the canonical config so there is ONE definition.
+export type { AwardPhase } from "@/config/tournamentPhases";
+
+// DB row/insert/update types for tournament_phases.
+export type TournamentPhase = TableRow<"tournament_phases">;
+export type TournamentPhaseInsert = TableInsert<"tournament_phases">;
+export type TournamentPhaseUpdate = TableUpdate<"tournament_phases">;
+

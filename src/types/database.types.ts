@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -43,6 +43,7 @@ export type Database = {
           id: string
           image_url: string | null
           is_active: boolean
+          is_winner: boolean
           name: string
           team_name: string | null
         }
@@ -54,6 +55,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean
+          is_winner?: boolean
           name: string
           team_name?: string | null
         }
@@ -65,6 +67,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_active?: boolean
+          is_winner?: boolean
           name?: string
           team_name?: string | null
         }
@@ -232,9 +235,80 @@ export type Database = {
           },
         ]
       }
+      tournament_phases: {
+        Row: {
+          created_at: string
+          edits_locked: boolean
+          ends_at: string | null
+          id: string
+          label: string
+          phase_code: string
+          reward_points: number
+          sort_order: number
+          starts_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          edits_locked?: boolean
+          ends_at?: string | null
+          id?: string
+          label: string
+          phase_code: string
+          reward_points: number
+          sort_order: number
+          starts_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          edits_locked?: boolean
+          ends_at?: string | null
+          id?: string
+          label?: string
+          phase_code?: string
+          reward_points?: number
+          sort_order?: number
+          starts_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      special_predictions_with_points: {
+        Row: {
+          candidate_id: string | null
+          category: string | null
+          created_at: string | null
+          id: string | null
+          is_correct: boolean | null
+          league_id: string | null
+          points: number | null
+          predicted_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_predictions_candidate_id_category_fkey"
+            columns: ["candidate_id", "category"]
+            isOneToOne: false
+            referencedRelation: "award_candidates"
+            referencedColumns: ["id", "category"]
+          },
+          {
+            foreignKeyName: "special_predictions_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_predictions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
@@ -373,3 +447,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
