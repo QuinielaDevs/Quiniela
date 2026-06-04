@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useTransition } from "react";
 import { Plus, Trophy, Coins, Calendar, User, UserPlus, ShieldAlert, History } from "lucide-react";
 import { CreateDuelDialog } from "./CreateDuelDialog";
+import { AcceptDuelDialog } from "./AcceptDuelDialog";
+import { rejectChallenge, cancelChallenge } from "@/app/actions/duels.actions";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/utils/utils";
@@ -65,6 +67,10 @@ export function DuelsDashboard({
   const [historyChallenges, setHistoryChallenges] = useState<Challenge[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
+  const [isAcceptOpen, setIsAcceptOpen] = useState(false);
+  const [isActionPending, startActionTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Sincronizar retos iniciales si cambian en el server
   useEffect(() => {
@@ -113,6 +119,39 @@ export function DuelsDashboard({
   const handleCreateSuccess = () => {
     // Forzamos actualización de datos del servidor (saldo, retos activos, etc.)
     router.refresh();
+  };
+
+  const handleOpenAccept = (challenge: Challenge) => {
+    setSelectedChallenge(challenge);
+    setIsAcceptOpen(true);
+  };
+
+  const handleAcceptSuccess = () => {
+    router.refresh();
+  };
+
+  const handleReject = (challengeId: string) => {
+    setActionError(null);
+    startActionTransition(async () => {
+      const result = await rejectChallenge({ challengeId });
+      if (result.success) {
+        router.refresh();
+      } else {
+        setActionError(result.error ?? "No se pudo rechazar el desafío.");
+      }
+    });
+  };
+
+  const handleCancel = (challengeId: string) => {
+    setActionError(null);
+    startActionTransition(async () => {
+      const result = await cancelChallenge({ challengeId });
+      if (result.success) {
+        router.refresh();
+      } else {
+        setActionError(result.error ?? "No se pudo cancelar el desafío.");
+      }
+    });
   };
 
   // Creación de diccionario de nombres de miembros para mapeo rápido
@@ -254,6 +293,54 @@ export function DuelsDashboard({
             </span>
           </div>
         </div>
+
+        {/* Acciones del Desafío */}
+        {challenge.status === "pending" && (
+          <div className="flex gap-2 mt-1">
+            {challenge.type === "direct" && challenge.challenged_id === currentUserId && (
+              <>
+                <Button
+                  onClick={() => handleOpenAccept(challenge)}
+                  disabled={isActionPending}
+                  size="sm"
+                  className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 font-bold"
+                >
+                  Aceptar
+                </Button>
+                <Button
+                  onClick={() => handleReject(challenge.id)}
+                  disabled={isActionPending}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 border-border text-destructive hover:bg-destructive/10"
+                >
+                  Rechazar
+                </Button>
+              </>
+            )}
+            {challenge.type === "open" && challenge.creator_id !== currentUserId && (
+              <Button
+                onClick={() => handleOpenAccept(challenge)}
+                disabled={isActionPending}
+                size="sm"
+                className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold"
+              >
+                Unirse al Pozo
+              </Button>
+            )}
+            {challenge.creator_id === currentUserId && (
+              <Button
+                onClick={() => handleCancel(challenge.id)}
+                disabled={isActionPending}
+                variant="outline"
+                size="sm"
+                className="w-full border-border text-destructive hover:bg-destructive/10 font-bold"
+              >
+                Cancelar
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -285,6 +372,12 @@ export function DuelsDashboard({
           Crear Desafío
         </Button>
       </div>
+
+      {actionError && (
+        <div className="text-sm font-semibold text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+          {actionError}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-border">
@@ -412,6 +505,18 @@ export function DuelsDashboard({
         matches={matches}
         members={members}
         onSuccess={handleCreateSuccess}
+      />
+
+      {/* Modal de Aceptación */}
+      <AcceptDuelDialog
+        isOpen={isAcceptOpen}
+        onClose={() => {
+          setIsAcceptOpen(false);
+          setSelectedChallenge(null);
+        }}
+        challenge={selectedChallenge}
+        wagerBalance={wagerBalance}
+        onSuccess={handleAcceptSuccess}
       />
     </div>
   );

@@ -33,3 +33,27 @@ export const createChallengeSchema = z.object({
 
 export type CreateChallengeInput = z.input<typeof createChallengeSchema>;
 export type CreateChallengeParsed = z.output<typeof createChallengeSchema>;
+
+export const acceptChallengeSchema = z.object({
+  challengeId: z.string().uuid("Desafío inválido."),
+  predictionHome: z
+    .number()
+    .int("El marcador local debe ser un entero.")
+    .nonnegative("El marcador local no puede ser negativo.")
+    .max(99, "El marcador local es demasiado alto."),
+  predictionAway: z
+    .number()
+    .int("El marcador visitante debe ser un entero.")
+    .nonnegative("El marcador visitante no puede ser negativo.")
+    .max(99, "El marcador visitante es demasiado alto."),
+});
+
+export type AcceptChallengeInput = z.input<typeof acceptChallengeSchema>;
+export type AcceptChallengeParsed = z.output<typeof acceptChallengeSchema>;
+
+export const challengeIdSchema = z.object({
+  challengeId: z.string().uuid("Desafío inválido."),
+});
+
+export type ChallengeIdInput = z.input<typeof challengeIdSchema>;
+export type ChallengeIdParsed = z.output<typeof challengeIdSchema>;
