@@ -20,7 +20,7 @@ type NavItem = {
 const ITEMS: NavItem[] = [
   { href: "/predictions", label: "Pronósticos", icon: ClipboardList, enabled: true },
   { href: "/standings", label: "Posiciones", icon: Trophy, enabled: true },
-  { href: "/duels", label: "Duelos", icon: Swords, enabled: false },
+  { href: "/duels", label: "Duelos", icon: Swords, enabled: true },
   { href: "/account", label: "Mi Cuenta", icon: User, enabled: false },
 ];
 

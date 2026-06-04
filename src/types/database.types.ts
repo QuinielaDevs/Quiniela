@@ -34,6 +34,113 @@ export type Database = {
   }
   public: {
     Tables: {
+      challenge_participants: {
+        Row: {
+          challenge_id: string
+          joined_at: string
+          prediction_away: number
+          prediction_home: number
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          joined_at?: string
+          prediction_away: number
+          prediction_home: number
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          joined_at?: string
+          prediction_away?: number
+          prediction_home?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_participants_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenges: {
+        Row: {
+          challenged_id: string | null
+          created_at: string
+          creator_id: string
+          id: string
+          league_id: string
+          match_id: string
+          points_bet: number
+          status: string
+          type: string
+          winner_ids: string[] | null
+        }
+        Insert: {
+          challenged_id?: string | null
+          created_at?: string
+          creator_id: string
+          id?: string
+          league_id: string
+          match_id: string
+          points_bet: number
+          status?: string
+          type: string
+          winner_ids?: string[] | null
+        }
+        Update: {
+          challenged_id?: string | null
+          created_at?: string
+          creator_id?: string
+          id?: string
+          league_id?: string
+          match_id?: string
+          points_bet?: number
+          status?: string
+          type?: string
+          winner_ids?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenges_challenged_id_fkey"
+            columns: ["challenged_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       league_members: {
         Row: {
           id: string
@@ -42,6 +149,7 @@ export type Database = {
           payment_status: string
           role: string
           user_id: string
+          wager_balance: number
         }
         Insert: {
           id?: string
@@ -50,6 +158,7 @@ export type Database = {
           payment_status?: string
           role?: string
           user_id: string
+          wager_balance?: number
         }
         Update: {
           id?: string
@@ -58,6 +167,7 @@ export type Database = {
           payment_status?: string
           role?: string
           user_id?: string
+          wager_balance?: number
         }
         Relationships: [
           {
@@ -171,6 +281,51 @@ export type Database = {
         }
         Relationships: []
       }
+      point_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          league_id: string
+          reference_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description: string
+          id?: string
+          league_id: string
+          reference_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          league_id?: string
+          reference_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_transactions_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       predictions: {
         Row: {
           away_score_pred: number
@@ -261,6 +416,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_challenge: {
+        Args: {
+          p_challenged_id?: string
+          p_league_id: string
+          p_match_id: string
+          p_points_bet: number
+          p_prediction_away?: number
+          p_prediction_home?: number
+          p_type: string
+        }
+        Returns: string
+      }
       fn_create_league: {
         Args: {
           p_invite_code: string
@@ -309,6 +476,7 @@ export type Database = {
           payment_status: string
           role: string
           user_id: string
+          wager_balance: number
         }
         SetofOptions: {
           from: "*"
@@ -350,6 +518,16 @@ export type Database = {
         }
       }
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
+      score_prediction: {
+        Args: {
+          p_away_pred: number
+          p_away_score: number
+          p_home_pred: number
+          p_home_score: number
+          p_multiplier: number
+        }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
