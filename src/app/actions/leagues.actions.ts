@@ -1,13 +1,26 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { createClient } from "@/utils/supabase/server";
 import { generateInviteCode, INVITE_CODE_ALPHABET } from "@/utils/invite-code";
 import { getJoinLeagueErrorMessage } from "@/utils/join-league-errors";
 import {
   createLeagueSchema,
+  removeMemberSchema,
+  setMemberPaymentStatusSchema,
   type CreateLeagueInput,
+  type RemoveMemberInput,
+  type SetMemberPaymentStatusInput,
 } from "@/app/actions/leagues.schema";
+import {
+  ADMIN_NOT_AUTHORIZED_ERROR,
+  ADMIN_SAVE_ERROR,
+} from "@/app/actions/leagues.constants";
 import type { League, LeagueMember, ServerActionResult } from "@/types";
+
+/** Código Postgres de privilegio insuficiente (no autenticado / no admin). */
+const INSUFFICIENT_PRIVILEGE = "42501";
 
 /** Código Postgres de violación de restricción unique (invite_code duplicado). */
 const UNIQUE_VIOLATION = "23505";
@@ -142,5 +155,88 @@ export async function joinLeagueByInvite(
       data: null,
       error: "No pudimos unirte a la liga. Intenta de nuevo.",
     };
+  }
+}
+
+/** Mapea un error del RPC a un mensaje de UI seguro (no filtra detalles técnicos). */
+function toAdminError(error: { code?: string | null } | null): string {
+  return error?.code === INSUFFICIENT_PRIVILEGE
+    ? ADMIN_NOT_AUTHORIZED_ERROR
+    : ADMIN_SAVE_ERROR;
+}
+
+/**
+ * Alterna/fija el estado de pago de un miembro (Story 3.3 — AC #3). El RPC
+ * `fn_set_member_payment_status` (SECURITY DEFINER) valida que el llamante sea
+ * admin de esa liga. NUNCA propaga excepciones; revalida la tabla y el panel.
+ */
+export async function setMemberPaymentStatus(
+  input: SetMemberPaymentStatusInput,
+): Promise<ServerActionResult<LeagueMember>> {
+  try {
+    const parsed = setMemberPaymentStatusSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+      };
+    }
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .rpc("fn_set_member_payment_status", {
+        p_league_id: parsed.data.leagueId,
+        p_user_id: parsed.data.userId,
+        p_status: parsed.data.status,
+      })
+      .single();
+
+    if (error) {
+      return { success: false, data: null, error: toAdminError(error) };
+    }
+
+    revalidatePath("/standings");
+    revalidatePath("/standings/manage");
+    return { success: true, data: data as LeagueMember, error: null };
+  } catch {
+    return { success: false, data: null, error: ADMIN_SAVE_ERROR };
+  }
+}
+
+/**
+ * Expulsa a un miembro de la liga (Story 3.3 — AC #4). El RPC `fn_remove_member`
+ * (SECURITY DEFINER) aplica admin-gating y guardas (no auto-expulsión, no dejar
+ * la liga sin admin) y un trigger borra en cascada sus predicciones. NUNCA
+ * propaga excepciones; revalida la tabla y el panel.
+ */
+export async function removeMember(
+  input: RemoveMemberInput,
+): Promise<ServerActionResult<null>> {
+  try {
+    const parsed = removeMemberSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+      };
+    }
+
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("fn_remove_member", {
+      p_league_id: parsed.data.leagueId,
+      p_user_id: parsed.data.userId,
+    });
+
+    if (error) {
+      return { success: false, data: null, error: toAdminError(error) };
+    }
+
+    revalidatePath("/standings");
+    revalidatePath("/standings/manage");
+    return { success: true, data: null, error: null };
+  } catch {
+    return { success: false, data: null, error: ADMIN_SAVE_ERROR };
   }
 }

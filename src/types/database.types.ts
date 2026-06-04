@@ -428,6 +428,10 @@ export type Database = {
         Args: { p_match_time: string }
         Returns: number
       }
+      fn_remove_member: {
+        Args: { p_league_id: string; p_user_id: string }
+        Returns: undefined
+      }
       fn_save_prediction: {
         Args: {
           p_away_score_pred: number
@@ -454,7 +458,28 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fn_set_member_payment_status: {
+        Args: { p_league_id: string; p_status: string; p_user_id: string }
+        Returns: {
+          id: string
+          joined_at: string
+          league_id: string
+          payment_status: string
+          role: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "league_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
+      fn_user_is_league_admin: {
+        Args: { p_league_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

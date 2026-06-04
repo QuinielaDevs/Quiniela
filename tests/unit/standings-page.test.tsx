@@ -56,6 +56,7 @@ const MEMBERS = [
   {
     league_id: "L1",
     user_id: "user-1",
+    role: "member",
     payment_status: "pending",
     joined_at: "2026-06-01T00:00:00.000Z",
     profiles: { display_name: "Ana", avatar_url: "/a.svg" },
@@ -63,10 +64,16 @@ const MEMBERS = [
   {
     league_id: "L1",
     user_id: "user-2",
+    role: "member",
     payment_status: "paid",
     joined_at: "2026-06-02T00:00:00.000Z",
     profiles: { display_name: "Beto", avatar_url: "/b.svg" },
   },
+];
+
+const MEMBERS_AS_ADMIN = [
+  { ...MEMBERS[0], role: "admin" },
+  MEMBERS[1],
 ];
 
 describe("/standings (StandingsBoard)", () => {
@@ -131,5 +138,45 @@ describe("/standings (StandingsBoard)", () => {
     await renderBoard();
 
     expect(screen.queryByTestId("payment-banner")).not.toBeInTheDocument();
+  });
+
+  it("muestra el engranaje de gestión solo si el usuario actual es admin", async () => {
+    mockTables({
+      league_members: { data: MEMBERS_AS_ADMIN },
+      matches: { data: [] },
+      leagues: {
+        data: {
+          name: "La Pija",
+          requires_payment: false,
+          payment_amount: null,
+          payment_instructions: null,
+        },
+      },
+    });
+
+    await renderBoard();
+
+    const gear = screen.getByLabelText("Gestionar liga");
+    expect(gear).toBeInTheDocument();
+    expect(gear).toHaveAttribute("href", "/standings/manage");
+  });
+
+  it("no muestra el engranaje si el usuario actual no es admin", async () => {
+    mockTables({
+      league_members: { data: MEMBERS },
+      matches: { data: [] },
+      leagues: {
+        data: {
+          name: "La Pija",
+          requires_payment: false,
+          payment_amount: null,
+          payment_instructions: null,
+        },
+      },
+    });
+
+    await renderBoard();
+
+    expect(screen.queryByLabelText("Gestionar liga")).not.toBeInTheDocument();
   });
 });

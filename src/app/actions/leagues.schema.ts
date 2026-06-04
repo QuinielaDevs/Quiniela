@@ -45,3 +45,31 @@ export const createLeagueSchema = z
   });
 
 export type CreateLeagueInput = z.input<typeof createLeagueSchema>;
+
+/**
+ * Esquema del toggle de pago por el admin (Story 3.3 — AC #3). El admin-gating
+ * real lo hace el RPC `fn_set_member_payment_status` (SECURITY DEFINER); aquí
+ * solo validamos forma: UUIDs y estado dentro del enum del CHECK de la tabla.
+ */
+export const setMemberPaymentStatusSchema = z.object({
+  leagueId: z.string().uuid("Liga inválida."),
+  userId: z.string().uuid("Miembro inválido."),
+  status: z.enum(["pending", "paid"], {
+    message: "Estado de pago inválido.",
+  }),
+});
+
+export type SetMemberPaymentStatusInput = z.input<
+  typeof setMemberPaymentStatusSchema
+>;
+
+/**
+ * Esquema de la expulsión de un miembro (Story 3.3 — AC #4). Las guardas duras
+ * (admin, no auto-expulsión, no quedarse sin admin) viven en `fn_remove_member`.
+ */
+export const removeMemberSchema = z.object({
+  leagueId: z.string().uuid("Liga inválida."),
+  userId: z.string().uuid("Miembro inválido."),
+});
+
+export type RemoveMemberInput = z.input<typeof removeMemberSchema>;

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Settings } from "lucide-react";
 
 import { createClient } from "@/utils/supabase/server";
 import { StandingsTable } from "@/components/standings/StandingsTable";
@@ -12,11 +13,12 @@ import {
   type StandingMember,
   type StandingPrediction,
 } from "@/utils/standings";
-import type { PaymentStatus } from "@/types";
+import type { LeagueRole, PaymentStatus } from "@/types";
 
 // Fila de league_members embebiendo el perfil (FK user_id → profiles.id).
 type MemberRow = {
   user_id: string;
+  role: LeagueRole;
   payment_status: PaymentStatus;
   joined_at: string;
   profiles: { display_name: string; avatar_url: string } | null;
@@ -58,7 +60,7 @@ export async function StandingsBoard() {
     await Promise.all([
       supabase
         .from("league_members")
-        .select("user_id, payment_status, joined_at, profiles(display_name, avatar_url)")
+        .select("user_id, role, payment_status, joined_at, profiles(display_name, avatar_url)")
         .eq("league_id", leagueId),
       supabase
         .from("matches")
@@ -112,6 +114,7 @@ export async function StandingsBoard() {
   const currentMember = rows.find((m) => m.user_id === userId);
   const showPaymentBanner =
     !!league?.requires_payment && currentMember?.payment_status === "pending";
+  const isAdmin = currentMember?.role === "admin";
 
   return (
     <>
@@ -122,6 +125,19 @@ export async function StandingsBoard() {
           amount={league.payment_amount}
           instructions={league.payment_instructions}
         />
+      )}
+
+      {isAdmin && (
+        <div className="flex justify-end">
+          <Link
+            href="/standings/manage"
+            aria-label="Gestionar liga"
+            className="inline-flex h-12 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-semibold text-muted-foreground"
+          >
+            <Settings className="size-5" aria-hidden="true" />
+            Gestionar
+          </Link>
+        </div>
       )}
 
       <StandingsTable
