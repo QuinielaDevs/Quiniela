@@ -3,14 +3,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { LiveStandingsBoard } from "@/components/live/LiveStandingsBoard";
+import type { LiveMatch } from "@/components/live/goalImpact";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { createClient } from "@/utils/supabase/server";
 import type { PaymentStatus } from "@/types";
-import type {
-  StandingMatch,
-  StandingMember,
-  StandingPrediction,
-} from "@/utils/standings";
+import type { StandingMember, StandingPrediction } from "@/utils/standings";
 
 type MemberRow = {
   user_id: string;
@@ -58,12 +55,14 @@ export async function LiveBoard() {
       .order("match_time", { ascending: true }),
   ]);
 
-  const matches: StandingMatch[] = (matchRows ?? []).map((match) => ({
+  const matches: LiveMatch[] = (matchRows ?? []).map((match) => ({
     id: match.id,
     status: match.status,
     matchday: match.matchday,
     homeScore: match.home_score,
     awayScore: match.away_score,
+    homeTeam: match.home_team ?? null,
+    awayTeam: match.away_team ?? null,
   }));
   const matchIds = matches.map((match) => match.id);
 
@@ -97,6 +96,7 @@ export async function LiveBoard() {
   return (
     <LiveStandingsBoard
       leagueId={leagueId}
+      currentUserId={userId}
       members={members}
       initialMatches={matches}
       initialPredictions={predictions}

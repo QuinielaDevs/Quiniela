@@ -10,29 +10,43 @@ import {
 } from "react";
 
 import { PaymentStatusBadge } from "@/components/standings/PaymentStatusBadge";
+import {
+  GoalToastStack,
+  MAX_VISIBLE_TOASTS,
+  type GoalToastModel,
+} from "@/components/live/GoalToast";
+import {
+  buildGoalToastMessage,
+  findMovers,
+  hasScoreIncrease,
+  resolveScoringTeam,
+  selectAnnouncedMover,
+  type LiveMatch,
+} from "@/components/live/goalImpact";
 import { createClient } from "@/utils/supabase/client";
 import {
   buildProjectedStandings,
-  type StandingMatch,
   type StandingMember,
   type StandingPrediction,
 } from "@/utils/standings";
 import { cn } from "@/utils/utils";
 
 const POLLING_INTERVAL_MS = 60_000;
+const FLASH_DURATION_MS = 1500;
 const RELEVANT_MATCH_STATUSES = new Set(["finished", "live"]);
 
 type LiveStandingsBoardProps = {
   leagueId: string;
+  currentUserId: string;
   members: StandingMember[];
-  initialMatches: StandingMatch[];
+  initialMatches: LiveMatch[];
   initialPredictions: StandingPrediction[];
 };
 
 type ConnectionState = "connecting" | "live" | "reconnecting" | "polling";
 
 type Snapshot = {
-  matches: StandingMatch[];
+  matches: LiveMatch[];
   predictions: StandingPrediction[];
 };
 
@@ -40,6 +54,8 @@ type MatchPayload = {
   id?: unknown;
   status?: unknown;
   matchday?: unknown;
+  home_team?: unknown;
+  away_team?: unknown;
   home_score?: unknown;
   away_score?: unknown;
 };
@@ -48,7 +64,11 @@ function toNullableNumber(value: unknown): number | null {
   return Number.isInteger(value) ? (value as number) : null;
 }
 
-function mapPayloadToMatch(payload: MatchPayload): StandingMatch | null {
+function toNullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function mapPayloadToMatch(payload: MatchPayload): LiveMatch | null {
   if (typeof payload.id !== "string" || typeof payload.status !== "string") {
     return null;
   }
@@ -59,6 +79,8 @@ function mapPayloadToMatch(payload: MatchPayload): StandingMatch | null {
     matchday: toNullableNumber(payload.matchday),
     homeScore: toNullableNumber(payload.home_score),
     awayScore: toNullableNumber(payload.away_score),
+    homeTeam: toNullableString(payload.home_team),
+    awayTeam: toNullableString(payload.away_team),
   };
 }
 
@@ -76,6 +98,7 @@ function statusClass(status: ConnectionState): string {
 
 export function LiveStandingsBoard({
   leagueId,
+  currentUserId,
   members,
   initialMatches,
   initialPredictions,
@@ -92,11 +115,15 @@ export function LiveStandingsBoard({
   const connectionRef = useRef<ConnectionState>("connecting");
   const rowRefs = useRef(new Map<string, HTMLLIElement>());
   const previousRowTopsRef = useRef(new Map<string, number>());
+  const toastIdRef = useRef(0);
+  const flashTimeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [snapshot, setSnapshot] = useState<Snapshot>({
     matches: initialMatches,
     predictions: initialPredictions,
   });
   const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const [toasts, setToasts] = useState<GoalToastModel[]>([]);
+  const [flashedUsers, setFlashedUsers] = useState<Set<string>>(new Set());
   const { matches, predictions } = snapshot;
 
   const rows = useMemo(
@@ -124,6 +151,39 @@ export function LiveStandingsBoard({
     }
   }, []);
 
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+
+  const pushToast = useCallback((message: string) => {
+    toastIdRef.current += 1;
+    const id = `goal-${toastIdRef.current}`;
+    // Tope de toasts visibles: descarta los más viejos para no inundar el móvil.
+    setToasts((current) => [...current, { id, message }].slice(-MAX_VISIBLE_TOASTS));
+  }, []);
+
+  const flashRows = useCallback((userIds: string[]) => {
+    if (userIds.length === 0) return;
+    setFlashedUsers((current) => {
+      const next = new Set(current);
+      for (const userId of userIds) next.add(userId);
+      return next;
+    });
+    for (const userId of userIds) {
+      const existing = flashTimeoutsRef.current.get(userId);
+      if (existing) clearTimeout(existing);
+      const timeout = setTimeout(() => {
+        flashTimeoutsRef.current.delete(userId);
+        setFlashedUsers((current) => {
+          const next = new Set(current);
+          next.delete(userId);
+          return next;
+        });
+      }, FLASH_DURATION_MS);
+      flashTimeoutsRef.current.set(userId, timeout);
+    }
+  }, []);
+
   const refreshSnapshot = useCallback(
     async (options?: { allowWhenLive?: boolean }) => {
       const supabase = supabaseRef.current;
@@ -135,17 +195,19 @@ export function LiveStandingsBoard({
 
       const { data: matchRows, error: matchError } = await supabase
         .from("matches")
-        .select("id, status, matchday, home_score, away_score")
+        .select("id, status, matchday, home_team, away_team, home_score, away_score")
         .in("status", ["finished", "live"])
         .order("match_time", { ascending: true });
       if (matchError || latestRefreshRef.current !== requestId) return;
 
-      const nextMatches: StandingMatch[] = (matchRows ?? []).map((match) => ({
+      const nextMatches: LiveMatch[] = (matchRows ?? []).map((match) => ({
         id: match.id,
         status: match.status,
         matchday: match.matchday,
         homeScore: match.home_score,
         awayScore: match.away_score,
+        homeTeam: match.home_team ?? null,
+        awayTeam: match.away_team ?? null,
       }));
 
       const matchIds = nextMatches.map((match) => match.id);
@@ -207,40 +269,64 @@ export function LiveStandingsBoard({
       const nextMatch = mapPayloadToMatch(payload.new as MatchPayload);
       if (!nextMatch) return;
 
-      const currentMatches = snapshotRef.current.matches;
+      // snapshotRef.current es la fuente autoritativa del estado vigente; se
+      // mantiene sincronizada en cada mutación (Realtime y polling).
+      const current = snapshotRef.current;
+      const currentMatches = current.matches;
       const isRelevant = RELEVANT_MATCH_STATUSES.has(nextMatch.status);
-      const isNewRelevantMatch =
-        isRelevant && !currentMatches.some((match) => match.id === nextMatch.id);
+      const prevMatch = currentMatches.find((match) => match.id === nextMatch.id);
+      const isNewRelevantMatch = isRelevant && !prevMatch;
 
+      let nextMatches: LiveMatch[];
+      if (!isRelevant) {
+        nextMatches = currentMatches.filter((match) => match.id !== nextMatch.id);
+      } else if (isNewRelevantMatch) {
+        nextMatches = [...currentMatches, nextMatch];
+      } else {
+        nextMatches = currentMatches.map((match) =>
+          match.id === nextMatch.id ? { ...match, ...nextMatch } : match,
+        );
+      }
+
+      const nextSnapshot: Snapshot = {
+        matches: nextMatches,
+        predictions: current.predictions,
+      };
       snapshotVersionRef.current += 1;
-      setSnapshot((current) => {
-        let nextSnapshot: Snapshot;
+      snapshotRef.current = nextSnapshot;
+      setSnapshot(nextSnapshot);
 
-        if (!isRelevant) {
-          nextSnapshot = {
-            ...current,
-            matches: current.matches.filter((match) => match.id !== nextMatch.id),
-          };
-        } else if (isNewRelevantMatch) {
-          nextSnapshot = { ...current, matches: [...current.matches, nextMatch] };
-        } else {
-          nextSnapshot = {
-            ...current,
-            matches: current.matches.map((match) =>
-              match.id === nextMatch.id ? { ...match, ...nextMatch } : match,
-            ),
-          };
+      // "Impacto de Gol": solo ante un GOL real (algún lado incrementa) en un
+      // partido ya conocido que además reordene puestos. Una corrección a la
+      // baja, un partido nuevo (sin predicciones aún) o un cambio que no mueve a
+      // nadie no disparan toast.
+      if (isRelevant && prevMatch && hasScoreIncrease(prevMatch, nextMatch)) {
+        const prevRows = buildProjectedStandings(
+          members,
+          currentMatches,
+          current.predictions,
+        );
+        const nextRows = buildProjectedStandings(
+          members,
+          nextMatches,
+          current.predictions,
+        );
+        const movers = findMovers(prevRows, nextRows);
+        if (movers.length > 0) {
+          const announced = selectAnnouncedMover(movers, currentUserId);
+          if (announced) {
+            const scoringTeam = resolveScoringTeam(prevMatch, nextMatch);
+            pushToast(buildGoalToastMessage(announced, scoringTeam));
+            flashRows(movers.map((mover) => mover.userId));
+          }
         }
-
-        snapshotRef.current = nextSnapshot;
-        return nextSnapshot;
-      });
+      }
 
       if (isNewRelevantMatch) {
         void refreshSnapshot({ allowWhenLive: true });
       }
     },
-    [refreshSnapshot],
+    [members, currentUserId, refreshSnapshot, pushToast, flashRows],
   );
 
   useLayoutEffect(() => {
@@ -344,8 +430,18 @@ export function LiveStandingsBoard({
     stopReconnect,
   ]);
 
+  useEffect(() => {
+    const flashTimeouts = flashTimeoutsRef.current;
+    return () => {
+      for (const timeout of flashTimeouts.values()) clearTimeout(timeout);
+      flashTimeouts.clear();
+    };
+  }, []);
+
   return (
     <section className="flex flex-col gap-3" data-testid="live-board">
+      <GoalToastStack toasts={toasts} onDismiss={dismissToast} />
+
       <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card p-3">
         <div className="min-w-0">
           <p className="font-display text-lg font-bold">Tabla en Vivo</p>
@@ -368,17 +464,22 @@ export function LiveStandingsBoard({
       <ol className="flex flex-col gap-2">
         {rows.map((row) => {
           const isLeader = row.rank === 1;
+          const isFlashing = flashedUsers.has(row.userId);
           return (
             <li
               key={row.userId}
               data-testid="live-row"
+              data-flash={isFlashing ? "gold" : undefined}
               ref={(element) => {
                 if (element) rowRefs.current.set(row.userId, element);
                 else rowRefs.current.delete(row.userId);
               }}
               className={cn(
-                "flex items-center gap-3 rounded-md border bg-card p-3 transition-[transform,opacity,border-color] duration-300 motion-reduce:transition-none",
+                "flex items-center gap-3 rounded-md border bg-card p-3 transition-[transform,opacity,border-color,box-shadow,background-color] duration-300 motion-reduce:transition-none",
                 isLeader ? "border-accent" : "border-border",
+                // Destello dorado (Championship Gold) en la fila que sube; vía
+                // tokens, aditivo al reordenamiento FLIP existente.
+                isFlashing && "border-accent bg-accent/15 ring-2 ring-accent",
               )}
             >
               <span

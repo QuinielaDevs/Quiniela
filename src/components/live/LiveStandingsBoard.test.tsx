@@ -1,12 +1,9 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LiveStandingsBoard } from "@/components/live/LiveStandingsBoard";
-import type {
-  StandingMatch,
-  StandingMember,
-  StandingPrediction,
-} from "@/utils/standings";
+import type { LiveMatch } from "@/components/live/goalImpact";
+import type { StandingMember, StandingPrediction } from "@/utils/standings";
 
 const createClient = vi.fn();
 
@@ -31,13 +28,15 @@ const members: StandingMember[] = [
   },
 ];
 
-const initialMatches: StandingMatch[] = [
+const initialMatches: LiveMatch[] = [
   {
     id: "live-1",
     status: "live",
     matchday: 1,
     homeScore: 0,
     awayScore: 0,
+    homeTeam: "Local FC",
+    awayTeam: "Visitante FC",
   },
 ];
 
@@ -159,6 +158,7 @@ describe("LiveStandingsBoard", () => {
     render(
       <LiveStandingsBoard
         leagueId="L1"
+        currentUserId="ana"
         members={members}
         initialMatches={initialMatches}
         initialPredictions={predictions}
@@ -230,6 +230,7 @@ describe("LiveStandingsBoard", () => {
     render(
       <LiveStandingsBoard
         leagueId="L1"
+        currentUserId="ana"
         members={members}
         initialMatches={initialMatches}
         initialPredictions={predictions}
@@ -263,6 +264,7 @@ describe("LiveStandingsBoard", () => {
     render(
       <LiveStandingsBoard
         leagueId="L1"
+        currentUserId="ana"
         members={members}
         initialMatches={initialMatches}
         initialPredictions={predictions}
@@ -287,6 +289,7 @@ describe("LiveStandingsBoard", () => {
     const { unmount } = render(
       <LiveStandingsBoard
         leagueId="L1"
+        currentUserId="ana"
         members={members}
         initialMatches={initialMatches}
         initialPredictions={predictions}
@@ -325,5 +328,241 @@ describe("LiveStandingsBoard", () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
     expect(mock.supabase.from).toHaveBeenCalledTimes(fromCallsAfterUnmount);
+  });
+
+  it("muestra un toast 'Impacto de Gol' con equipo y jugador al subir de puesto", async () => {
+    const mock = makeSupabaseMock();
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        currentUserId="beto"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    expect(screen.queryByTestId("goal-toast-stack")).not.toBeInTheDocument();
+
+    await act(async () => {
+      mock.getPostgresHandler()?.({
+        new: {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_team: "Local FC",
+          away_team: "Visitante FC",
+          home_score: 0,
+          away_score: 1,
+        },
+      });
+    });
+
+    const stack = screen.getByTestId("goal-toast-stack");
+    expect(stack).toHaveAttribute("aria-live", "polite");
+    expect(
+      screen.getByText(
+        "¡Gol de Visitante FC! Beto sube al 1er puesto proyectado 🎉",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("usa el fallback neutro cuando el payload no trae el equipo", async () => {
+    const mock = makeSupabaseMock();
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        currentUserId="beto"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    await act(async () => {
+      mock.getPostgresHandler()?.({
+        new: {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_score: 0,
+          away_score: 1,
+        },
+      });
+    });
+
+    expect(
+      screen.getByText(
+        "¡Cambio en los marcadores! Beto sube al 1er puesto proyectado 🎉",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("destella en dorado la fila que sube y lo limpia tras el timeout", async () => {
+    const mock = makeSupabaseMock();
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        currentUserId="beto"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    await act(async () => {
+      mock.getPostgresHandler()?.({
+        new: {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_team: "Local FC",
+          away_team: "Visitante FC",
+          home_score: 0,
+          away_score: 1,
+        },
+      });
+    });
+
+    // Beto subió al 1er puesto → su fila (ahora la primera) destella en dorado.
+    const flashedRow = screen.getAllByTestId("live-row")[0];
+    expect(flashedRow).toHaveAttribute("data-flash", "gold");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(screen.getAllByTestId("live-row")[0]).not.toHaveAttribute("data-flash");
+  });
+
+  it("no muestra toast cuando el gol no reordena puestos", async () => {
+    const mock = makeSupabaseMock();
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        currentUserId="ana"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    // Ana ya es líder (rank 1) por desempate; un gol local que acierta su
+    // predicción no cambia el orden, así que no debe emitir toast.
+    await act(async () => {
+      mock.getPostgresHandler()?.({
+        new: {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_team: "Local FC",
+          away_team: "Visitante FC",
+          home_score: 1,
+          away_score: 0,
+        },
+      });
+    });
+
+    expect(screen.queryByTestId("goal-toast-stack")).not.toBeInTheDocument();
+  });
+
+  it("no muestra toast ante una corrección a la baja aunque reordene", async () => {
+    const mock = makeSupabaseMock();
+    createClient.mockReturnValue(mock.supabase);
+
+    // Partido con el visitante adelante (0-1): Beto (pred 0-1) lidera por exacto.
+    const homeBehind: LiveMatch[] = [
+      {
+        id: "live-1",
+        status: "live",
+        matchday: 1,
+        homeScore: 0,
+        awayScore: 1,
+        homeTeam: "Local FC",
+        awayTeam: "Visitante FC",
+      },
+    ];
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        currentUserId="ana"
+        members={members}
+        initialMatches={homeBehind}
+        initialPredictions={predictions}
+      />,
+    );
+
+    expect(screen.getAllByTestId("live-row").map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Beto"),
+      expect.stringContaining("Ana"),
+    ]);
+
+    // Corrección a 0-0: nadie acierta, empate → Ana lidera por joined_at. La
+    // tabla SÍ se reordena, pero no hubo gol → no debe emitir toast.
+    await act(async () => {
+      mock.getPostgresHandler()?.({
+        new: {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_team: "Local FC",
+          away_team: "Visitante FC",
+          home_score: 0,
+          away_score: 0,
+        },
+      });
+    });
+
+    expect(screen.getAllByTestId("live-row").map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Ana"),
+      expect.stringContaining("Beto"),
+    ]);
+    expect(screen.queryByTestId("goal-toast-stack")).not.toBeInTheDocument();
+  });
+
+  it("permite descartar el toast con el botón cerrar", async () => {
+    const mock = makeSupabaseMock();
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        currentUserId="beto"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    await act(async () => {
+      mock.getPostgresHandler()?.({
+        new: {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_team: "Local FC",
+          away_team: "Visitante FC",
+          home_score: 0,
+          away_score: 1,
+        },
+      });
+    });
+
+    expect(screen.getByTestId("goal-toast")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Descartar notificación"));
+    });
+
+    expect(screen.queryByTestId("goal-toast")).not.toBeInTheDocument();
   });
 });

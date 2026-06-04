@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of story-4.2 (2026-06-04)
+
+- Handler Realtime en `src/components/live/LiveStandingsBoard.tsx` migró de `setSnapshot(updater funcional)` a lectura/escritura directa de `snapshotRef.current`. Para eventos Realtime síncronos es equivalente, pero si `refreshSnapshot({allowWhenLive:true})` (rama de partido nuevo, heredada de 4.1) resuelve mientras llega un evento de marcador, su guarda de versión está bypasseada y puede clobberear el update concurrente. Pre-existente desde 4.1; evaluar serializar refreshSnapshot con el snapshotVersion al tocar este flujo.
+- En modo polling (Realtime caído, `reconnecting`/`polling`) un gol detectado por el `refreshSnapshot` de 60s actualiza la tabla pero NO emite toast ni destello "Impacto de Gol" — la lógica vive solo en `handleMatchUpdate`. Es consistente con AC#6 (el toast se deriva del UPDATE de Realtime), pero degrada el feedback a cero durante la ventana de polling. Enhancement: comparar prev/next snapshot dentro de `refreshSnapshot` para emitir feedback también en polling.
+- `toScore(null)` ⇒ `0` en `src/components/live/goalImpact.ts`: una transición de marcador `null → 1` (backfill de un marcador desconocido, no un gol en juego) cuenta como incremento y podría fabricar un toast/destello fantasma. Baja frecuencia (live suele traer 0-0, y `buildProjectedStandings` ya excluye live con score null) y el fix (exigir prev conocido) podría suprimir goles legítimos vistos primero por Realtime. Revisar si aparecen falsos positivos con datos reales del sync.
+- Swipe del toast (`src/components/live/GoalToast.tsx`) sin gate de eje dominante: un arrastre intencionalmente vertical (scroll) sobre el toast lo desplaza horizontalmente por el jitter en `clientX`. Polish de UX; agregar chequeo `|dy| > |dx|` para ignorar intención vertical.
+
 ## Deferred from: code review of story-1.1 (2026-06-01)
 
 - `[db.seed] enabled=true` apunta a `./seed.sql` inexistente (`supabase/config.toml:71`) — default de plantilla; `supabase start` lo tolera, pero conviene crear un `seed.sql` vacío o desactivar `[db.seed]`.
