@@ -324,7 +324,7 @@ claude-opus-4-8 (Claude Opus 4.8)
 
 ## Review Findings
 
-> Revisión adversarial — 2026-06-03. **⚠️ 2 de 3 capas fallaron por límite de sesión** (Edge Case Hunter y Acceptance Auditor): la revisión se basa en el **Blind Hunter** + verificación directa del revisor. Historia sensible a seguridad (RLS / SECURITY DEFINER). Hallazgo crítico potencial (numeric serializado como string → crash al renderizar) **verificado y DESCARTADO**: PostgREST devuelve `numeric` como número JSON (`2.50`→`2.5`, typeof number). Triage: 0 decisiones, 1 patch, 1 diferido, ~11 descartados.
+> Revisión adversarial — 2026-06-03 (3 capas; las 2 que cayeron por límite de sesión se re-lanzaron y completaron). **Acceptance Auditor: PASS** (las 7 ACs cumplidas, gates verdes, alcance respetado). Historia sensible a seguridad (RLS / SECURITY DEFINER): las 3 capas confirman las rutas seguras (auth/pertenencia/kickoff dentro del DEFINER, `search_path=''`, sin SQL dinámico; `multiplier` no escribible por el cliente). Hallazgo crítico potencial (numeric serializado como string → crash al renderizar) **verificado y DESCARTADO**: PostgREST devuelve `numeric` como número JSON. Triage final: 0 decisiones, 1 patch (aplicado), 1 diferido (ampliado con sub-casos del Edge Case Hunter), resto descartado/by-design.
 
 ### Patches (aplicados 2026-06-03)
 
@@ -334,7 +334,8 @@ claude-opus-4-8 (Claude Opus 4.8)
 
 ### Deferred
 
-- [x] [Review][Defer] El candado de UI (`isMatchLocked`) se evalúa solo en render: si la tarjeta queda abierta y se cruza el umbral de kickoff (−1min), los botones no se auto-bloquean hasta el siguiente render. El servidor SÍ rechaza la escritura (RPC P0001), así que no hay riesgo de datos; es una mejora de UX (requiere un timer/intervalo para re-renderizar en el momento del bloqueo) [src/components/predictions/MatchCard.tsx]
+- [x] [Review][Defer] **UI derivada de tiempo evaluada solo en render** (`MatchCard.tsx`). Sin un timer/intervalo que fuerce re-render, una tarjeta abierta no refleja el paso del tiempo. Sub-casos (Blind + Edge Case Hunter): (a) el candado no se auto-bloquea al cruzar `match_time−1min`; (b) el indicador de multiplicador y `nextMultiplier` quedan stale al cruzar un lote de días; (c) `degradeAckRef` (confirmación por sesión) podría tapar una degradación mayor posterior; (d) si la tarjeta se bloquea con la advertencia abierta, el diálogo sigue interactivo. **Sin riesgo de datos**: el servidor (RPC `fn_save_prediction` → P0001) es la autoridad y rechaza toda escritura post-kickoff. Solución única: un `setInterval` que re-renderice y reseteé el ack al cruzar umbrales. [src/components/predictions/MatchCard.tsx]
+- [x] [Review][Defer] La RPC `fn_save_prediction` y la tabla `predictions` validan `>= 0` pero **no un tope superior** de marcador (el `MAX_PREDICTION_SCORE = 99` es solo cliente/zod). Una llamada directa a la RPC por un `authenticated` podría guardar un marcador enorme (cosmético, sin impacto de seguridad). Hardening futuro: CHECK de tope en la tabla + validación en la RPC. [supabase/migrations/20260603201630_prediction_multiplier_and_kickoff_lock.sql]
 
 ### Descartados (resumen)
 - **Falso positivo:** `numeric` como string (verificado: es número).
