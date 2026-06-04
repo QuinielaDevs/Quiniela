@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Settings } from "lucide-react";
+import { Radio, Settings } from "lucide-react";
 
 import { createClient } from "@/utils/supabase/server";
 import { StandingsTable } from "@/components/standings/StandingsTable";
@@ -127,8 +127,17 @@ export async function StandingsBoard() {
         />
       )}
 
-      {isAdmin && (
-        <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Link
+          href="/live"
+          aria-label="Ver tabla en vivo"
+          className="inline-flex h-12 items-center gap-2 rounded-full border border-accent bg-accent/15 px-4 text-sm font-semibold text-accent"
+        >
+          <Radio className="size-5" aria-hidden="true" />
+          En vivo
+        </Link>
+
+        {isAdmin && (
           <Link
             href="/standings/manage"
             aria-label="Gestionar liga"
@@ -137,8 +146,8 @@ export async function StandingsBoard() {
             <Settings className="size-5" aria-hidden="true" />
             Gestionar
           </Link>
-        </div>
-      )}
+        )}
+      </div>
 
       <StandingsTable
         members={members}

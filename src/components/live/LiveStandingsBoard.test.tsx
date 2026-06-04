@@ -1,0 +1,329 @@
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { LiveStandingsBoard } from "@/components/live/LiveStandingsBoard";
+import type {
+  StandingMatch,
+  StandingMember,
+  StandingPrediction,
+} from "@/utils/standings";
+
+const createClient = vi.fn();
+
+vi.mock("@/utils/supabase/client", () => ({
+  createClient: () => createClient(),
+}));
+
+const members: StandingMember[] = [
+  {
+    userId: "ana",
+    displayName: "Ana",
+    avatarUrl: "/assets/avatars/default-player.svg",
+    paymentStatus: "paid",
+    joinedAt: "2026-06-01T00:00:00.000Z",
+  },
+  {
+    userId: "beto",
+    displayName: "Beto",
+    avatarUrl: "/assets/avatars/default-player.svg",
+    paymentStatus: "pending",
+    joinedAt: "2026-06-02T00:00:00.000Z",
+  },
+];
+
+const initialMatches: StandingMatch[] = [
+  {
+    id: "live-1",
+    status: "live",
+    matchday: 1,
+    homeScore: 0,
+    awayScore: 0,
+  },
+];
+
+const predictions: StandingPrediction[] = [
+  {
+    userId: "ana",
+    matchId: "live-1",
+    homeScorePred: 1,
+    awayScorePred: 0,
+    multiplier: 1,
+  },
+  {
+    userId: "beto",
+    matchId: "live-1",
+    homeScorePred: 0,
+    awayScorePred: 1,
+    multiplier: 1,
+  },
+];
+
+type StatusHandler = (status: string) => void;
+type PostgresHandler = (payload: { new: Record<string, unknown> }) => void;
+
+function toPredictionRow(prediction: StandingPrediction) {
+  return {
+    user_id: prediction.userId,
+    match_id: prediction.matchId,
+    home_score_pred: prediction.homeScorePred,
+    away_score_pred: prediction.awayScorePred,
+    multiplier: prediction.multiplier,
+  };
+}
+
+function makeSupabaseMock({
+  matchRows = [
+    {
+      id: "live-1",
+      status: "live",
+      matchday: 1,
+      home_score: 1,
+      away_score: 0,
+    },
+  ],
+  predictionRows = predictions.map(toPredictionRow),
+  matchError = null,
+  predictionError = null,
+}: {
+  matchRows?: Record<string, unknown>[];
+  predictionRows?: Record<string, unknown>[];
+  matchError?: unknown;
+  predictionError?: unknown;
+} = {}) {
+  const statusHandlers: StatusHandler[] = [];
+  const postgresHandlers: PostgresHandler[] = [];
+  const channels: Array<{
+    on: ReturnType<typeof vi.fn>;
+    subscribe: ReturnType<typeof vi.fn>;
+  }> = [];
+
+  const makeChannel = () => {
+    const channel = {
+      on: vi.fn((_event, _filter, callback: PostgresHandler) => {
+        postgresHandlers.push(callback);
+        return channel;
+      }),
+      subscribe: vi.fn((callback: StatusHandler) => {
+        statusHandlers.push(callback);
+        return channel;
+      }),
+    };
+    channels.push(channel);
+    return channel;
+  };
+
+  const from = vi.fn((table: string) => {
+    const result =
+      table === "matches"
+        ? { data: matchRows, error: matchError }
+        : { data: predictionRows, error: predictionError };
+
+    const builder: Record<string, unknown> = {};
+    for (const method of ["select", "eq", "in", "order"]) {
+      builder[method] = () => builder;
+    }
+    builder.then = (
+      resolve: (value: { data: unknown; error: unknown }) => unknown,
+    ) => resolve(result);
+    return builder;
+  });
+
+  return {
+    supabase: {
+      channel: vi.fn(makeChannel),
+      removeChannel: vi.fn(() => Promise.resolve()),
+      from,
+    },
+    getStatusHandler: (index = statusHandlers.length - 1) => statusHandlers[index],
+    getPostgresHandler: (index = postgresHandlers.length - 1) =>
+      postgresHandlers[index],
+    channels,
+  };
+}
+
+describe("LiveStandingsBoard", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("se suscribe a matches y reordena filas al recibir un marcador live", async () => {
+    const mock = makeSupabaseMock();
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    expect(mock.supabase.channel).toHaveBeenCalledWith("live-matches:L1");
+    expect(screen.getAllByTestId("live-row").map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Ana"),
+      expect.stringContaining("Beto"),
+    ]);
+
+    await act(async () => {
+      mock.getPostgresHandler()?.({
+        new: {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_score: 0,
+          away_score: 1,
+        },
+      });
+    });
+
+    expect(screen.getAllByTestId("live-row").map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Beto"),
+      expect.stringContaining("Ana"),
+    ]);
+  });
+
+  it("recarga predicciones cuando un partido entra en vivo durante la sesion", async () => {
+    const mock = makeSupabaseMock({
+      matchRows: [
+        {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_score: 0,
+          away_score: 0,
+        },
+        {
+          id: "live-2",
+          status: "live",
+          matchday: 1,
+          home_score: 2,
+          away_score: 0,
+        },
+      ],
+      predictionRows: [
+        ...predictions.map(toPredictionRow),
+        toPredictionRow({
+          userId: "ana",
+          matchId: "live-2",
+          homeScorePred: 2,
+          awayScorePred: 0,
+          multiplier: 1,
+        }),
+        toPredictionRow({
+          userId: "beto",
+          matchId: "live-2",
+          homeScorePred: 0,
+          awayScorePred: 1,
+          multiplier: 1,
+        }),
+      ],
+    });
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    await act(async () => {
+      mock.getPostgresHandler()?.({
+        new: {
+          id: "live-2",
+          status: "live",
+          matchday: 1,
+          home_score: 2,
+          away_score: 0,
+        },
+      });
+    });
+
+    expect(mock.supabase.from).toHaveBeenCalledWith("predictions");
+    expect(screen.getAllByTestId("live-row").map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Ana"),
+      expect.stringContaining("Beto"),
+    ]);
+    expect(screen.getByLabelText("5 puntos proyectados")).toBeInTheDocument();
+  });
+
+  it("preserva el ultimo snapshot valido cuando falla el polling", async () => {
+    const mock = makeSupabaseMock({ matchError: new Error("network") });
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    await act(async () => {
+      mock.getStatusHandler()?.("CHANNEL_ERROR");
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(screen.getAllByTestId("live-row").map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Ana"),
+      expect.stringContaining("Beto"),
+    ]);
+  });
+
+  it("muestra estados de conexion, activa polling y limpia recursos", async () => {
+    const mock = makeSupabaseMock();
+    createClient.mockReturnValue(mock.supabase);
+
+    const { unmount } = render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    await act(async () => {
+      mock.getStatusHandler()?.("SUBSCRIBED");
+    });
+    expect(screen.getByText("En vivo")).toBeInTheDocument();
+
+    await act(async () => {
+      mock.getStatusHandler()?.("CHANNEL_ERROR");
+    });
+    expect(screen.getByText("Reconectando...")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(mock.supabase.from).toHaveBeenCalledWith("matches");
+    expect(mock.supabase.from).toHaveBeenCalledWith("predictions");
+    expect(mock.supabase.channel).toHaveBeenCalledTimes(2);
+    expect(mock.supabase.removeChannel).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      mock.getStatusHandler()?.("SUBSCRIBED");
+    });
+    expect(screen.getByText("En vivo")).toBeInTheDocument();
+
+    unmount();
+
+    expect(mock.supabase.removeChannel).toHaveBeenCalledTimes(2);
+
+    const fromCallsAfterUnmount = mock.supabase.from.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(mock.supabase.from).toHaveBeenCalledTimes(fromCallsAfterUnmount);
+  });
+});

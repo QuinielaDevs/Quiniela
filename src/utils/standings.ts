@@ -49,6 +49,11 @@ export type StandingRow = {
   exactCount: number;
 };
 
+export type ProjectedStandingRow = StandingRow & {
+  /** Puntos virtuales aportados por partidos live; no son clasificacion oficial. */
+  livePoints: number;
+};
+
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -128,6 +133,81 @@ export function buildStandings(
     paymentStatus: row.member.paymentStatus,
     totalPoints: row.totalPoints,
     exactCount: row.exactCount,
+  }));
+}
+
+/**
+ * Construye la tabla proyectada: finished + live. Los partidos live se calculan
+ * como si su marcador momentaneo fuera el resultado final, pero solo para esta
+ * vista. `buildStandings` sigue siendo la fuente de la clasificacion oficial y
+ * solo cuenta partidos finished.
+ */
+export function buildProjectedStandings(
+  members: StandingMember[],
+  matches: StandingMatch[],
+  predictions: StandingPrediction[],
+): ProjectedStandingRow[] {
+  const matchesInScope = matches.filter(
+    (m) =>
+      m.status === "finished" ||
+      (m.status === "live" &&
+        Number.isInteger(m.homeScore) &&
+        Number.isInteger(m.awayScore)),
+  );
+
+  const predictionByKey = new Map(
+    predictions.map((p) => [`${p.userId}:${p.matchId}`, p]),
+  );
+
+  const rows = members.map((member) => {
+    let totalPoints = 0;
+    let livePoints = 0;
+    let exactCount = 0;
+
+    for (const match of matchesInScope) {
+      const pred = predictionByKey.get(`${member.userId}:${match.id}`);
+      if (!pred) continue;
+
+      // Para proyeccion, un live con marcador valido se evalua como snapshot
+      // virtual. La semantica oficial de scoring.ts para status live no cambia.
+      const base = calculateBasePoints(
+        { home: pred.homeScorePred, away: pred.awayScorePred },
+        { home: match.homeScore as number, away: match.awayScore as number },
+        "finished",
+      );
+      const points = calculatePredictionPoints(base, pred.multiplier);
+      totalPoints += points;
+      if (match.status === "live") livePoints += points;
+      if (base === POINTS_EXACT) exactCount += 1;
+    }
+
+    return {
+      member,
+      totalPoints: round2(totalPoints),
+      livePoints: round2(livePoints),
+      exactCount,
+      duelPoints: 0,
+    };
+  });
+
+  rows.sort((a, b) => {
+    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    if (b.exactCount !== a.exactCount) return b.exactCount - a.exactCount;
+    if (b.duelPoints !== a.duelPoints) return b.duelPoints - a.duelPoints;
+    const byJoined = a.member.joinedAt.localeCompare(b.member.joinedAt);
+    if (byJoined !== 0) return byJoined;
+    return a.member.userId.localeCompare(b.member.userId);
+  });
+
+  return rows.map((row, index) => ({
+    rank: index + 1,
+    userId: row.member.userId,
+    displayName: row.member.displayName,
+    avatarUrl: row.member.avatarUrl,
+    paymentStatus: row.member.paymentStatus,
+    totalPoints: row.totalPoints,
+    exactCount: row.exactCount,
+    livePoints: row.livePoints,
   }));
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildProjectedStandings,
   buildStandings,
   type StandingMatch,
   type StandingMember,
@@ -231,5 +232,94 @@ describe("buildStandings", () => {
     const rows = buildStandings(members, matches, predictions);
 
     expect(rows.map((r) => r.userId)).toEqual(["ana", "zoe"]);
+  });
+});
+
+describe("buildProjectedStandings", () => {
+  it("suma puntos consolidados finished y puntos virtuales live", () => {
+    const members = [member("a"), member("b")];
+    const matches = [
+      match("finished-1", { status: "finished", homeScore: 2, awayScore: 1 }),
+      match("live-1", { status: "live", homeScore: 1, awayScore: 0 }),
+    ];
+    const predictions = [
+      prediction("a", "finished-1", { homeScorePred: 2, awayScorePred: 1 }),
+      prediction("a", "live-1", { homeScorePred: 1, awayScorePred: 0 }),
+      prediction("b", "finished-1", { homeScorePred: 0, awayScorePred: 0 }),
+      prediction("b", "live-1", { homeScorePred: 2, awayScorePred: 0 }),
+    ];
+
+    const rows = buildProjectedStandings(members, matches, predictions);
+
+    expect(rows.map((r) => r.userId)).toEqual(["a", "b"]);
+    expect(rows[0]).toMatchObject({
+      userId: "a",
+      totalPoints: 10,
+      exactCount: 2,
+      livePoints: 5,
+    });
+    expect(rows[1]).toMatchObject({
+      userId: "b",
+      totalPoints: 2,
+      exactCount: 0,
+      livePoints: 2,
+    });
+  });
+
+  it("aplica multiplicador tambien a partidos live proyectados", () => {
+    const members = [member("a")];
+    const matches = [match("live-1", { status: "live", homeScore: 3, awayScore: 1 })];
+    const predictions = [
+      prediction("a", "live-1", {
+        homeScorePred: 3,
+        awayScorePred: 1,
+        multiplier: 2,
+      }),
+    ];
+
+    const rows = buildProjectedStandings(members, matches, predictions);
+
+    expect(rows[0]).toMatchObject({
+      totalPoints: 10,
+      livePoints: 10,
+      exactCount: 1,
+    });
+  });
+
+  it("excluye scheduled, canceled, suspended y live con marcador null", () => {
+    const members = [member("a")];
+    const matches = [
+      match("scheduled-1", { status: "scheduled", homeScore: 1, awayScore: 0 }),
+      match("canceled-1", { status: "canceled", homeScore: 1, awayScore: 0 }),
+      match("suspended-1", { status: "suspended", homeScore: 1, awayScore: 0 }),
+      match("live-null", { status: "live", homeScore: null, awayScore: null }),
+    ];
+    const predictions = matches.map((m) =>
+      prediction("a", m.id, { homeScorePred: 1, awayScorePred: 0 }),
+    );
+
+    const rows = buildProjectedStandings(members, matches, predictions);
+
+    expect(rows[0]).toMatchObject({
+      totalPoints: 0,
+      livePoints: 0,
+      exactCount: 0,
+    });
+  });
+
+  it("mantiene desempate canonico y orden estable", () => {
+    const members = [
+      member("late", { joinedAt: "2026-06-02T00:00:00.000Z" }),
+      member("early", { joinedAt: "2026-06-01T00:00:00.000Z" }),
+    ];
+    const matches = [match("live-1", { status: "live", homeScore: 1, awayScore: 0 })];
+    const predictions = [
+      prediction("late", "live-1", { homeScorePred: 1, awayScorePred: 0 }),
+      prediction("early", "live-1", { homeScorePred: 1, awayScorePred: 0 }),
+    ];
+
+    const rows = buildProjectedStandings(members, matches, predictions);
+
+    expect(rows.map((r) => r.userId)).toEqual(["early", "late"]);
   });
 });

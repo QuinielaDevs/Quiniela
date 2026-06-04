@@ -161,6 +161,27 @@ describe("/standings (StandingsBoard)", () => {
     expect(gear).toHaveAttribute("href", "/standings/manage");
   });
 
+  it("muestra enlace a la tabla en vivo", async () => {
+    mockTables({
+      league_members: { data: MEMBERS },
+      matches: { data: [] },
+      leagues: {
+        data: {
+          name: "La Pija",
+          requires_payment: false,
+          payment_amount: null,
+          payment_instructions: null,
+        },
+      },
+    });
+
+    await renderBoard();
+
+    const liveLink = screen.getByLabelText("Ver tabla en vivo");
+    expect(liveLink).toBeInTheDocument();
+    expect(liveLink).toHaveAttribute("href", "/live");
+  });
+
   it("no muestra el engranaje si el usuario actual no es admin", async () => {
     mockTables({
       league_members: { data: MEMBERS },
