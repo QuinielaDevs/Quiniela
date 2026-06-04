@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/server";
 import { MatchCard } from "@/components/predictions/MatchCard";
+import { BottomNavbar } from "@/components/layout/BottomNavbar";
 
 type PredictionsPageProps = {
   searchParams?: Promise<{ joined?: string }>;
@@ -152,7 +153,7 @@ export default function PredictionsPage({
   searchParams,
 }: PredictionsPageProps) {
   return (
-    <main className="min-h-svh bg-background px-4 py-6 text-foreground">
+    <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground">
       <div className="mx-auto flex w-full max-w-md flex-col gap-4">
         <header className="space-y-1">
           <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent">
@@ -169,6 +170,8 @@ export default function PredictionsPage({
           <PredictionsBoard />
         </Suspense>
       </div>
+
+      <BottomNavbar />
     </main>
   );
 }

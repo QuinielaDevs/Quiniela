@@ -16,5 +16,7 @@ insert into public.matches
 values
   ('demo-001', 'Argentina', 'México',    'ARG', 'MEX', null, null, now() + interval '2 days',  'scheduled', 1, 'group'),
   ('demo-002', 'España',    'Alemania',  'ESP', 'GER', null, null, now() + interval '3 hours', 'scheduled', 1, 'group'),
-  ('demo-003', 'Brasil',    'Ecuador',   'BRA', 'ECU', 3,    1,    now() - interval '2 hours',  'finished',  1, 'group')
+  ('demo-003', 'Brasil',    'Ecuador',   'BRA', 'ECU', 3,    1,    now() - interval '2 hours',  'finished',  1, 'group'),
+  -- Story 3.1: un finished de OTRA jornada para probar el filtro por jornada.
+  ('demo-004', 'Francia',   'Croacia',   'FRA', 'CRO', 2,    0,    now() - interval '1 day',    'finished',  2, 'group')
 on conflict (external_ref) do nothing;
