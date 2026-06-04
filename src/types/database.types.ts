@@ -171,6 +171,111 @@ export type Database = {
         }
         Relationships: []
       }
+      member_badges: {
+        Row: {
+          badge_label: string
+          badge_type: string
+          created_at: string
+          earned_at: string
+          id: string
+          league_id: string
+          matchday: number
+          points: number
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          badge_label: string
+          badge_type: string
+          created_at?: string
+          earned_at?: string
+          id?: string
+          league_id: string
+          matchday: number
+          points?: number
+          reason: string
+          user_id: string
+        }
+        Update: {
+          badge_label?: string
+          badge_type?: string
+          created_at?: string
+          earned_at?: string
+          id?: string
+          league_id?: string
+          matchday?: number
+          points?: number
+          reason?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_badges_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_badges_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_game_profiles: {
+        Row: {
+          computed_at: string
+          created_at: string
+          id: string
+          league_id: string
+          matchday: number
+          profile_label: string
+          profile_type: string
+          summary: string
+          user_id: string
+        }
+        Insert: {
+          computed_at?: string
+          created_at?: string
+          id?: string
+          league_id: string
+          matchday: number
+          profile_label: string
+          profile_type: string
+          summary: string
+          user_id: string
+        }
+        Update: {
+          computed_at?: string
+          created_at?: string
+          id?: string
+          league_id?: string
+          matchday?: number
+          profile_label?: string
+          profile_type?: string
+          summary?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_game_profiles_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_game_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       predictions: {
         Row: {
           away_score_pred: number

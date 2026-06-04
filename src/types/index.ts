@@ -38,6 +38,16 @@ export type Prediction = TableRow<"predictions">;
 export type PredictionInsert = TableInsert<"predictions">;
 export type PredictionUpdate = TableUpdate<"predictions">;
 
+// --- member_badges ---
+export type MemberBadge = TableRow<"member_badges">;
+export type MemberBadgeInsert = TableInsert<"member_badges">;
+export type MemberBadgeUpdate = TableUpdate<"member_badges">;
+
+// --- member_game_profiles ---
+export type MemberGameProfile = TableRow<"member_game_profiles">;
+export type MemberGameProfileInsert = TableInsert<"member_game_profiles">;
+export type MemberGameProfileUpdate = TableUpdate<"member_game_profiles">;
+
 /**
  * Estados válidos de un partido (espeja el CHECK de `matches.status`). Los tipos
  * generados lo tipan como `string`; mantener sincronizado con la migración
@@ -54,6 +64,13 @@ export type MatchStatus =
 export type LeagueRole = "admin" | "member";
 /** Estados de pago de un miembro (espeja el CHECK de la tabla). */
 export type PaymentStatus = "pending" | "paid";
+/** Insignias válidas por jornada (espeja el CHECK de member_badges.badge_type). */
+export type BadgeType = "nostradamus" | "el_salado" | "el_tibio";
+/** Perfiles psicológicos válidos (espeja el CHECK de member_game_profiles.profile_type). */
+export type GameProfileType =
+  | "optimista"
+  | "conservador"
+  | "cazador_sorpresas";
 
 // --- reglas de liga (columna leagues.rules JSONB) ---
 /**

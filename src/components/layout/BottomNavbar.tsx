@@ -8,8 +8,7 @@ import type { ComponentType } from "react";
 import { cn } from "@/utils/utils";
 
 // Barra de navegación inferior móvil (EXPERIENCE: Pronósticos | Posiciones |
-// Duelos | Mi Cuenta). Story 3.1 implementa las dos primeras; Duelos (Epic 5)
-// y Mi Cuenta (Story 3.2) quedan como placeholders deshabilitados hasta su epic.
+// Duelos | Mi Cuenta). Duelos (Epic 5) queda como placeholder deshabilitado.
 type NavItem = {
   href: string;
   label: string;
@@ -21,7 +20,7 @@ const ITEMS: NavItem[] = [
   { href: "/predictions", label: "Pronósticos", icon: ClipboardList, enabled: true },
   { href: "/standings", label: "Posiciones", icon: Trophy, enabled: true },
   { href: "/duels", label: "Duelos", icon: Swords, enabled: false },
-  { href: "/account", label: "Mi Cuenta", icon: User, enabled: false },
+  { href: "/account", label: "Mi Cuenta", icon: User, enabled: true },
 ];
 
 export function BottomNavbar() {

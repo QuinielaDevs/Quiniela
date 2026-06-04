@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-01T19:12:28-04:00"
-last_updated: "2026-06-03T22:45:00-04:00"
+last_updated: "2026-06-04T00:00:00-04:00"
 project: "pija-quiniela"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -56,7 +56,7 @@ development_status:
   epic-2-retrospective: optional
   epic-3: in-progress
   3-1-tabla-de-posiciones-clasica-acumulada-y-filtro-por-jornada: done
-  3-2-insignias-humoristicas-y-perfiles-psicologicos-de-juego: backlog
+  3-2-insignias-humoristicas-y-perfiles-psicologicos-de-juego: done
   3-3-panel-rapido-de-administracion-y-control-de-pagos: backlog
   epic-3-retrospective: optional
   epic-4: backlog
