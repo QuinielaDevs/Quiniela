@@ -518,23 +518,14 @@ describe("Duelos y Escrow: RPC create_challenge", () => {
   });
 
   describe("Duelos y Escrow: Aceptación, Rechazo, Cancelación y Triggers (Story 5.2)", () => {
-    // Helper para verificar el invariante de conservación por miembro
+    // Helper para verificar el invariante de conservación por miembro (comparación numérica en SQL)
     async function assertConservation(userId: string) {
-      const { data: member } = await admin
-        .from("league_members")
-        .select("wager_balance")
-        .eq("league_id", leagueId)
-        .eq("user_id", userId)
-        .single();
-      
-      const { data: sumData } = await admin
-        .from("point_transactions")
-        .select("amount")
-        .eq("league_id", leagueId)
-        .eq("user_id", userId);
-      
-      const sumAmount = sumData!.reduce((sum, tx) => sum + Number(tx.amount), 0);
-      expect(Number(member!.wager_balance).toFixed(2)).toBe(sumAmount.toFixed(2));
+      const { data: isConserved, error } = await admin.rpc("check_conservation_invariant", {
+        p_league_id: leagueId,
+        p_user_id: userId,
+      });
+      expect(error).toBeNull();
+      expect(isConserved).toBe(true);
     }
 
     it("(a) Aceptación directa feliz: acepta con saldo suficiente", async () => {
@@ -845,6 +836,62 @@ describe("Duelos y Escrow: RPC create_challenge", () => {
       expect(Number(memberA!.wager_balance)).toBe(100.00);
 
       await assertConservation(userA.id);
+    });
+
+    it("(e3) Reto cancelado o pospuesto en kickoff -> canceled y reembolsado", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      // Crear open challenge
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 30,
+        p_type: "open",
+        p_prediction_home: 1,
+        p_prediction_away: 0,
+      });
+
+      // userB acepta
+      await clientB.rpc("accept_challenge", {
+        p_challenge_id: challengeId,
+        p_prediction_home: 2,
+        p_prediction_away: 2,
+      });
+
+      // Pasar match a 'canceled'
+      await admin.from("matches").update({ status: "canceled" }).eq("id", matchId);
+
+      // Ambos deben ser reembolsados y el reto cancelado
+      const { data: challenge } = await admin
+        .from("challenges")
+        .select("status")
+        .eq("id", challengeId)
+        .single();
+      expect(challenge!.status).toBe("canceled");
+
+      const { data: memberA } = await admin
+        .from("league_members")
+        .select("wager_balance")
+        .eq("league_id", leagueId)
+        .eq("user_id", userA.id)
+        .single();
+      expect(Number(memberA!.wager_balance)).toBe(100.00);
+
+      const { data: memberB } = await admin
+        .from("league_members")
+        .select("wager_balance")
+        .eq("league_id", leagueId)
+        .eq("user_id", userB.id)
+        .single();
+      expect(Number(memberB!.wager_balance)).toBe(100.00);
+
+      await assertConservation(userA.id);
+      await assertConservation(userB.id);
     });
 
     it("(f) Concurrencia de aceptación (double-spend): exactamente 1 exitoso", async () => {

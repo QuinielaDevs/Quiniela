@@ -42,6 +42,19 @@ export function AcceptDuelDialog({
   const [predictionAway, setPredictionAway] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (isOpen && challenge) {
+      setPredictionHome(0);
+      setPredictionAway(0);
+      setError(null);
+    }
+  }, [isOpen, challenge]);
 
   if (!isOpen || !challenge) return null;
 
@@ -49,6 +62,7 @@ export function AcceptDuelDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPending) return;
     if (isBalanceInsufficient) {
       setError("Saldo insuficiente.");
       return;
@@ -74,12 +88,14 @@ export function AcceptDuelDialog({
     });
   };
 
-  const dateStr = new Date(challenge.match.match_time).toLocaleDateString("es-ES", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const dateStr = mounted
+    ? new Date(challenge.match.match_time).toLocaleDateString("es-ES", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto">
@@ -90,8 +106,9 @@ export function AcceptDuelDialog({
             Aceptar Desafío
           </h2>
           <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-colors"
+            onClick={() => !isPending && onClose()}
+            disabled={isPending}
+            className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-colors disabled:opacity-50"
             aria-label="Cerrar modal"
           >
             <X className="size-5" />

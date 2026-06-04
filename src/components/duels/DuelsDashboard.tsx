@@ -122,6 +122,7 @@ export function DuelsDashboard({
   };
 
   const handleOpenAccept = (challenge: Challenge) => {
+    setActionError(null);
     setSelectedChallenge(challenge);
     setIsAcceptOpen(true);
   };
@@ -312,7 +313,7 @@ export function DuelsDashboard({
                   disabled={isActionPending}
                   variant="outline"
                   size="sm"
-                  className="flex-1 border-border text-destructive hover:bg-destructive/10"
+                  className="flex-1 border-border text-destructive hover:bg-destructive/10 font-bold"
                 >
                   Rechazar
                 </Button>

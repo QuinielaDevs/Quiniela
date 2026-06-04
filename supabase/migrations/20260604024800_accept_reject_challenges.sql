@@ -14,6 +14,20 @@ declare
 begin
   select league_id into v_league_id from public.challenges where id = p_challenge_id;
   
+  -- Bloquear las filas de league_members en orden consistente (por user_id) para evitar deadlocks
+  perform 1
+  from public.league_members
+  where league_id = v_league_id
+    and user_id in (
+      select user_id
+      from public.point_transactions
+      where reference_id = p_challenge_id
+      group by user_id
+      having -sum(amount) > 0
+    )
+  order by user_id
+  for update;
+
   -- Escrow neto retenido por usuario para ESTE reto = -SUM(amount). Si ya se reembolsó, da 0.
   for r in
     select user_id, -sum(amount) as refund
@@ -50,7 +64,7 @@ declare
   v_uid            uuid := (select auth.uid());
   v_challenge      record;
   v_match          record;
-  v_current_points numeric(6, 2);
+  v_current_points numeric(12, 2);
 begin
   if v_uid is null then
     raise exception 'No autenticado' using errcode = '42501';
@@ -91,10 +105,11 @@ begin
     raise exception 'Ya eres participante de este desafío.' using errcode = 'P0005';
   end if;
 
-  -- Obtener info del partido
+  -- Obtener info del partido y bloquear para lectura (prevent status updates)
   select * into v_match
   from public.matches
-  where id = v_challenge.match_id;
+  where id = v_challenge.match_id
+  for share;
 
   -- Verificar si el partido ya comenzó (Kickoff - Opción B)
   if v_match.match_time <= now() or v_match.status <> 'scheduled' then
@@ -176,7 +191,7 @@ begin
     raise exception 'El desafío ya no se encuentra pendiente.' using errcode = 'P0005';
   end if;
 
-  if v_challenge.type <> 'direct' or v_challenge.challenged_id <> v_uid then
+  if v_challenge.type <> 'direct' or v_challenge.challenged_id is null or v_challenge.challenged_id <> v_uid then
     raise exception 'No autorizado para rechazar este desafío.' using errcode = '42501';
   end if;
 
@@ -259,27 +274,40 @@ as $$
 declare
   v_chal record;
 begin
-  -- 1. Pozos o retos pendientes con ≥ 2 participantes se mueven a 'active'
-  update public.challenges
-  set status = 'active'
-  where match_id = new.id
-    and status = 'pending'
-    and (
-      select count(*)
-      from public.challenge_participants cp
-      where cp.challenge_id = challenges.id
-    ) >= 2;
-
-  -- 2. Retos sin contraparte (con exactamente 1 participante: solo el creador) pasan a 'canceled' y reembolsan
-  for v_chal in
+  if new.status in ('canceled', 'postponed') then
+    -- Cancelar y reembolsar TODOS los desafíos pendientes de este partido
+    for v_chal in
+      update public.challenges
+      set status = 'canceled'
+      where match_id = new.id
+        and status = 'pending'
+      returning id
+    loop
+      perform public.refund_challenge_escrow(v_chal.id);
+    end loop;
+  else
+    -- 1. Pozos o retos pendientes con ≥ 2 participantes se mueven a 'active'
     update public.challenges
-    set status = 'canceled'
+    set status = 'active'
     where match_id = new.id
       and status = 'pending'
-    returning id
-  loop
-    perform public.refund_challenge_escrow(v_chal.id);
-  end loop;
+      and (
+        select count(*)
+        from public.challenge_participants cp
+        where cp.challenge_id = challenges.id
+      ) >= 2;
+
+    -- 2. Retos sin contraparte (con exactamente 1 participante: solo el creador) pasan a 'canceled' y reembolsan
+    for v_chal in
+      update public.challenges
+      set status = 'canceled'
+      where match_id = new.id
+        and status = 'pending'
+      returning id
+    loop
+      perform public.refund_challenge_escrow(v_chal.id);
+    end loop;
+  end if;
 
   return new;
 end;
@@ -301,3 +329,31 @@ grant execute on function public.cancel_challenge(uuid) to authenticated;
 
 -- 7. Restricción check para pruebas de rollback en reembolso (Story 5.2 AC 10j)
 alter table public.point_transactions add constraint chk_point_transactions_refund_rollback_test check (amount <> 888.00);
+
+-- 8. Helper para verificar invariante de conservación en tests (comparación numérica en SQL)
+create or replace function public.check_conservation_invariant(
+  p_league_id uuid,
+  p_user_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_balance numeric(12, 2);
+  v_sum     numeric(12, 2);
+begin
+  select wager_balance into v_balance
+  from public.league_members
+  where league_id = p_league_id and user_id = p_user_id;
+  
+  select coalesce(sum(amount), 0) into v_sum
+  from public.point_transactions
+  where league_id = p_league_id and user_id = p_user_id;
+  
+  return v_balance = v_sum;
+end;
+$$;
+
+grant execute on function public.check_conservation_invariant(uuid, uuid) to authenticated;

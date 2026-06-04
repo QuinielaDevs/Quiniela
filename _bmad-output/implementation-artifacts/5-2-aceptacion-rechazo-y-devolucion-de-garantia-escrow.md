@@ -3,7 +3,7 @@ baseline_commit: b764d5c0388002437728659c9998ee9daebf8d35
 ---
 # Story 5.2: Aceptación, Rechazo y Devolución de Garantía (Escrow)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -129,6 +129,23 @@ so that **mantener la integridad de mi balance de puntos en juego**.
   - [x] Correr `npm run typecheck` y verificar que no existan errores de compilación de TypeScript.
   - [x] Correr `npm run test:integration` y `npm run test:unit` para verificar que la suite completa pase en verde.
   - [x] Probar el flujo manualmente en el navegador web local simulando dos cuentas en pestañas/navegadores diferentes.
+
+### Review Findings
+
+- [x] [Review][Decision] Escrow points locked indefinitely if a match is canceled or postponed — If a match transitions from `scheduled` to `canceled` or `postponed`, the trigger `tr_cancel_pending_challenges_on_match_start` transitions challenges with >= 2 participants to `active` (locking escrow), rather than canceling and refunding them. [supabase/migrations/20260604024800_accept_reject_challenges.sql:1119-1162]
+- [x] [Review][Patch] Corrupt UTF-8 encoding in server actions, Zod schemas, UI components, and migrations [supabase/migrations/20260604024800_accept_reject_challenges.sql]
+- [x] [Review][Patch] Hydration mismatch risk via `toLocaleDateString` in render [src/components/duels/AcceptDuelDialog.tsx:598-603]
+- [x] [Review][Patch] Stale predictions state when dialog is closed and reopened [src/components/duels/AcceptDuelDialog.tsx]
+- [x] [Review][Patch] Lack of active check for `isPending` in `handleSubmit` [src/components/duels/AcceptDuelDialog.tsx:571-596]
+- [x] [Review][Patch] Dialog can be closed while action is executing [src/components/duels/AcceptDuelDialog.tsx:613-619]
+- [x] [Review][Patch] Numeric overflow hazard in `v_current_points numeric(6, 2)` [supabase/migrations/20260604024800_accept_reject_challenges.sql:919]
+- [x] [Review][Patch] Database deadlock risk during bulk updates in `refund_challenge_escrow` [supabase/migrations/20260604024800_accept_reject_challenges.sql:891-893]
+- [x] [Review][Patch] Concurrent match status race condition in `accept_challenge` [supabase/migrations/20260604024800_accept_reject_challenges.sql:961-968]
+- [x] [Review][Patch] Direct challenge authorization bypass if `challenged_id` is null during rejection [supabase/migrations/20260604024800_accept_reject_challenges.sql:1045]
+- [x] [Review][Patch] Test check constraint `chk_point_transactions_refund_rollback_test` added to production schema [supabase/migrations/20260604024800_accept_reject_challenges.sql:1169]
+- [x] [Review][Patch] Stale error messages in DuelsDashboard [src/components/duels/DuelsDashboard.tsx]
+- [x] [Review][Patch] Font weight inconsistency between Accept and Reject buttons [src/components/duels/DuelsDashboard.tsx]
+- [x] [Review][Patch] Missing null safety on transaction aggregation in integration tests [tests/integration/triggers.test.ts:1195]
 
 ## Dev Notes
 
