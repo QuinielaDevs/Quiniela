@@ -49,3 +49,9 @@
 
 - `FOR UPDATE` en `fn_remove_member` (supabase/migrations/20260604120000_member_admin_management.sql) bloquea solo las filas `role='admin'` existentes; no serializa contra un futuro flujo de promote-to-admin o cambio de rol (hoy inexistente). Revisar el bloqueo cuando se añada promoción de admins.
 - El test de "último admin" (tests/integration/member-admin-management.test.ts) valida el invariante (la liga conserva ≥1 admin) pero no ejercita la rama concurrente `count<=1`+`FOR UPDATE`, que requeriría un test de dos transacciones simultáneas. La carrera es difícil de reproducir en integración.
+
+## Deferred from: mini-sesión de decisiones post-Epic 3 (2026-06-04)
+
+- **Historia futura — Editar reglas de liga post-creación**: añadir al panel `/standings/manage` la edición de modo de predicción, monto e instrucciones de cobro (hoy solo se fijan al crear la liga en Story 1.3). Reusa el patrón Server Action + RPC `SECURITY DEFINER` (admin-gated) y `leagues.rules`/`payment_*`. Candidata a story propia cuando se priorice.
+- **Deuda conocida — Transferir/otorgar rol admin (promote-to-admin)**: NO se hace para MVP (1 admin/liga = el creador). Cuando se implemente, endurecer la guarda de "último admin" en `fn_remove_member` (hoy `FOR UPDATE` defensivo) para serializar también contra cambios de rol.
+- **Deuda recurrente — Selector multi-liga**: `/standings`, `/standings/manage`, `/account` y `/predictions` resuelven "liga más reciente". Evaluar una historia de selector multi-liga (diferido ya en 3.1 y 3.3).

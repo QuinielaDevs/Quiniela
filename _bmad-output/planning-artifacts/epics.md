@@ -60,7 +60,7 @@ This document provides the complete epic and story breakdown for pija-quiniela, 
 - **FR-19: Insignias y Medallas Humorísticas Automáticas**
   Asigna insignias especiales al cierre de cada jornada: "Nostradamus" (marcador exacto difícil), "El Salado" (cero puntos en jornada), "El Tibio" (mayoría de empates pronosticados).
 - **FR-20: Criterio de Desempate Estructurado**
-  Desempata la clasificación jerárquicamente: 1. Duelos 1v1 directos, 2. Cantidad de marcadores exactos (5 pts), 3. Fecha de registro en la liga.
+  Desempata la clasificación jerárquicamente. **Orden canónico (decisión 2026-06-04, post-Epic 3): 1. Cantidad de marcadores exactos (5 pts), 2. Duelos 1v1 directos, 3. Fecha de registro en la liga (`joined_at`).** Esto sigue la AC de la Story 3.1 (lo implementado en `src/utils/standings.ts`) y **supera el orden original de este FR** (que listaba duelos antes que exactos). El criterio de duelos queda inerte (=0) hasta que Epic 5 cree las tablas de duelos.
 - **FR-21: Tarjetas de Perfil Psicológico de Juego**
   Genera una tarjeta visual al terminar cada jornada categorizando los hábitos de juego del usuario (Optimista, Conservador, Cazador de Sorpresas), optimizada para compartir en WhatsApp.
 
