@@ -4,7 +4,7 @@ baseline_commit: 787e22692bfe331d3cb722ea4ed8798c9f8b4df2
 
 # Story 5.1: Creación de Duelo 1v1 Directo y Abierto con Deducción de Escrow
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -121,9 +121,12 @@ so that **retar sus conocimientos de fútbol bajo riesgo real de perder mis punt
 - [x] **Tarea 7 — Verificación y Tests de Componente** (AC: #10)
   - [x] Agregar pruebas unitarias o de componente para `CreateDuelDialog` y el renderizado del saldo y alertas.
   - [x] Ejecutar linting, typechecking y tests locales (`npm run test:unit`, `npm run test:integration`).
-  - [x] Realizar una verificación manual en el navegador.do y alertas.
-  - [ ] Ejecutar linting, typechecking y tests locales (`npm run test:unit`, `npm run test:integration`).
-  - [ ] Realizar una verificación manual en el navegador.
+  - [x] Realizar una verificación manual en el navegador.
+
+### Review Findings
+
+- [x] [Review][Patch] Falta validación de fecha de inicio del partido en la RPC `create_challenge` [supabase/migrations/20260604024700_challenges_and_escrow.sql:132]
+- [x] [Review][Defer] La carga diferida de retos históricos (finalizados/cancelados) en `src/components/duels/DuelsDashboard.tsx` no cancela peticiones previas inactivas en caso de que el usuario alterne rápidamente entre pestañas, lo que podría derivar en condiciones de carrera al actualizar el estado. [src/components/duels/DuelsDashboard.tsx:75] — deferred, pre-existing
 
 ## Dev Notes
 

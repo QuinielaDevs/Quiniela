@@ -157,6 +157,16 @@ begin
     raise exception 'La apuesta debe ser mayor que cero.' using errcode = 'P0001';
   end if;
 
+  -- Verificar que el partido exista, esté programado y no haya comenzado
+  if not exists (
+    select 1 from public.matches
+    where id = p_match_id 
+      and status = 'scheduled' 
+      and match_time > now()
+  ) then
+    raise exception 'El partido ya comenzó o no está disponible para apuestas.' using errcode = 'P0004';
+  end if;
+
   -- Validación de tipo de reto
   if p_type not in ('direct', 'open') then
     raise exception 'Tipo de reto invalido.' using errcode = '23514';

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-01T19:12:28-04:00"
-last_updated: "2026-06-04T15:33:44Z"
+last_updated: "2026-06-04T15:51:45Z"
 project: "pija-quiniela"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -64,7 +64,7 @@ development_status:
   4-2-notificaciones-impacto-de-gol-live-toast: backlog
   epic-4-retrospective: optional
   epic-5: in-progress
-  5-1-creacion-de-duelo-1v1-directo-y-abierto-con-deduccion-de-escrow: review
+  5-1-creacion-de-duelo-1v1-directo-y-abierto-con-deduccion-de-escrow: done
   5-2-aceptacion-rechazo-y-devolucion-de-garantia-escrow: backlog
   5-3-resolucion-y-reparto-automatizado-del-pozo-de-puntos: backlog
   5-4-compartir-de-forma-viral-por-whatsapp-y-landing-page-banter-preview: backlog

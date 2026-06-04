@@ -340,6 +340,63 @@ describe("Duelos y Escrow: RPC create_challenge", () => {
     expect(Number(memberA!.wager_balance)).toBe(100.00);
   });
 
+  it("(f) Validación de partido: rechaza creación si el partido ya comenzó o no está programado", async () => {
+    // Caso 1: Partido ya comenzó (status = 'live')
+    const matchLive = await admin
+      .from("matches")
+      .insert({
+        home_team: "Brasil",
+        away_team: "Croacia",
+        match_time: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+        status: "live",
+      })
+      .select("id")
+      .single();
+    expect(matchLive.error).toBeNull();
+    createdMatchIds.push(matchLive.data!.id);
+
+    // Caso 2: Partido en el pasado (match_time < now())
+    const matchPast = await admin
+      .from("matches")
+      .insert({
+        home_team: "Francia",
+        away_team: "Marruecos",
+        match_time: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        status: "scheduled",
+      })
+      .select("id")
+      .single();
+    expect(matchPast.error).toBeNull();
+    createdMatchIds.push(matchPast.data!.id);
+
+    await seedBalance(userA.id, leagueId, 100.00);
+    const clientA = createAuthedClient(userA.token);
+
+    // Intentar crear con partido en vivo
+    const { error: errLive } = await clientA.rpc("create_challenge", {
+      p_league_id: leagueId,
+      p_match_id: matchLive.data!.id,
+      p_points_bet: 20,
+      p_type: "open",
+      p_prediction_home: 1,
+      p_prediction_away: 1,
+    });
+    expect(errLive).not.toBeNull();
+    expect(errLive?.code).toBe("P0004");
+
+    // Intentar crear con partido en el pasado
+    const { error: errPast } = await clientA.rpc("create_challenge", {
+      p_league_id: leagueId,
+      p_match_id: matchPast.data!.id,
+      p_points_bet: 20,
+      p_type: "open",
+      p_prediction_home: 1,
+      p_prediction_away: 1,
+    });
+    expect(errPast).not.toBeNull();
+    expect(errPast?.code).toBe("P0004");
+  });
+
   it("Invariante de conservación: wager_balance == SUM(amount) en point_transactions", async () => {
     await seedBalance(userA.id, leagueId, 200.00);
 

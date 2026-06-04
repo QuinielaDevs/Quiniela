@@ -26,6 +26,9 @@ function getDuelsErrorMessage(error: unknown): string {
   if (err.code === "P0001") {
     return "La apuesta debe ser mayor que cero.";
   }
+  if (err.code === "P0004") {
+    return "El partido ya comenzó o no está disponible para apuestas.";
+  }
   if (err.code === "42501") {
     return "No tienes permisos o no eres miembro de la liga.";
   }
