@@ -317,7 +317,38 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fn_match_editable: { Args: { p_match_id: string }; Returns: boolean }
       fn_match_unlocked: { Args: { p_match_id: string }; Returns: boolean }
+      fn_prediction_multiplier: {
+        Args: { p_match_time: string }
+        Returns: number
+      }
+      fn_save_prediction: {
+        Args: {
+          p_away_score_pred: number
+          p_home_score_pred: number
+          p_league_id: string
+          p_match_id: string
+        }
+        Returns: {
+          away_score_pred: number
+          created_at: string
+          home_score_pred: number
+          id: string
+          league_id: string
+          match_id: string
+          multiplier: number
+          points_earned: number | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "predictions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
     }
     Enums: {

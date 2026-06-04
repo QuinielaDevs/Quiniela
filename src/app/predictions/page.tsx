@@ -63,7 +63,9 @@ export async function PredictionsBoard() {
       .order("match_time", { ascending: true }),
     supabase
       .from("predictions")
-      .select("id, match_id, home_score_pred, away_score_pred, updated_at")
+      .select(
+        "id, match_id, home_score_pred, away_score_pred, multiplier, updated_at",
+      )
       .eq("league_id", leagueId)
       .eq("user_id", userId),
   ]);
@@ -96,6 +98,7 @@ export async function PredictionsBoard() {
                     id: prediction.id,
                     homeScorePred: prediction.home_score_pred,
                     awayScorePred: prediction.away_score_pred,
+                    multiplier: prediction.multiplier,
                     updatedAt: prediction.updated_at,
                   }
                 : null

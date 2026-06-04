@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { calculateBasePoints } from "./scoring";
+import {
+  calculateBasePoints,
+  calculatePredictionMultiplier,
+  calculatePredictionPoints,
+} from "./scoring";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// Helper: arma un par (savedAt, matchTime) con `days` de antelación exacta.
+function multiplierForDays(days: number): number {
+  const savedAt = 0;
+  const matchTime = days * MS_PER_DAY;
+  return calculatePredictionMultiplier(savedAt, matchTime);
+}
 
 // Motor de puntuación base (Story 2.1 — AC #4, #5). Lógica pura, sin DB ni DOM.
 // Reglas: marcador exacto = 5; resultado acertado (mismo ganador/empate) = 2;
@@ -94,5 +106,72 @@ describe("calculateBasePoints — guarda defensiva de marcadores inválidos", ()
     expect(
       calculateBasePoints({ home: 2.5, away: 1 }, { home: 2, away: 1 }, "finished"),
     ).toBe(0);
+  });
+});
+
+describe("calculatePredictionMultiplier — lotes por antelación (Story 2.4)", () => {
+  it("< 7 días → 1.00 (borde 6.99d)", () => {
+    expect(multiplierForDays(6.99)).toBe(1.0);
+  });
+
+  it(">= 7 días → 1.30 (borde exacto 7d)", () => {
+    expect(multiplierForDays(7)).toBe(1.3);
+  });
+
+  it(">= 14 días → 1.60 (borde exacto 14d)", () => {
+    expect(multiplierForDays(14)).toBe(1.6);
+  });
+
+  it(">= 21 días → 1.90 (borde exacto 21d)", () => {
+    expect(multiplierForDays(21)).toBe(1.9);
+  });
+
+  it(">= 28 días → 2.20 (borde exacto 28d)", () => {
+    expect(multiplierForDays(28)).toBe(2.2);
+  });
+
+  it(">= 35 días → 2.50 (borde exacto 35d y 38d)", () => {
+    expect(multiplierForDays(35)).toBe(2.5);
+    expect(multiplierForDays(38)).toBe(2.5);
+  });
+
+  it("0 días o antelación negativa (después del kickoff) → 1.00", () => {
+    expect(multiplierForDays(0)).toBe(1.0);
+    expect(multiplierForDays(-3)).toBe(1.0);
+  });
+
+  it("acepta Date y string ISO además de números", () => {
+    const saved = new Date("2026-05-01T00:00:00.000Z");
+    const kickoff = new Date("2026-06-11T00:00:00.000Z"); // 41 días
+    expect(calculatePredictionMultiplier(saved, kickoff)).toBe(2.5);
+    expect(
+      calculatePredictionMultiplier(
+        "2026-06-10T00:00:00.000Z",
+        "2026-06-11T00:00:00.000Z",
+      ),
+    ).toBe(1.0); // 1 día
+  });
+
+  it("tiempos inválidos → 1.00 (defensivo)", () => {
+    expect(calculatePredictionMultiplier("no-date", 0)).toBe(1.0);
+  });
+});
+
+describe("calculatePredictionPoints — base * multiplicador (Story 2.4)", () => {
+  it("marcador exacto con 2.5x → 12.5", () => {
+    expect(calculatePredictionPoints(5, 2.5)).toBe(12.5);
+  });
+
+  it("resultado acertado con 1.6x → 3.2", () => {
+    expect(calculatePredictionPoints(2, 1.6)).toBe(3.2);
+  });
+
+  it("base 0 → 0 con cualquier multiplicador", () => {
+    expect(calculatePredictionPoints(0, 2.5)).toBe(0);
+  });
+
+  it("valores no finitos → 0", () => {
+    expect(calculatePredictionPoints(NaN, 1.3)).toBe(0);
+    expect(calculatePredictionPoints(5, Infinity)).toBe(0);
   });
 });

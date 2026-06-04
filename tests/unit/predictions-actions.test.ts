@@ -20,35 +20,20 @@ const SAVED_PREDICTION = {
   user_id: USER_ID,
   home_score_pred: VALID_INPUT.homeScorePred,
   away_score_pred: VALID_INPUT.awayScorePred,
-  multiplier: 1,
+  multiplier: 1.6,
   points_earned: null,
   created_at: "2026-06-03T18:00:00.000Z",
   updated_at: "2026-06-03T18:00:00.000Z",
 };
 
-function makeUpdateQuery(result: unknown) {
-  const maybeSingle = vi.fn().mockResolvedValue(result);
-  const select = vi.fn(() => ({ maybeSingle }));
-  const eq = vi.fn(() => ({ eq, select }));
-  return {
-    update: vi.fn(() => ({ eq })),
-    eq,
-    select,
-    maybeSingle,
-  };
-}
-
-function makeInsertQuery(result: unknown) {
+// Mockea supabase.rpc("fn_save_prediction", ...).single() → { data, error }.
+function mockRpc(result: { data: unknown; error: unknown }) {
   const single = vi.fn().mockResolvedValue(result);
-  const select = vi.fn(() => ({ single }));
-  return {
-    insert: vi.fn(() => ({ select })),
-    select,
-    single,
-  };
+  const rpc = vi.fn(() => ({ single }));
+  return { rpc, single };
 }
 
-describe("savePrediction", () => {
+describe("savePrediction (RPC fn_save_prediction)", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -60,10 +45,7 @@ describe("savePrediction", () => {
       "@/app/actions/predictions.actions"
     );
 
-    const result = await savePrediction({
-      ...VALID_INPUT,
-      homeScorePred: -1,
-    });
+    const result = await savePrediction({ ...VALID_INPUT, homeScorePred: -1 });
 
     expect(result.success).toBe(false);
     expect(result.data).toBeNull();
@@ -71,56 +53,22 @@ describe("savePrediction", () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
-  it("retorna error seguro cuando no hay usuario autenticado", async () => {
+  it("guarda via RPC y retorna la fila (con multiplier calculado por el backend)", async () => {
+    const { rpc } = mockRpc({ data: SAVED_PREDICTION, error: null });
     const { createClient } = await import("@/utils/supabase/server");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
-      },
-    } as never);
+    vi.mocked(createClient).mockResolvedValue({ rpc } as never);
     const { savePrediction } = await import(
       "@/app/actions/predictions.actions"
     );
 
     const result = await savePrediction(VALID_INPUT);
 
-    expect(result).toEqual({
-      success: false,
-      data: null,
-      error: "Debes iniciar sesion para guardar tu prediccion.",
+    expect(rpc).toHaveBeenCalledWith("fn_save_prediction", {
+      p_league_id: VALID_INPUT.leagueId,
+      p_match_id: VALID_INPUT.matchId,
+      p_home_score_pred: 2,
+      p_away_score_pred: 1,
     });
-  });
-
-  it("actualiza una prediccion existente y retorna la fila guardada", async () => {
-    const updateQuery = makeUpdateQuery({
-      data: SAVED_PREDICTION,
-      error: null,
-    });
-    const from = vi.fn(() => updateQuery);
-    const { createClient } = await import("@/utils/supabase/server");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: USER_ID } },
-          error: null,
-        }),
-      },
-      from,
-    } as never);
-    const { savePrediction } = await import(
-      "@/app/actions/predictions.actions"
-    );
-
-    const result = await savePrediction(VALID_INPUT);
-
-    expect(from).toHaveBeenCalledWith("predictions");
-    expect(updateQuery.update).toHaveBeenCalledWith({
-      home_score_pred: 2,
-      away_score_pred: 1,
-    });
-    expect(updateQuery.eq).toHaveBeenCalledWith("league_id", VALID_INPUT.leagueId);
-    expect(updateQuery.eq).toHaveBeenCalledWith("match_id", VALID_INPUT.matchId);
-    expect(updateQuery.eq).toHaveBeenCalledWith("user_id", USER_ID);
     expect(result).toEqual({
       success: true,
       data: SAVED_PREDICTION,
@@ -128,92 +76,33 @@ describe("savePrediction", () => {
     });
   });
 
-  it("inserta una prediccion si no existe fila previa", async () => {
-    const updateQuery = makeUpdateQuery({ data: null, error: null });
-    const insertQuery = makeInsertQuery({
-      data: SAVED_PREDICTION,
-      error: null,
+  it("mapea el bloqueo de kickoff (P0001) a un error definitivo no reintentable", async () => {
+    const { rpc } = mockRpc({
+      data: null,
+      error: { code: "P0001", message: "Pronostico cerrado" },
     });
-    const from = vi.fn().mockReturnValueOnce(updateQuery).mockReturnValueOnce(insertQuery);
     const { createClient } = await import("@/utils/supabase/server");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: USER_ID } },
-          error: null,
-        }),
-      },
-      from,
-    } as never);
+    vi.mocked(createClient).mockResolvedValue({ rpc } as never);
     const { savePrediction } = await import(
       "@/app/actions/predictions.actions"
+    );
+    const { PREDICTION_LOCKED_ERROR } = await import(
+      "@/app/actions/predictions.constants"
     );
 
     const result = await savePrediction(VALID_INPUT);
 
-    expect(insertQuery.insert).toHaveBeenCalledWith({
-      league_id: VALID_INPUT.leagueId,
-      match_id: VALID_INPUT.matchId,
-      user_id: USER_ID,
-      home_score_pred: 2,
-      away_score_pred: 1,
-    });
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual(SAVED_PREDICTION);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PREDICTION_LOCKED_ERROR);
   });
 
-  it("si el insert choca por unique violation, reintenta update una vez", async () => {
-    const firstUpdateQuery = makeUpdateQuery({ data: null, error: null });
-    const insertQuery = makeInsertQuery({
+  it("normaliza errores de permiso/RLS sin filtrar SQL", async () => {
+    const { rpc } = mockRpc({
       data: null,
-      error: { code: "23505", message: "duplicate key value violates unique constraint" },
+      error: { code: "42501", message: "permission denied for table predictions" },
     });
-    const retryUpdateQuery = makeUpdateQuery({
-      data: SAVED_PREDICTION,
-      error: null,
-    });
-    const from = vi
-      .fn()
-      .mockReturnValueOnce(firstUpdateQuery)
-      .mockReturnValueOnce(insertQuery)
-      .mockReturnValueOnce(retryUpdateQuery);
     const { createClient } = await import("@/utils/supabase/server");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: USER_ID } },
-          error: null,
-        }),
-      },
-      from,
-    } as never);
-    const { savePrediction } = await import(
-      "@/app/actions/predictions.actions"
-    );
-
-    const result = await savePrediction(VALID_INPUT);
-
-    expect(from).toHaveBeenCalledTimes(3);
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual(SAVED_PREDICTION);
-  });
-
-  it("normaliza errores internos sin exponer SQL/RLS", async () => {
-    const updateQuery = makeUpdateQuery({
-      data: null,
-      error: { message: "permission denied for table predictions", code: "42501" },
-    });
-    const from = vi.fn(() => updateQuery);
-    const { createClient } = await import("@/utils/supabase/server");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: USER_ID } },
-          error: null,
-        }),
-      },
-      from,
-    } as never);
+    vi.mocked(createClient).mockResolvedValue({ rpc } as never);
     const { savePrediction } = await import(
       "@/app/actions/predictions.actions"
     );
@@ -228,21 +117,12 @@ describe("savePrediction", () => {
   });
 
   it("marca errores transitorios de Supabase como reintentables", async () => {
-    const updateQuery = makeUpdateQuery({
+    const { rpc } = mockRpc({
       data: null,
       error: { message: "fetch failed", status: 503 },
     });
-    const from = vi.fn(() => updateQuery);
     const { createClient } = await import("@/utils/supabase/server");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: USER_ID } },
-          error: null,
-        }),
-      },
-      from,
-    } as never);
+    vi.mocked(createClient).mockResolvedValue({ rpc } as never);
     const { savePrediction } = await import(
       "@/app/actions/predictions.actions"
     );

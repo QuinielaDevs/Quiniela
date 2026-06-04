@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Lock } from "lucide-react";
 
 import { savePrediction } from "@/app/actions/predictions.actions";
 import {
@@ -9,6 +10,7 @@ import {
   TRANSIENT_SAVE_ERROR,
 } from "@/app/actions/predictions.constants";
 import { GoalPicker } from "@/components/predictions/GoalPicker";
+import { calculatePredictionMultiplier, MIN_MULTIPLIER } from "@/utils/scoring";
 import type { Match } from "@/types";
 import { cn } from "@/utils/utils";
 
@@ -16,6 +18,7 @@ type MatchCardPrediction = {
   id?: string;
   homeScorePred: number;
   awayScorePred: number;
+  multiplier?: number;
   updatedAt?: string;
 };
 
@@ -46,10 +49,26 @@ type PendingPrediction = {
 
 const DEBOUNCE_MS = 500;
 const OFFLINE_COPY = "Sin conexion - Pendiente";
+const LOCKED_COPY = "Pronostico cerrado";
+const KICKOFF_LOCK_MS = 60_000;
+const CLOSED_STATUSES = new Set(["live", "finished", "suspended", "canceled"]);
 
 function isBrowserOnline() {
   if (typeof navigator === "undefined") return true;
   return navigator.onLine;
+}
+
+// Bloqueo de UI: defensivo/ergonómico. La AUTORIDAD del bloqueo es la DB (la RPC
+// fn_save_prediction rechaza tras match_time - 1min con la hora del servidor).
+function isMatchLocked(match: MatchCardProps["match"]): boolean {
+  if (CLOSED_STATUSES.has(match.status)) return true;
+  const kickoffMs = new Date(match.match_time).getTime();
+  if (!Number.isFinite(kickoffMs)) return false;
+  return Date.now() >= kickoffMs - KICKOFF_LOCK_MS;
+}
+
+function formatMultiplier(value: number): string {
+  return `${value.toFixed(1)}x`;
 }
 
 export function MatchCard({
@@ -58,19 +77,26 @@ export function MatchCard({
   initialPrediction,
   disabled = false,
 }: MatchCardProps) {
-  const hasInitialPrediction = initialPrediction !== null && initialPrediction !== undefined;
+  const hasInitialPrediction =
+    initialPrediction !== null && initialPrediction !== undefined;
   const initialPredictionId = initialPrediction?.id;
   const initialHomeScore = initialPrediction?.homeScorePred ?? 0;
   const initialAwayScore = initialPrediction?.awayScorePred ?? 0;
+  const savedMultiplier = initialPrediction?.multiplier ?? MIN_MULTIPLIER;
 
   const [homeScore, setHomeScore] = useState(initialHomeScore);
   const [awayScore, setAwayScore] = useState(initialAwayScore);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [warningOpen, setWarningOpen] = useState(false);
 
   const requestIdRef = useRef(0);
   const hasUserEditedRef = useRef(false);
   const pendingRef = useRef<PendingPrediction | null>(null);
+  // Una confirmación de degradación cubre el resto de la sesión de edición de
+  // esta tarjeta; evita re-abrir el modal en cada click posterior.
+  const degradeAckRef = useRef(false);
+  const pendingEditRef = useRef<(() => void) | null>(null);
   const lastSavedRef = useRef<PendingPrediction | null>(
     hasInitialPrediction
       ? {
@@ -79,6 +105,17 @@ export function MatchCard({
         }
       : null,
   );
+
+  // Multiplicador: el guardado (saved) y el que se obtendría al editar AHORA.
+  // El valor autoritativo final siempre lo calcula el backend; esto es UI.
+  const isLocked = isMatchLocked(match);
+  const nextMultiplier = calculatePredictionMultiplier(
+    Date.now(),
+    match.match_time,
+  );
+  const displayMultiplier = hasInitialPrediction
+    ? savedMultiplier
+    : nextMultiplier;
 
   useEffect(() => {
     const nextInitial = {
@@ -89,11 +126,14 @@ export function MatchCard({
     requestIdRef.current += 1;
     hasUserEditedRef.current = false;
     pendingRef.current = null;
+    degradeAckRef.current = false;
+    pendingEditRef.current = null;
     lastSavedRef.current = hasInitialPrediction ? nextInitial : null;
     setHomeScore(nextInitial.homeScorePred);
     setAwayScore(nextInitial.awayScorePred);
     setSaveState("idle");
     setError(null);
+    setWarningOpen(false);
   }, [
     hasInitialPrediction,
     initialAwayScore,
@@ -203,20 +243,65 @@ export function MatchCard({
     };
   }, [runSave, saveState]);
 
-  const handleHomeScoreChange = useCallback((next: number) => {
-    hasUserEditedRef.current = true;
-    setHomeScore(next);
+  // Intercepta una edición: si bajaría el multiplicador guardado y no se ha
+  // confirmado aún, abre la advertencia ANTES de tocar el estado/debounce.
+  const requestScoreChange = useCallback(
+    (applyEdit: () => void) => {
+      const wouldDegrade =
+        hasInitialPrediction &&
+        !degradeAckRef.current &&
+        savedMultiplier > MIN_MULTIPLIER &&
+        nextMultiplier < savedMultiplier;
+
+      if (wouldDegrade) {
+        pendingEditRef.current = applyEdit;
+        setWarningOpen(true);
+        return;
+      }
+      applyEdit();
+    },
+    [hasInitialPrediction, savedMultiplier, nextMultiplier],
+  );
+
+  const handleHomeScoreChange = useCallback(
+    (next: number) => {
+      requestScoreChange(() => {
+        hasUserEditedRef.current = true;
+        setHomeScore(next);
+      });
+    },
+    [requestScoreChange],
+  );
+
+  const handleAwayScoreChange = useCallback(
+    (next: number) => {
+      requestScoreChange(() => {
+        hasUserEditedRef.current = true;
+        setAwayScore(next);
+      });
+    },
+    [requestScoreChange],
+  );
+
+  const confirmDegrade = useCallback(() => {
+    degradeAckRef.current = true;
+    setWarningOpen(false);
+    const apply = pendingEditRef.current;
+    pendingEditRef.current = null;
+    apply?.();
   }, []);
 
-  const handleAwayScoreChange = useCallback((next: number) => {
-    hasUserEditedRef.current = true;
-    setAwayScore(next);
+  const cancelDegrade = useCallback(() => {
+    pendingEditRef.current = null;
+    setWarningOpen(false);
   }, []);
 
   const controlsDisabled =
-    disabled || saveState === "saving" || saveState === "offline";
-  const statusCopy =
-    saveState === "saving"
+    disabled || saveState === "saving" || saveState === "offline" || isLocked;
+
+  const statusCopy = isLocked
+    ? null
+    : saveState === "saving"
       ? "Guardando..."
       : saveState === "saved"
         ? "Guardado ✓"
@@ -236,22 +321,36 @@ export function MatchCard({
       )}
     >
       <div className="mb-3 flex min-h-6 items-center justify-between gap-3">
-        <div className="text-xs text-muted-foreground">
-          {match.matchday ? `Jornada ${match.matchday}` : match.stage}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{match.matchday ? `Jornada ${match.matchday}` : match.stage}</span>
+          <span className="font-semibold text-accent">
+            {formatMultiplier(displayMultiplier)}
+          </span>
         </div>
-        {statusCopy && (
+
+        {isLocked ? (
           <div
-            className={cn(
-              "text-xs font-semibold",
-              saveState === "saved" && "text-success",
-              saveState === "offline" && "text-destructive",
-              saveState === "error" && "text-destructive",
-              saveState === "saving" && "text-muted-foreground",
-            )}
-            role={saveState === "error" ? "alert" : "status"}
+            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+            role="status"
           >
-            {statusCopy}
+            <Lock className="size-3.5" aria-hidden="true" />
+            {LOCKED_COPY}
           </div>
+        ) : (
+          statusCopy && (
+            <div
+              className={cn(
+                "text-xs font-semibold",
+                saveState === "saved" && "text-success",
+                saveState === "offline" && "text-destructive",
+                saveState === "error" && "text-destructive",
+                saveState === "saving" && "text-muted-foreground",
+              )}
+              role={saveState === "error" ? "alert" : "status"}
+            >
+              {statusCopy}
+            </div>
+          )
         )}
       </div>
 
@@ -292,6 +391,35 @@ export function MatchCard({
           />
         </div>
       </div>
+
+      {warningOpen && (
+        <div
+          role="alertdialog"
+          aria-label="Advertencia de multiplicador"
+          className="mt-3 rounded-sm border border-accent bg-background p-3 text-sm"
+        >
+          <p className="text-foreground">
+            Tu multiplicador bajara de {formatMultiplier(savedMultiplier)} a{" "}
+            {formatMultiplier(nextMultiplier)}.
+          </p>
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={cancelDegrade}
+              className="h-9 rounded-sm border border-border px-4 text-sm font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={confirmDegrade}
+              className="h-9 rounded-sm bg-primary px-4 text-sm font-semibold text-primary-foreground"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

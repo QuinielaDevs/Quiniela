@@ -6,6 +6,7 @@ import { MatchCard } from "@/components/predictions/MatchCard";
 import { savePrediction } from "@/app/actions/predictions.actions";
 import {
   MAX_PREDICTION_SCORE,
+  PREDICTION_LOCKED_ERROR,
   TRANSIENT_SAVE_ERROR,
 } from "@/app/actions/predictions.constants";
 
@@ -388,5 +389,124 @@ describe("MatchCard", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByRole("spinbutton")).toBeNull();
     expect(document.querySelector("input")).toBeNull();
+  });
+
+  // ---- Story 2.4: multiplicador, advertencia de degradación y candado ----
+
+  it("muestra el multiplicador guardado de la prediccion", () => {
+    renderMatchCard({
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
+    });
+
+    expect(screen.getByText("2.5x")).toBeInTheDocument();
+  });
+
+  it("una edicion que NO degrada el multiplicador no abre advertencia y guarda normal", async () => {
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z")); // 8 dias → 1.3x
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: SAVED_PREDICTION,
+      error: null,
+    });
+    renderMatchCard({
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 1.3 },
+    });
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    await flushPromises();
+
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+  });
+
+  it("una edicion que degrada abre advertencia; cancelar no guarda", async () => {
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z")); // next 1.3x < 2.5x
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: SAVED_PREDICTION,
+      error: null,
+    });
+    renderMatchCard({
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
+    });
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    await flushPromises();
+
+    expect(savePrediction).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("confirmar la advertencia aplica el cambio y guarda tras 500ms", async () => {
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z"));
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: SAVED_PREDICTION,
+      error: null,
+    });
+    renderMatchCard({
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
+    });
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    await flushPromises();
+
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+    expect(savePrediction).toHaveBeenCalledWith(
+      expect.objectContaining({ homeScorePred: 2, awayScorePred: 0 }),
+    );
+  });
+
+  it("bloquea la edicion cuando falta <=1min para el kickoff y muestra candado", () => {
+    vi.setSystemTime(new Date("2026-06-11T19:59:30.000Z")); // 30s antes del kickoff
+    renderMatchCard({ initialPrediction: { homeScorePred: 0, awayScorePred: 0 } });
+
+    expect(screen.getByText("Pronostico cerrado")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Incrementar goles de Argentina"),
+    ).toBeDisabled();
+    expect(
+      screen.getByLabelText("Disminuir goles de Mexico"),
+    ).toBeDisabled();
+  });
+
+  it("un error de kickoff del servidor es definitivo y no entra en retry offline", async () => {
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z")); // cliente NO bloqueado
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: false,
+      data: null,
+      error: PREDICTION_LOCKED_ERROR,
+    });
+    renderMatchCard({ initialPrediction: null });
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    await flushPromises();
+
+    expect(screen.getByText(PREDICTION_LOCKED_ERROR)).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(savePrediction).toHaveBeenCalledTimes(1);
   });
 });

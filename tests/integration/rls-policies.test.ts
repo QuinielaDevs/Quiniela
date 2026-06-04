@@ -110,25 +110,29 @@ beforeAll(async () => {
   futureMatchId = sorted[1]!.id;
   createdMatchIds.push(unlockedMatchId, futureMatchId);
 
-  // userA crea sus predicciones (dueño + miembro → insert permitido).
+  // userA crea su predicción del partido FUTURO (editable → insert permitido).
   const clientA = createAuthedClient(userA.token);
-  const { error: pErr } = await clientA.from("predictions").insert([
-    {
-      league_id: leagueId,
-      match_id: futureMatchId,
-      user_id: userA.id,
-      home_score_pred: 2,
-      away_score_pred: 1,
-    },
-    {
-      league_id: leagueId,
-      match_id: unlockedMatchId,
-      user_id: userA.id,
-      home_score_pred: 0,
-      away_score_pred: 3,
-    },
-  ]);
+  const { error: pErr } = await clientA.from("predictions").insert({
+    league_id: leagueId,
+    match_id: futureMatchId,
+    user_id: userA.id,
+    home_score_pred: 2,
+    away_score_pred: 1,
+  });
   expect(pErr).toBeNull();
+
+  // El partido desbloqueado ya pasó match_time - 1min: desde Story 2.4 la
+  // ESCRITURA directa del cliente está bloqueada por la política de kickoff
+  // (fn_match_editable). Sembramos esta predicción con service_role (bypassa
+  // RLS) solo como fixture para el test de LECTURA desbloqueada.
+  const { error: pErr2 } = await admin.from("predictions").insert({
+    league_id: leagueId,
+    match_id: unlockedMatchId,
+    user_id: userA.id,
+    home_score_pred: 0,
+    away_score_pred: 3,
+  });
+  expect(pErr2).toBeNull();
 });
 
 afterAll(async () => {

@@ -6,19 +6,26 @@ import {
   type SavePredictionInput,
 } from "@/app/actions/predictions.schema";
 import {
+  PREDICTION_LOCKED_ERROR,
   SAVE_ERROR,
   TRANSIENT_SAVE_ERROR,
 } from "@/app/actions/predictions.constants";
 import type { Prediction, ServerActionResult } from "@/types";
-
-const UNIQUE_VIOLATION = "23505";
-const AUTH_ERROR = "Debes iniciar sesion para guardar tu prediccion.";
 
 type SupabaseErrorLike = {
   code?: string | null;
   message?: string | null;
   status?: number | null;
 };
+
+// El partido cerró por kickoff: la RPC lanza 'Pronostico cerrado' con errcode
+// P0001. Es DEFINITIVO (no entra en la cola offline/retry de 2.3).
+function isPredictionLockedError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const maybeError = error as SupabaseErrorLike;
+  const message = (maybeError.message ?? "").toLowerCase();
+  return maybeError.code === "P0001" || message.includes("cerrado");
+}
 
 function isTransientSaveError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -50,52 +57,12 @@ function toSafeSaveError(error?: unknown): string {
   return isTransientSaveError(error) ? TRANSIENT_SAVE_ERROR : SAVE_ERROR;
 }
 
-async function updateExistingPrediction(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  input: ReturnType<typeof savePredictionSchema.parse>,
-  userId: string,
-): Promise<{ data: Prediction | null; error: SupabaseErrorLike | null }> {
-  const { data, error } = await supabase
-    .from("predictions")
-    .update({
-      home_score_pred: input.homeScorePred,
-      away_score_pred: input.awayScorePred,
-    })
-    .eq("league_id", input.leagueId)
-    .eq("match_id", input.matchId)
-    .eq("user_id", userId)
-    .select()
-    .maybeSingle();
-
-  return {
-    data: data as Prediction | null,
-    error,
-  };
-}
-
-async function insertPrediction(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  input: ReturnType<typeof savePredictionSchema.parse>,
-  userId: string,
-): Promise<{ data: Prediction | null; error: SupabaseErrorLike | null }> {
-  const { data, error } = await supabase
-    .from("predictions")
-    .insert({
-      league_id: input.leagueId,
-      match_id: input.matchId,
-      user_id: userId,
-      home_score_pred: input.homeScorePred,
-      away_score_pred: input.awayScorePred,
-    })
-    .select()
-    .single();
-
-  return {
-    data: data as Prediction | null,
-    error,
-  };
-}
-
+/**
+ * Guarda (crea/actualiza) la predicción del usuario autenticado vía la RPC
+ * segura `fn_save_prediction` (Story 2.4): el backend valida usuario, pertenencia,
+ * scores y kickoff, y calcula/persiste el `multiplier` con `now()` del servidor.
+ * El cliente NUNCA envía `multiplier` ni `user_id`. NUNCA propaga excepciones.
+ */
 export async function savePrediction(
   input: SavePredictionInput,
 ): Promise<ServerActionResult<Prediction>> {
@@ -110,55 +77,23 @@ export async function savePrediction(
     }
 
     const supabase = await createClient();
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
+    const { data, error } = await supabase
+      .rpc("fn_save_prediction", {
+        p_league_id: parsed.data.leagueId,
+        p_match_id: parsed.data.matchId,
+        p_home_score_pred: parsed.data.homeScorePred,
+        p_away_score_pred: parsed.data.awayScorePred,
+      })
+      .single();
 
-    if (userError || !userId) {
-      return { success: false, data: null, error: AUTH_ERROR };
-    }
-
-    const updated = await updateExistingPrediction(
-      supabase,
-      parsed.data,
-      userId,
-    );
-    if (updated.error) {
-      return {
-        success: false,
-        data: null,
-        error: toSafeSaveError(updated.error),
-      };
-    }
-    if (updated.data) {
-      return { success: true, data: updated.data, error: null };
-    }
-
-    const inserted = await insertPrediction(supabase, parsed.data, userId);
-    if (!inserted.error && inserted.data) {
-      return { success: true, data: inserted.data, error: null };
-    }
-
-    if (inserted.error?.code === UNIQUE_VIOLATION) {
-      const retried = await updateExistingPrediction(
-        supabase,
-        parsed.data,
-        userId,
-      );
-      if (!retried.error && retried.data) {
-        return { success: true, data: retried.data, error: null };
+    if (error) {
+      if (isPredictionLockedError(error)) {
+        return { success: false, data: null, error: PREDICTION_LOCKED_ERROR };
       }
-      return {
-        success: false,
-        data: null,
-        error: toSafeSaveError(retried.error),
-      };
+      return { success: false, data: null, error: toSafeSaveError(error) };
     }
 
-    return {
-      success: false,
-      data: null,
-      error: toSafeSaveError(inserted.error),
-    };
+    return { success: true, data: data as Prediction, error: null };
   } catch (error) {
     return {
       success: false,

@@ -76,3 +76,71 @@ export function calculateBasePoints(
 
   return POINTS_NONE;
 }
+
+// ============================================================
+// Multiplicador por antelación (Story 2.4 — AC #1, #6).
+// Premia las predicciones tempranas. Escala por LOTES de días calibrada a la
+// ventana real del Mundial 2026 (11 jun → 19 jul = 38 días): >=35 días alcanza
+// el máximo 2.50x. Esta misma regla se espeja en SQL (fn_prediction_multiplier);
+// si cambia una, cambiar la otra y su vector de pruebas para evitar drift.
+// ============================================================
+
+export const MIN_MULTIPLIER = 1.0;
+export const MAX_MULTIPLIER = 2.5;
+
+/** Umbrales (días de antelación → multiplicador), ordenados de mayor a menor. */
+export const MULTIPLIER_TIERS: ReadonlyArray<{ minDays: number; value: number }> =
+  [
+    { minDays: 35, value: 2.5 },
+    { minDays: 28, value: 2.2 },
+    { minDays: 21, value: 1.9 },
+    { minDays: 14, value: 1.6 },
+    { minDays: 7, value: 1.3 },
+    { minDays: 0, value: 1.0 },
+  ];
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function toMs(value: Date | string | number): number {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  return new Date(value).getTime();
+}
+
+/**
+ * Multiplicador por antelación de una predicción respecto al kickoff. Determinista
+ * sobre milisegundos UTC (no calendario local). Antelación negativa o tiempos
+ * inválidos → MIN_MULTIPLIER (1.00). El valor AUTORITATIVO lo calcula el backend
+ * con `now()` del servidor; esta versión TS sirve para la UI predictiva.
+ */
+export function calculatePredictionMultiplier(
+  savedAt: Date | string | number,
+  matchTime: Date | string | number,
+): number {
+  const savedAtMs = toMs(savedAt);
+  const matchTimeMs = toMs(matchTime);
+  if (!Number.isFinite(savedAtMs) || !Number.isFinite(matchTimeMs)) {
+    return MIN_MULTIPLIER;
+  }
+
+  const days = (matchTimeMs - savedAtMs) / MS_PER_DAY;
+  for (const tier of MULTIPLIER_TIERS) {
+    if (days >= tier.minDays) return tier.value;
+  }
+  return MIN_MULTIPLIER;
+}
+
+/**
+ * Aplicación final: PuntosObtenidos = PuntosBase * Multiplicador. No duplica la
+ * regla de puntos base (`calculateBasePoints`). Redondea a 2 decimales para
+ * `predictions.points_earned numeric(6,2)`.
+ */
+export function calculatePredictionPoints(
+  basePoints: number,
+  multiplier: number,
+): number {
+  if (!Number.isFinite(basePoints) || !Number.isFinite(multiplier)) {
+    return 0;
+  }
+  return Math.round(basePoints * multiplier * 100) / 100;
+}

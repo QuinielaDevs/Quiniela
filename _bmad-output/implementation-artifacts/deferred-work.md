@@ -27,3 +27,7 @@
 
 - Sin bloqueo de escritura por kickoff −1min en las políticas INSERT/UPDATE de `predictions` (`supabase/migrations/20260603144630_predictions_rls.sql`): el time-gating de LECTURA ya está activo, pero un usuario puede editar su predicción después del kickoff (partido `live`/`finished`). Asignado a Story 2.4 ("cuando falte 1 minuto... la UI bloquea") — pero debe enforcarse en servidor (RLS/trigger con `fn_match_unlocked` en el `with check`), no solo en UI. Exposición práctica nula hasta que existan GoalPicker/autosave (Stories 2.2-2.3).
 - `MatchStatus` definido en tres lugares sincronizados a mano (CHECK de `matches.status` + literal en `src/types/index.ts` + literal en `src/utils/scoring.ts`); los tipos generados lo tipan como `string`. Riesgo de drift silencioso si cambia el set de estados. Mismo patrón ya diferido para `LeagueRole`/`PaymentStatus` en 1.2; considerar una fuente única (constante derivada o test que valide los literales contra el CHECK).
+
+## Deferred from: code review of story-2.4 (2026-06-03)
+
+- El candado de UI en `MatchCard` (`isMatchLocked`, `src/components/predictions/MatchCard.tsx`) se evalúa solo en render: si la tarjeta queda abierta y el reloj cruza `match_time − 1min`, los botones `+`/`−` no se auto-bloquean hasta el siguiente render. El servidor SÍ rechaza la escritura (RPC `fn_save_prediction` → P0001), por lo que no hay riesgo de integridad de datos; es una mejora de UX. Solución: un `setTimeout`/intervalo que fuerce re-render en el instante del bloqueo. (Hallazgo Blind Hunter en code review de 2.4.)
