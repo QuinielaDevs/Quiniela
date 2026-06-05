@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/predictions.constants";
 import { GoalPicker } from "@/components/predictions/GoalPicker";
 import { calculatePredictionMultiplier, MIN_MULTIPLIER } from "@/utils/scoring";
+import { flagForTeamCode } from "@/utils/team-flags";
 import type { Match } from "@/types";
 import { cn } from "@/utils/utils";
 
@@ -356,7 +357,14 @@ export function MatchCard({
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <div className="flex flex-col items-start gap-2">
-          <span className="text-sm font-semibold">{match.home_team}</span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold">
+            {flagForTeamCode(match.home_team_code) && (
+              <span aria-hidden="true">
+                {flagForTeamCode(match.home_team_code)}
+              </span>
+            )}
+            {match.home_team}
+          </span>
           {match.home_team_code && (
             <span className="text-xs uppercase text-muted-foreground">
               {match.home_team_code}
@@ -374,8 +382,13 @@ export function MatchCard({
         <div className="pt-8 font-display text-xl font-bold text-accent">vs</div>
 
         <div className="flex flex-col items-end gap-2">
-          <span className="text-right text-sm font-semibold">
+          <span className="flex items-center gap-1.5 text-right text-sm font-semibold">
             {match.away_team}
+            {flagForTeamCode(match.away_team_code) && (
+              <span aria-hidden="true">
+                {flagForTeamCode(match.away_team_code)}
+              </span>
+            )}
           </span>
           {match.away_team_code && (
             <span className="text-xs uppercase text-muted-foreground">

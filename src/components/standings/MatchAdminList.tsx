@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { setMatchResult } from "@/app/actions/matches.actions";
 import { GoalPicker } from "@/components/predictions/GoalPicker";
+import { flagForTeamCode } from "@/utils/team-flags";
 import { cn } from "@/utils/utils";
 import type { MatchStatus } from "@/types";
 
@@ -142,8 +143,19 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">
+            {flagForTeamCode(match.homeTeamCode) && (
+              <span aria-hidden="true">
+                {flagForTeamCode(match.homeTeamCode)}{" "}
+              </span>
+            )}
             {match.homeTeam}{" "}
             <span className="text-muted-foreground">vs</span> {match.awayTeam}
+            {flagForTeamCode(match.awayTeamCode) && (
+              <span aria-hidden="true">
+                {" "}
+                {flagForTeamCode(match.awayTeamCode)}
+              </span>
+            )}
           </p>
           <p
             className="mt-0.5 text-[11px] uppercase tracking-wide text-muted-foreground"
