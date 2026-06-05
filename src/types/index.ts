@@ -39,21 +39,27 @@ export type PredictionInsert = TableInsert<"predictions">;
 export type PredictionUpdate = TableUpdate<"predictions">;
 
 /**
- * Estados válidos de un partido (espeja el CHECK de `matches.status`). Los tipos
- * generados lo tipan como `string`; mantener sincronizado con la migración
- * matches_and_predictions.sql y con `MatchStatus` en src/utils/scoring.ts.
+ * Estados válidos de un partido (espeja el CHECK de `matches.status`). Fuente
+ * ÚNICA en TS: el array runtime; el tipo se DERIVA de él. Un test de paridad
+ * (tests/integration/enum-parity.test.ts) valida este array contra el CHECK de
+ * la BD para detectar drift. Mantener `MatchStatus` en src/utils/scoring.ts
+ * alineado (o importarlo desde aquí).
  */
-export type MatchStatus =
-  | "scheduled"
-  | "live"
-  | "finished"
-  | "suspended"
-  | "canceled";
+export const MATCH_STATUSES = [
+  "scheduled",
+  "live",
+  "finished",
+  "suspended",
+  "canceled",
+] as const;
+export type MatchStatus = (typeof MATCH_STATUSES)[number];
 
 /** Roles válidos de un miembro de liga (espeja el CHECK de la tabla). */
-export type LeagueRole = "admin" | "member";
+export const LEAGUE_ROLES = ["admin", "member"] as const;
+export type LeagueRole = (typeof LEAGUE_ROLES)[number];
 /** Estados de pago de un miembro (espeja el CHECK de la tabla). */
-export type PaymentStatus = "pending" | "paid";
+export const PAYMENT_STATUSES = ["pending", "paid"] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 // --- reglas de liga (columna leagues.rules JSONB) ---
 /**
@@ -61,7 +67,8 @@ export type PaymentStatus = "pending" | "paid";
  * `rules.predictionMode` (no el label de la UI) para no romper datos si cambia
  * el texto del mockup. (Story 1.3 — admin-settings.html)
  */
-export type PredictionMode = "dual" | "jornada" | "grupos";
+export const PREDICTION_MODES = ["dual", "jornada", "grupos"] as const;
+export type PredictionMode = (typeof PREDICTION_MODES)[number];
 
 /** Forma del JSONB `leagues.rules`. Crece en stories futuras. */
 export type LeagueRules = { predictionMode: PredictionMode };
