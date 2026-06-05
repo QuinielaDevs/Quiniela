@@ -142,8 +142,7 @@ export function MatchCard({
   const formattedTime = useMemo(() => {
     const date = new Date(match.match_time);
     if (!Number.isFinite(date.getTime())) return "";
-    return date.toLocaleString("es-VE", {
-      timeZone: "America/Caracas",
+    return date.toLocaleString("es", {
       day: "2-digit",
       month: "short",
       hour: "2-digit",
