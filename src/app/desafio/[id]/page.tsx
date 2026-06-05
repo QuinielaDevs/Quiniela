@@ -39,7 +39,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const description = `Apuesta tus puntos en el partido ${matchDesc} del Mundial 2026. ¿Quién tiene la mejor predicción? Creado por ${challenge.creator_display_name}.`;
 
+  const defaultUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000";
+
   return {
+    metadataBase: new URL(defaultUrl),
     title: `${title} - PIJA Quiniela`,
     description,
     openGraph: {

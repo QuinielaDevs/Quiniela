@@ -12,6 +12,43 @@ import { rejectChallenge, cancelChallenge } from "@/app/actions/duels.actions";
 import { joinLeagueByInvite } from "@/app/actions/leagues.actions";
 import { cn } from "@/utils/utils";
 
+// Helper de bandera de país para estética de equipos (Story 5.4)
+export function getFlagEmoji(countryCode: string | null): string {
+  if (!countryCode) return "⚽";
+  const code = countryCode.toUpperCase();
+  const flagMap: Record<string, string> = {
+    ARG: "🇦🇷",
+    FRA: "🇫🇷",
+    BRA: "🇧🇷",
+    ESP: "🇪🇸",
+    GER: "🇩🇪",
+    ITA: "🇮🇹",
+    ENG: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    MEX: "🇲🇽",
+    USA: "🇺🇸",
+    URU: "🇺🇾",
+    COL: "🇨🇴",
+    CHI: "🇨🇱",
+    ECU: "🇪🇨",
+    PAR: "🇵🇾",
+    VEN: "🇻🇪",
+    BOL: "🇧🇴",
+    PER: "🇵🇪",
+    POR: "🇵🇹",
+    NED: "🇳🇱",
+    BEL: "🇧🇪",
+    CRO: "🇭🇷",
+    MAR: "🇲🇦",
+    SEN: "🇸🇳",
+    JPN: "🇯🇵",
+    KOR: "🇰🇷",
+    CAN: "🇨🇦",
+    KSA: "🇸🇦",
+    QAT: "🇶🇦",
+  };
+  return flagMap[code] || "⚽";
+}
+
 interface ChallengeDetails {
   challenge_id: string;
   points_bet: number;
@@ -64,23 +101,29 @@ export function DesafioClient({
   // por lo que challenged_id === currentUserId significa que el usuario es el participante.
   const isParticipantOfOpenPool = challenge.type === "open" && isChallenged;
 
-  const dateStr = new Date(challenge.match_time).toLocaleDateString("es-ES", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const dateStr = challenge.match_time
+    ? new Date(challenge.match_time).toLocaleDateString("es-ES", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Fecha no programada";
 
   const handleJoinLeague = () => {
     if (!challenge.invite_code) return;
     setActionError(null);
     startTransition(async () => {
-      const result = await joinLeagueByInvite(challenge.invite_code!);
-      if (result.success) {
-        router.refresh();
-      } else {
-        setActionError(result.error ?? "No se pudo unir a la liga.");
+      try {
+        const result = await joinLeagueByInvite(challenge.invite_code!);
+        if (result.success) {
+          router.refresh();
+        } else {
+          setActionError(result.error ?? "No se pudo unir a la liga.");
+        }
+      } catch (err) {
+        setActionError("Error de red al unirse a la liga.");
       }
     });
   };
@@ -88,11 +131,15 @@ export function DesafioClient({
   const handleReject = () => {
     setActionError(null);
     startTransition(async () => {
-      const result = await rejectChallenge({ challengeId: challenge.challenge_id });
-      if (result.success) {
-        router.refresh();
-      } else {
-        setActionError(result.error ?? "No se pudo rechazar el desafío.");
+      try {
+        const result = await rejectChallenge({ challengeId: challenge.challenge_id });
+        if (result.success) {
+          router.refresh();
+        } else {
+          setActionError(result.error ?? "No se pudo rechazar el desafío.");
+        }
+      } catch (err) {
+        setActionError("Error de red al rechazar el desafío.");
       }
     });
   };
@@ -100,11 +147,15 @@ export function DesafioClient({
   const handleCancel = () => {
     setActionError(null);
     startTransition(async () => {
-      const result = await cancelChallenge({ challengeId: challenge.challenge_id });
-      if (result.success) {
-        router.refresh();
-      } else {
-        setActionError(result.error ?? "No se pudo cancelar el desafío.");
+      try {
+        const result = await cancelChallenge({ challengeId: challenge.challenge_id });
+        if (result.success) {
+          router.refresh();
+        } else {
+          setActionError(result.error ?? "No se pudo cancelar el desafío.");
+        }
+      } catch (err) {
+        setActionError("Error de red al cancelar el desafío.");
       }
     });
   };
@@ -191,11 +242,12 @@ export function DesafioClient({
           {/* Marcadores e Información de los Equipos */}
           <div className="flex items-center justify-around py-2">
             <div className="flex flex-col items-center text-center space-y-1 w-24">
-              {challenge.home_team_code ? (
-                <span className="text-4xl font-display uppercase tracking-widest">{challenge.home_team_code}</span>
-              ) : (
-                <div className="size-10 bg-gray-700/35 rounded-full flex items-center justify-center">⚽</div>
-              )}
+              <span className="text-4xl filter drop-shadow-md">
+                {getFlagEmoji(challenge.home_team_code)}
+              </span>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mt-1">
+                {challenge.home_team_code}
+              </span>
               <span className="text-xs font-bold truncate max-w-full text-white">{challenge.home_team}</span>
             </div>
 
@@ -207,11 +259,12 @@ export function DesafioClient({
             </div>
 
             <div className="flex flex-col items-center text-center space-y-1 w-24">
-              {challenge.away_team_code ? (
-                <span className="text-4xl font-display uppercase tracking-widest">{challenge.away_team_code}</span>
-              ) : (
-                <div className="size-10 bg-gray-700/35 rounded-full flex items-center justify-center">⚽</div>
-              )}
+              <span className="text-4xl filter drop-shadow-md">
+                {getFlagEmoji(challenge.away_team_code)}
+              </span>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mt-1">
+                {challenge.away_team_code}
+              </span>
               <span className="text-xs font-bold truncate max-w-full text-white">{challenge.away_team}</span>
             </div>
           </div>
@@ -236,7 +289,7 @@ export function DesafioClient({
                   <div className="size-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent">C</div>
                 )}
                 <span className="font-semibold text-gray-200">
-                  {challenge.creator_display_name} <span className="text-[10px] text-muted-foreground">(Creador)</span>
+                  {challenge.creator_display_name || "Jugador Anónimo"} <span className="text-[10px] text-muted-foreground">(Creador)</span>
                 </span>
               </div>
               <span className="font-mono font-bold text-gray-100 text-sm">
@@ -256,7 +309,7 @@ export function DesafioClient({
                   </span>
                 </div>
                 <span className="font-mono font-bold text-gray-100 text-sm">
-                  {isPendingChallenge && !challenge.challenged_prediction_home ? (
+                  {isPendingChallenge && challenge.challenged_prediction_home === null ? (
                     <span className="text-xs text-muted-foreground font-normal">Pendiente de aceptación</span>
                   ) : challenge.challenged_prediction_home !== null ? (
                     `${challenge.challenged_prediction_home} - ${challenge.challenged_prediction_away}`
@@ -426,6 +479,7 @@ export function DesafioClient({
                   {challenge.type === "open" && !isCreator && !isParticipantOfOpenPool && (
                     <Button
                       onClick={() => setIsAcceptOpen(true)}
+                      disabled={isPending}
                       className="w-full bg-[#E9C46A] hover:bg-[#E9C46A]/90 text-[#0D1B2A] font-extrabold h-12"
                     >
                       Unirse al Pozo

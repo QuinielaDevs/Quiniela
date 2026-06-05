@@ -352,7 +352,7 @@ export function DuelsDashboard({
                   className="flex-1 border-border text-success hover:bg-success/10 font-bold flex items-center justify-center gap-1.5"
                 >
                   <Share2 className="size-4" />
-                  Compartir
+                  Compartir en WhatsApp
                 </Button>
                 <Button
                   onClick={() => handleCancel(challenge.id)}
