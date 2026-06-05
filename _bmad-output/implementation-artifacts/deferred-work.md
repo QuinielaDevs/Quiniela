@@ -67,6 +67,21 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 - `[ABIERTO/UI]` Riesgo de hydration mismatch en `DesafioClient.tsx` por `toLocaleDateString` en cliente. Solución: formatear server-side o con locale/timezone fijos. **Batch UI pendiente.**
 - `[ABIERTO/UI]` Tras unirse a la liga, la landing refresca pero no abre el modal de aceptación → fricción. Solución: auto-abrir `AcceptDuelDialog` tras el join exitoso. **Batch UI pendiente.**
 
+## Story 6.1 — Premios Especiales (code review 2026-06-03)
+- `[RESUELTO]` Fuga de datos de predicciones tras abandonar una liga (`20260603015757_special_awards_rls.sql`) — cerrado por el trigger `tr_cleanup_predictions_on_member_leave` (`20260603183500_fix_deferred_work.sql`), que borra las predicciones especiales al salir/expulsar de la liga.
+- `[ABIERTO]` Parseo repetitivo e ineficiente de fechas en `resolvePhase` (`src/utils/awardsScoring.ts`) — `TOURNAMENT_PHASES_2026` parsea cadenas de fecha en cada invocación pese a ser constantes. Cachear/precomputar.
+
+## Story 6.2 — Puntuación decreciente y cierre por semifinales (code review 2026-06-03)
+- `[ABIERTO]` Doble fuente de verdad en la config de fases (`src/config/tournamentPhases.ts`) — la Server Action y la UI chequean fechas hardcodeadas en TS en vez de consultar la tabla `tournament_phases`. Ya existen `fn_are_special_predictions_locked()` y `fn_get_active_tournament_phase()` (`20260603181000_fix_retro_gaps.sql`) para migrar a la verdad del lado BD.
+- `[ABIERTO/parcial]` Resolución de tiempo inconsistente Node vs PostgreSQL (`special-predictions.actions.ts`) — `new Date()` de Node vs `now()` de la BD. Mitigable usando las RPC DB-backed añadidas en `fix_retro_gaps`.
+- `[RESUELTO]` La vista `special_predictions_with_points` descartaba predicciones de candidatos borrados/inactivos (inner join) — cambiada a LEFT JOIN en `20260603183500_fix_deferred_work.sql`.
+- `[ABIERTO/UI]` Mensaje de bloqueo hardcodeado en `AwardsBoard` ("Semifinales en adelante") — quedará desfasado si cambia la lógica de bloqueo. Derivar del `label` de la fase activa.
+
+### Integración Epic-6 ↔ Epic-7 (detectado y resuelto en el merge 2026-06-05)
+- `[RESUELTO]` `fn_sync_tournament_phases_from_matches` usaba la columna imaginada `kickoff_at` y `stage = 'semifinals'/'semifinal'`, incompatibles con el esquema real de Epic-7 (`match_time`, `stage = 'semi'`). Corregida en `20260605140000_sync_tournament_phases.sql`.
+- `[RESUELTO]` Las fechas de `tournament_phases` estaban hardcodeadas (hasta 3h de desfase con el calendario real). La nueva migración `20260605140000_sync_tournament_phases.sql` EJECUTA la función corregida tras el seed de Epic-7, derivando las fronteras de fase del calendario real. `src/config/tournamentPhases.ts` actualizado a los mismos valores; el contract test valida config ↔ BD ↔ calendario.
+- `[ABIERTO]` Doble fuente de verdad parcial: el config TS y la tabla `tournament_phases` ahora COINCIDEN, pero siguen siendo dos copias sincronizadas a mano. Si el calendario cambia, re-ejecutar `fn_sync_tournament_phases_from_matches` y actualizar el config. Single-source real = futura story del motor de fases (Epic 7.x).
+
 ---
 
 ## Resumen

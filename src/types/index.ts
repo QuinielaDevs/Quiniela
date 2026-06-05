@@ -78,6 +78,24 @@ export type GameProfileType =
   | "conservador"
   | "cazador_sorpresas";
 
+// --- award_candidates (Story 6.1) ---
+export type AwardCandidate = TableRow<"award_candidates">;
+export type AwardCandidateInsert = TableInsert<"award_candidates">;
+export type AwardCandidateUpdate = TableUpdate<"award_candidates">;
+
+// --- special_predictions (Story 6.1) ---
+export type SpecialPrediction = TableRow<"special_predictions">;
+export type SpecialPredictionInsert = TableInsert<"special_predictions">;
+export type SpecialPredictionUpdate = TableUpdate<"special_predictions">;
+
+/**
+ * Categorías de galardón (espeja el CHECK de award_candidates/special_predictions).
+ * RIESGO DE DRIFT: si cambias el CHECK en la migración, actualiza esta unión a mano
+ * (database.types.ts genera `category: string`, no la unión literal). Mismo patrón
+ * que LeagueRole/PaymentStatus en 1.2.
+ */
+export type AwardCategory = "champion" | "top_scorer" | "mvp";
+
 // --- reglas de liga (columna leagues.rules JSONB) ---
 /**
  * Modo de predicción de una liga. Se guarda una clave ESTABLE en
@@ -101,3 +119,11 @@ export type ServerActionResult<T> = {
   data: T | null;
   error: string | null;
 };
+
+// Re-export AwardPhase from the canonical config so there is ONE definition.
+export type { AwardPhase } from "@/config/tournamentPhases";
+
+// DB row/insert/update types for tournament_phases.
+export type TournamentPhase = TableRow<"tournament_phases">;
+export type TournamentPhaseInsert = TableInsert<"tournament_phases">;
+export type TournamentPhaseUpdate = TableUpdate<"tournament_phases">;

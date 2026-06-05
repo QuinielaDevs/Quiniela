@@ -34,6 +34,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      award_candidates: {
+        Row: {
+          category: string
+          created_at: string
+          display_order: number
+          flag_code: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          is_winner: boolean
+          name: string
+          team_name: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          display_order?: number
+          flag_code?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          is_winner?: boolean
+          name: string
+          team_name?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          display_order?: number
+          flag_code?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          is_winner?: boolean
+          name?: string
+          team_name?: string | null
+        }
+        Relationships: []
+      }
       challenge_participants: {
         Row: {
           challenge_id: string
@@ -534,9 +573,132 @@ export type Database = {
         }
         Relationships: []
       }
+      special_predictions: {
+        Row: {
+          candidate_id: string
+          category: string
+          created_at: string
+          id: string
+          league_id: string
+          predicted_at: string
+          user_id: string
+        }
+        Insert: {
+          candidate_id: string
+          category: string
+          created_at?: string
+          id?: string
+          league_id: string
+          predicted_at?: string
+          user_id: string
+        }
+        Update: {
+          candidate_id?: string
+          category?: string
+          created_at?: string
+          id?: string
+          league_id?: string
+          predicted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_predictions_candidate_id_category_fkey"
+            columns: ["candidate_id", "category"]
+            isOneToOne: false
+            referencedRelation: "award_candidates"
+            referencedColumns: ["id", "category"]
+          },
+          {
+            foreignKeyName: "special_predictions_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_predictions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tournament_phases: {
+        Row: {
+          created_at: string
+          edits_locked: boolean
+          ends_at: string | null
+          id: string
+          label: string
+          phase_code: string
+          reward_points: number
+          sort_order: number
+          starts_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          edits_locked?: boolean
+          ends_at?: string | null
+          id?: string
+          label: string
+          phase_code: string
+          reward_points: number
+          sort_order: number
+          starts_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          edits_locked?: boolean
+          ends_at?: string | null
+          id?: string
+          label?: string
+          phase_code?: string
+          reward_points?: number
+          sort_order?: number
+          starts_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      special_predictions_with_points: {
+        Row: {
+          candidate_id: string | null
+          category: string | null
+          created_at: string | null
+          id: string | null
+          is_correct: boolean | null
+          league_id: string | null
+          points: number | null
+          predicted_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_predictions_candidate_id_category_fkey"
+            columns: ["candidate_id", "category"]
+            isOneToOne: false
+            referencedRelation: "award_candidates"
+            referencedColumns: ["id", "category"]
+          },
+          {
+            foreignKeyName: "special_predictions_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_predictions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_challenge: {
@@ -564,6 +726,7 @@ export type Database = {
         }
         Returns: string
       }
+      fn_are_special_predictions_locked: { Args: never; Returns: boolean }
       fn_create_league: {
         Args: {
           p_invite_code: string
@@ -589,6 +752,26 @@ export type Database = {
           to: "leagues"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      fn_get_active_tournament_phase: {
+        Args: never
+        Returns: {
+          created_at: string
+          edits_locked: boolean
+          ends_at: string | null
+          id: string
+          label: string
+          phase_code: string
+          reward_points: number
+          sort_order: number
+          starts_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "tournament_phases"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       fn_get_challenge_landing: {
@@ -703,6 +886,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      fn_sync_tournament_phases_from_matches: {
+        Args: never
+        Returns: undefined
       }
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
       fn_user_is_league_admin: {

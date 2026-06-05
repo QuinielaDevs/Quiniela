@@ -1,5 +1,9 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { createAnonClient, createServiceRoleClient } from "./setup";
+import {
+  createAnonClient,
+  createAuthedClient,
+  createServiceRoleClient,
+} from "./setup";
 import {
   MATCH_STATUSES,
   LEAGUE_ROLES,
@@ -126,8 +130,7 @@ describe("paridad enum: league_members.role / payment_status", () => {
 describe("paridad enum: PredictionMode (validado en fn_create_league)", () => {
   it("fn_create_league acepta cada PREDICTION_MODES y rechaza otros", async () => {
     const { token } = await createUser();
-    const authed = createAnonClient();
-    await authed.auth.setSession({ access_token: token, refresh_token: "" });
+    const authed = createAuthedClient(token);
 
     for (const mode of PREDICTION_MODES) {
       const { error } = await authed.rpc("fn_create_league", {
