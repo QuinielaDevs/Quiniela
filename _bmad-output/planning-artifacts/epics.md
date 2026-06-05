@@ -163,6 +163,10 @@ Los jugadores pueden retarse apostando puntos de clasificación. Los puntos se r
 Los usuarios pueden pronosticar el Campeón, Goleador y MVP del torneo, ganando puntos decrecientes basados en qué tan temprano lo hicieron (bloqueándose antes de semifinales).
 **FRs covered:** FR-15, FR-16
 
+### Epic 7: Datos del Torneo — Seed, Captura de Resultados (Admin) y Avance de Fase
+Reemplaza la sincronización automática con API-Football (inviable en plan Free para `season=2026`, verificado el 2026-06-04). El calendario del Mundial 2026 se siembra desde datos reales (`supabase/seed-data/worldcup-2026/`), el administrador captura/edita resultados, y un motor automático calcula la clasificación de grupos y el avance de eliminatorias con las reglas FIFA del formato 2026. **Foundational: se ejecuta antes de Epics 5 y 6** (Epic 6 depende de los límites de fase que produce este motor).
+**Reescopa:** NFR-5 (mapeo de partidos); soporte de datos para FR-7…FR-11, FR-15…FR-17. Surgió del correct-course del 2026-06-04 (ver `sprint-change-proposal-2026-06-04.md`).
+
 ## Epic 1: Inicialización del Proyecto, Configuración de Testing y Autenticación Express
 
 El desarrollador cuenta con el boilerplate del proyecto con Playwright configurado. El usuario puede crear una cuenta e iniciar sesión instantáneamente con Google OAuth, y unirse de manera transparente a una liga privada mediante un enlace de invitación `/join/LIGA123` visualizando las instrucciones de cobro.
@@ -451,3 +455,58 @@ So that premiar mi visión y audacia estratégica.
 **When** finaliza el torneo y se registran los ganadores oficiales en Supabase
 **Then** el sistema asigna puntos según la fase de registro: Fase A (antes del partido inaugural) = 50 pts; Fase B (Fase de grupos) = 25 pts; Fase C (Octavos y Cuartos) = 10 pts
 **And** si el usuario intenta modificar o registrar predicciones a partir del inicio de la primera Semifinal (Fase D), el sistema bloquea los controles de edición y retorna 0 puntos
+
+## Epic 7: Datos del Torneo — Seed, Captura de Resultados (Admin) y Avance de Fase
+
+Reemplaza la sincronización automática con API-Football (inviable en plan Free para `season=2026`). El calendario del Mundial 2026 se siembra desde datos reales (`supabase/seed-data/worldcup-2026/`: `worldcup.json` = 104 partidos, `worldcup.teams.json` = 48 equipos con `fifa_code`/`group`/bandera). El administrador captura/edita resultados, y un motor automático calcula la clasificación de grupos y el avance de eliminatorias con las reglas FIFA del formato 2026. **Foundational: antes de Epics 5 y 6.**
+
+### Story 7.1: Seed del Calendario y Modelo de Fases (Grupos + Bracket)
+
+As a sistema de la quiniela,
+I want tener sembrado el calendario del Mundial 2026 (72 partidos de grupos en 12 grupos A–L) y la estructura de 32 partidos de eliminatoria como placeholders,
+So that la app funcione con datos reales del torneo sin depender de una API externa de pago.
+
+**Acceptance Criteria:**
+
+**Given** los datos en `supabase/seed-data/worldcup-2026/` y una migración nueva
+**When** se aplica la migración/seed
+**Then** `public.matches` gana columnas `group_label text`, `bracket_slot int`, `home_source text`, `away_source text` y `venue text`, preservando columnas/constraints existentes (`home_team`/`away_team` siguen `not null`, `status` CHECK intacto, `external_ref` unique)
+**And** un seed idempotente generado desde JSON inserta los 72 partidos de grupos con `home_team`/`away_team` = `name_normalised ?? name`, `*_team_code` = `teams.fifa_code`, `match_time` UTC, `matchday` = ronda de grupo 1/2/3 derivada, `stage='group'`, `group_label` A–L y `venue`
+**And** se siembran los 32 partidos de eliminatoria (R32→Final + 3.º lugar) como placeholders TBD, con `stage ∈ {round-32, round-16, quarter, semi, third-place, final}`, `bracket_slot` = `num`, `home_source`/`away_source` = códigos del JSON (`1A`/`2B`/`3A/B/C/D/F`/`W##`/`L##`) y equipos legibles `"Por definir"`
+**And** `external_ref` se reutiliza como clave estable del seed (`wc2026:grp:*`, `wc2026:ko:*`) con `insert ... on conflict (external_ref) do update`
+**And** los partidos knockout TBD no quedan habilitados para predicción de marcador hasta que Story 7.3 resuelva equipos reales; 7.1 no modifica UI ni reglas de predicción
+**And** el seed convive con la RLS actual (`matches_select_authenticated`); la escritura se hace por migración, no por cliente
+**And** pruebas de integración validan conteos (104 total, 72 grupos, 32 knockout), rondas, grupos/jornadas, apariciones de equipos, `bracket_slot`/sources, idempotencia y UTC del inaugural
+
+### Story 7.2: Captura y Edición de Resultados por el Administrador
+
+As a administrador de la liga,
+I want capturar y editar el marcador y estado de cada partido (`scheduled→live→finished`) desde el panel de administración,
+So that la clasificación, la tabla en vivo y el scoring se actualicen con resultados reales sin una API externa.
+
+**Acceptance Criteria:**
+
+**Given** un admin autenticado en `/standings/manage`
+**When** abre la gestión de partidos
+**Then** ve los partidos (al menos los de la jornada/fase activa) y puede fijar `home_score`, `away_score` y `status` mediante un RPC `SECURITY DEFINER` admin-gated (patrón Story 3.3) que valida rol admin, marcadores >=0 y transiciones de `status` válidas; sin escritura directa a `matches` por cliente
+**And** al pasar un partido a `live`/`finished` con marcador, la tabla en vivo (Epic 4) reacciona vía Realtime (reordenamiento + toast "Impacto de Gol") sin trabajo adicional
+**And** al marcar `finished`, la clasificación oficial (`buildStandings`) incorpora el partido (consolidación on-the-fly)
+**And** la UI es mobile-first con tokens Championship Gold, tap targets >=48px, y maneja error/permiso (no-admin bloqueado)
+**And** existen pruebas del RPC (admin sí / no-admin no / validaciones) e integración con el flujo de standings
+
+### Story 7.3: Motor Automático de Avance de Fase (Formato FIFA 2026)
+
+As a sistema de la quiniela,
+I want calcular automáticamente la clasificación de cada grupo y el avance a eliminatorias según las reglas FIFA del formato 2026,
+So that el bracket se llene solo conforme el admin registra resultados, sin intervención manual.
+
+**Acceptance Criteria:**
+
+**Given** los 72 partidos de grupos con resultados `finished`
+**When** se recalcula
+**Then** por cada grupo se ordena con desempates FIFA: puntos → diferencia de goles → goles a favor → enfrentamiento directo (pts, DG, GF entre empatados) → desempate determinista de respaldo (seed/orden estable) para criterios no computables (juego limpio, sorteo)
+**And** clasifican los 2 primeros de cada grupo (24) + los 8 mejores terceros (ranking de los 12 terceros: pts → DG → GF → respaldo determinista)
+**And** el motor resuelve los códigos de slot del JSON: `1X`/`2X` desde las tablas de grupo, los slots `3X/Y/Z` desde la lookup-table oficial FIFA de mejores terceros, y `W##`/`L##` desde ganador/perdedor del partido `num=##`, propagando R32→R16→Cuartos→Semis→Final (+ 3.º lugar) conforme hay resultados `finished`
+**And** mientras una fase no esté completa, los slots dependientes permanecen TBD; el motor es idempotente y recalcula de forma estable
+**And** el cálculo es puro/testeable (sin DOM/DB), análogo a `standings.ts`, y expone los límites de fase (inicio de Octavos, de Semis) que Epic 6 consume para su puntuación decreciente
+**And** existen pruebas unitarias exhaustivas: desempates, mejores terceros, llenado de bracket, idempotencia y respaldo determinista

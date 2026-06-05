@@ -11,12 +11,46 @@
 -- re-ejecutar `supabase db reset` sin duplicar. match_time relativos a now()
 -- para tener siempre un partido futuro (predicción editable) y uno finalizado.
 -- ============================================================
+do $$
+declare
+  v_worldcup_count int;
+begin
+  select count(*) into v_worldcup_count
+  from public.matches
+  where external_ref like 'wc2026:%';
+
+  if v_worldcup_count not in (0, 104) then
+    raise exception 'Seed local inconsistente: calendario wc2026 parcial (% filas, esperado 0 o 104)', v_worldcup_count;
+  end if;
+end;
+$$;
+
 insert into public.matches
   (external_ref, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time, status, matchday, stage)
-values
-  ('demo-001', 'Argentina', 'México',    'ARG', 'MEX', null, null, now() + interval '2 days',  'scheduled', 1, 'group'),
-  ('demo-002', 'España',    'Alemania',  'ESP', 'GER', null, null, now() + interval '3 hours', 'scheduled', 1, 'group'),
-  ('demo-003', 'Brasil',    'Ecuador',   'BRA', 'ECU', 3,    1,    now() - interval '2 hours',  'finished',  1, 'group'),
+select *
+from (
+  values
+  ('demo-001', 'Argentina', 'México',    'ARG', 'MEX', null::int, null::int, now() + interval '2 days',  'scheduled', 1, 'group'),
+  ('demo-002', 'España',    'Alemania',  'ESP', 'GER', null::int, null::int, now() + interval '3 hours', 'scheduled', 1, 'group'),
+  ('demo-003', 'Brasil',    'Ecuador',   'BRA', 'ECU', 3,         1,         now() - interval '2 hours',  'finished',  1, 'group'),
   -- Story 3.1: un finished de OTRA jornada para probar el filtro por jornada.
-  ('demo-004', 'Francia',   'Croacia',   'FRA', 'CRO', 2,    0,    now() - interval '1 day',    'finished',  2, 'group')
+  ('demo-004', 'Francia',   'Croacia',   'FRA', 'CRO', 2,         0,         now() - interval '1 day',    'finished',  2, 'group')
+) as demo_matches (
+  external_ref,
+  home_team,
+  away_team,
+  home_team_code,
+  away_team_code,
+  home_score,
+  away_score,
+  match_time,
+  status,
+  matchday,
+  stage
+)
+where not exists (
+  select 1
+  from public.matches
+  where external_ref like 'wc2026:%'
+)
 on conflict (external_ref) do nothing;

@@ -150,8 +150,13 @@ Hot reloading nativo, configuraciones de ESLint estándar y soporte directo para
 ### API & Communication Patterns
 
 - **Next.js Server Actions (TypeScript RPC):** Mutaciones directas desde el formulario táctil y flujos de juego al servidor, eliminando controladores REST redundantes.
-- **Ruta REST Segura `/api/sync`:** Un endpoint protegido para consumo exclusivo de crons automatizados de actualización de resultados deportivos.
-- **Sincronización Inteligente de Partidos:** Pull-and-Cache cron programado cada 30 minutos activo únicamente durante ventanas horarias de juego del Mundial, protegiendo la cuota gratuita de 100 peticiones diarias de la API deportiva.
+<!-- SUPERSEDED (2026-06-04 — Epic 7 / sprint-change-proposal-2026-06-04.md): el plan Free de
+     API-Football no da acceso a season=2026. La sync vía cron/API-Football y la ruta `/api/sync`
+     se reemplazan por: seed (supabase/seed-data/worldcup-2026/) + captura de resultados por el
+     admin (RPC admin-gated, Story 7.2) + motor automático de avance de fase (Story 7.3). El
+     keep-alive diario (db-keep-alive.yml) SE CONSERVA (no depende de API-Football). -->
+- **[SUPERSEDED → Epic 7] Ruta REST Segura `/api/sync`:** ~~Endpoint protegido para crons de actualización de resultados.~~ Reemplazado por captura de resultados del admin.
+- **[SUPERSEDED → Epic 7] Sincronización Inteligente de Partidos:** ~~Pull-and-Cache cron contra API-Football.~~ Reemplazado por seed + captura admin + motor de fases.
 
 ---
 

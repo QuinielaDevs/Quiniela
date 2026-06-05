@@ -123,11 +123,15 @@ export type Database = {
       matches: {
         Row: {
           away_score: number | null
+          away_source: string | null
           away_team: string
           away_team_code: string | null
+          bracket_slot: number | null
           created_at: string
           external_ref: string | null
+          group_label: string | null
           home_score: number | null
+          home_source: string | null
           home_team: string
           home_team_code: string | null
           id: string
@@ -136,14 +140,19 @@ export type Database = {
           stage: string | null
           status: string
           updated_at: string
+          venue: string | null
         }
         Insert: {
           away_score?: number | null
+          away_source?: string | null
           away_team: string
           away_team_code?: string | null
+          bracket_slot?: number | null
           created_at?: string
           external_ref?: string | null
+          group_label?: string | null
           home_score?: number | null
+          home_source?: string | null
           home_team: string
           home_team_code?: string | null
           id?: string
@@ -152,14 +161,19 @@ export type Database = {
           stage?: string | null
           status?: string
           updated_at?: string
+          venue?: string | null
         }
         Update: {
           away_score?: number | null
+          away_source?: string | null
           away_team?: string
           away_team_code?: string | null
+          bracket_slot?: number | null
           created_at?: string
           external_ref?: string | null
+          group_label?: string | null
           home_score?: number | null
+          home_source?: string | null
           home_team?: string
           home_team_code?: string | null
           id?: string
@@ -168,6 +182,7 @@ export type Database = {
           stage?: string | null
           status?: string
           updated_at?: string
+          venue?: string | null
         }
         Relationships: []
       }

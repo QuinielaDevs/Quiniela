@@ -19,6 +19,8 @@ Para garantizar un coste operativo de **cero absoluto ($0.00 USD)** durante la e
 
 ## 2. Estrategia de Integración de Datos (API de Fútbol)
 
+> **SUPERSEDED (2026-06-04 — ver Epic 7 / `sprint-change-proposal-2026-06-04.md`).** El plan Free de API-Football **no da acceso a `season=2026`** (verificado con llamadas reales: error de plan en `/fixtures` y `/leagues`). La estrategia Pull-and-Cache se reemplaza por: **seed del calendario desde datos reales** (`supabase/seed-data/worldcup-2026/`) + **captura de resultados por el administrador** (RPC admin-gated) + **motor automático de avance de fase**. La tabla en vivo (Epic 4) reacciona por Realtime al update del admin. El keep-alive diario se conserva. El texto siguiente queda como referencia histórica.
+
 Para la actualización de los marcadores, horarios y resultados oficiales de los partidos se adopta el patrón **Pull-and-Cache** con la API externa **API-Football (api-sports.io)**:
 
 1. **Restricción de Capa Gratuita:** API-Football otorga **100 solicitudes diarias** en su plan gratuito.

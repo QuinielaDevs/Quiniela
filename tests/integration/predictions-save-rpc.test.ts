@@ -70,6 +70,29 @@ async function insertMatch(matchTimeIso: string): Promise<string> {
   return data!.id;
 }
 
+async function insertTbdKnockoutMatch(matchTimeIso: string): Promise<string> {
+  const { data, error } = await admin
+    .from("matches")
+    .insert({
+      external_ref: `test-tbd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      home_team: "Por definir",
+      away_team: "Por definir",
+      home_team_code: null,
+      away_team_code: null,
+      match_time: matchTimeIso,
+      status: "scheduled",
+      stage: "round-32",
+      bracket_slot: Math.floor(10_000 + Math.random() * 1_000_000),
+      home_source: "1A",
+      away_source: "2B",
+    })
+    .select("id")
+    .single();
+  expect(error).toBeNull();
+  createdMatchIds.push(data!.id);
+  return data!.id;
+}
+
 let userA: { id: string; token: string };
 let userB: { id: string; token: string }; // NO miembro
 let leagueId: string;
@@ -196,6 +219,25 @@ describe("fn_save_prediction: multiplicador y upsert", () => {
 });
 
 describe("fn_save_prediction: bloqueo por kickoff (cierra diferido de 2.1)", () => {
+  it("la RPC falla para knockout TBD aunque el kickoff sea futuro", async () => {
+    const matchId = await insertTbdKnockoutMatch(
+      new Date(Date.now() + 20 * DAY_MS).toISOString(),
+    );
+    const clientA = createAuthedClient(userA.token);
+
+    const { error } = await clientA
+      .rpc("fn_save_prediction", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_home_score_pred: 1,
+        p_away_score_pred: 0,
+      })
+      .single();
+
+    expect(error).not.toBeNull();
+    expect(error?.message ?? "").toContain("cerrado");
+  });
+
   it("la RPC falla cuando falta <=1min para el kickoff", async () => {
     const matchId = await insertMatch(
       new Date(Date.now() + 30 * 1000).toISOString(), // 30s → dentro del umbral

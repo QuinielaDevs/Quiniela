@@ -61,6 +61,8 @@ export async function PredictionsBoard() {
         "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday",
       )
       .eq("status", "scheduled")
+      .not("home_team_code", "is", null)
+      .not("away_team_code", "is", null)
       .order("match_time", { ascending: true }),
     supabase
       .from("predictions")

@@ -36,7 +36,7 @@ vi.mock("@/components/predictions/MatchCard", () => ({
 // builder, y await resuelve el resultado configurado para esa tabla.
 function tableBuilder(result: { data: unknown }) {
   const builder: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "order", "limit"]) {
+  for (const method of ["select", "eq", "not", "order", "limit"]) {
     builder[method] = () => builder;
   }
   builder.then = (resolve: (value: { data: unknown; error: null }) => unknown) =>
