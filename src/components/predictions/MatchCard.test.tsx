@@ -24,6 +24,9 @@ const MATCH = {
   status: "scheduled",
   stage: "group",
   matchday: 1,
+  home_source: null,
+  away_source: null,
+  bracket_slot: null,
 };
 
 const LEAGUE_ID = "11111111-1111-4111-8111-111111111111";
@@ -474,8 +477,8 @@ describe("MatchCard", () => {
     );
   });
 
-  it("bloquea la edicion cuando falta <=1min para el kickoff y muestra candado", () => {
-    vi.setSystemTime(new Date("2026-06-11T19:59:30.000Z")); // 30s antes del kickoff
+  it("bloquea la edicion cuando llega la hora del kickoff y muestra candado", () => {
+    vi.setSystemTime(new Date("2026-06-11T20:00:00.000Z")); // hora exacta de kickoff
     renderMatchCard({ initialPrediction: { homeScorePred: 0, awayScorePred: 0 } });
 
     expect(screen.getByText("Pronostico cerrado")).toBeInTheDocument();
@@ -485,6 +488,16 @@ describe("MatchCard", () => {
     expect(
       screen.getByLabelText("Disminuir goles de Mexico"),
     ).toBeDisabled();
+  });
+
+  it("no bloquea la edicion antes de la hora del kickoff", () => {
+    vi.setSystemTime(new Date("2026-06-11T19:59:59.000Z")); // 1 segundo antes del kickoff
+    renderMatchCard({ initialPrediction: { homeScorePred: 0, awayScorePred: 0 } });
+
+    expect(screen.queryByText("Pronostico cerrado")).toBeNull();
+    expect(
+      screen.getByLabelText("Incrementar goles de Argentina"),
+    ).not.toBeDisabled();
   });
 
   it("un error de kickoff del servidor es definitivo y no entra en retry offline", async () => {
@@ -509,5 +522,39 @@ describe("MatchCard", () => {
     });
 
     expect(savePrediction).toHaveBeenCalledTimes(1);
+  });
+
+  // ---- Slot TBD de eliminatoria (equipos aun sin resolver) ----
+
+  it("muestra el origen del bracket y deja el slot TBD en solo-lectura", () => {
+    const tbdMatch = {
+      ...MATCH,
+      id: "66666666-6666-4666-8666-666666666666",
+      home_team: "Por definir",
+      away_team: "Por definir",
+      home_team_code: null,
+      away_team_code: null,
+      stage: "semi",
+      matchday: null,
+      home_source: "W97",
+      away_source: "W98",
+      bracket_slot: 101,
+    };
+
+    render(
+      <MatchCard
+        leagueId={LEAGUE_ID}
+        match={tbdMatch}
+        initialPrediction={null}
+      />,
+    );
+
+    expect(screen.getByText("Ganador 97")).toBeInTheDocument();
+    expect(screen.getByText("Ganador 98")).toBeInTheDocument();
+    expect(screen.getByText("Pendiente de clasificacion")).toBeInTheDocument();
+    expect(screen.getByText("Semis")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Incrementar goles de Ganador 97"),
+    ).toBeDisabled();
   });
 });

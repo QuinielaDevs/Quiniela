@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 
 import { savePrediction } from "@/app/actions/predictions.actions";
@@ -11,6 +11,8 @@ import {
 } from "@/app/actions/predictions.constants";
 import { GoalPicker } from "@/components/predictions/GoalPicker";
 import { calculatePredictionMultiplier, MIN_MULTIPLIER } from "@/utils/scoring";
+import { flagForTeamCode } from "@/utils/team-flags";
+import { describeMatchSource, stageLabel } from "@/utils/tournament";
 import type { Match } from "@/types";
 import { cn } from "@/utils/utils";
 
@@ -22,22 +24,28 @@ type MatchCardPrediction = {
   updatedAt?: string;
 };
 
+export type MatchCardMatch = Pick<
+  Match,
+  | "id"
+  | "home_team"
+  | "away_team"
+  | "home_team_code"
+  | "away_team_code"
+  | "match_time"
+  | "status"
+  | "stage"
+  | "matchday"
+  | "home_source"
+  | "away_source"
+  | "bracket_slot"
+>;
+
 type MatchCardProps = {
   leagueId: string;
-  match: Pick<
-    Match,
-    | "id"
-    | "home_team"
-    | "away_team"
-    | "home_team_code"
-    | "away_team_code"
-    | "match_time"
-    | "status"
-    | "stage"
-    | "matchday"
-  >;
+  match: MatchCardMatch;
   initialPrediction?: MatchCardPrediction | null;
   disabled?: boolean;
+  firstMatchTime?: string;
 };
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "offline" | "error";
@@ -50,7 +58,8 @@ type PendingPrediction = {
 const DEBOUNCE_MS = 500;
 const OFFLINE_COPY = "Sin conexion - Pendiente";
 const LOCKED_COPY = "Pronostico cerrado";
-const KICKOFF_LOCK_MS = 60_000;
+const TBD_COPY = "Pendiente de clasificacion";
+const KICKOFF_LOCK_MS = 0;
 const CLOSED_STATUSES = new Set(["live", "finished", "suspended", "canceled"]);
 
 function isBrowserOnline() {
@@ -58,8 +67,18 @@ function isBrowserOnline() {
   return navigator.onLine;
 }
 
+// Slot de eliminatoria aun sin equipos reales: la DB (fn_match_editable) bloquea
+// la prediccion hasta que Story 7.3 resuelve el bracket. La UI lo refleja
+// mostrando el origen (p.ej. "Ganador 97") y deshabilitando el picker.
+function isMatchTbd(match: MatchCardProps["match"]): boolean {
+  return (
+    match.bracket_slot != null &&
+    (match.home_team_code == null || match.away_team_code == null)
+  );
+}
+
 // Bloqueo de UI: defensivo/ergonómico. La AUTORIDAD del bloqueo es la DB (la RPC
-// fn_save_prediction rechaza tras match_time - 1min con la hora del servidor).
+// fn_save_prediction rechaza tras match_time con la hora del servidor).
 function isMatchLocked(match: MatchCardProps["match"]): boolean {
   if (CLOSED_STATUSES.has(match.status)) return true;
   const kickoffMs = new Date(match.match_time).getTime();
@@ -76,6 +95,7 @@ export function MatchCard({
   match,
   initialPrediction,
   disabled = false,
+  firstMatchTime,
 }: MatchCardProps) {
   const hasInitialPrediction =
     initialPrediction !== null && initialPrediction !== undefined;
@@ -108,14 +128,61 @@ export function MatchCard({
 
   // Multiplicador: el guardado (saved) y el que se obtendría al editar AHORA.
   // El valor autoritativo final siempre lo calcula el backend; esto es UI.
+  const isTbd = isMatchTbd(match);
   const isLocked = isMatchLocked(match);
   const nextMultiplier = calculatePredictionMultiplier(
     Date.now(),
     match.match_time,
+    firstMatchTime,
   );
   const displayMultiplier = hasInitialPrediction
     ? savedMultiplier
     : nextMultiplier;
+
+  const formattedTime = useMemo(() => {
+    const date = new Date(match.match_time);
+    if (!Number.isFinite(date.getTime())) return "";
+    return date.toLocaleString("es", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, [match.match_time]);
+
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  useEffect(() => {
+    const kickoffMs = new Date(match.match_time).getTime();
+    if (!Number.isFinite(kickoffMs)) return;
+
+    function updateRemaining() {
+      const diffMs = kickoffMs - Date.now();
+      if (diffMs <= 0) {
+        setTimeLeft("");
+        return;
+      }
+
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffSecs / 60);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffDays > 0) {
+        setTimeLeft(`Faltan ${diffDays} ${diffDays === 1 ? "día" : "días"}`);
+      } else if (diffHours > 0) {
+        setTimeLeft(`Falta${diffHours === 1 ? "" : "n"} ${diffHours} h`);
+      } else if (diffMins > 0) {
+        setTimeLeft(`Falta${diffMins === 1 ? "" : "n"} ${diffMins} min`);
+      } else {
+        setTimeLeft("Falta < 1 min");
+      }
+    }
+
+    updateRemaining();
+    const interval = setInterval(updateRemaining, 60_000);
+    return () => clearInterval(interval);
+  }, [match.match_time]);
 
   useEffect(() => {
     const nextInitial = {
@@ -297,7 +364,24 @@ export function MatchCard({
   }, []);
 
   const controlsDisabled =
-    disabled || saveState === "saving" || saveState === "offline" || isLocked;
+    disabled ||
+    isTbd ||
+    saveState === "saving" ||
+    saveState === "offline" ||
+    isLocked;
+
+  const phaseLabel = match.matchday
+    ? `Jornada ${match.matchday}`
+    : stageLabel(match.stage);
+
+  // En slots TBD el nombre legible es el origen del bracket (p.ej. "Ganador 97");
+  // se usa tanto para mostrar como para la etiqueta accesible del GoalPicker.
+  const homeLabel = isTbd
+    ? (describeMatchSource(match.home_source) ?? match.home_team)
+    : match.home_team;
+  const awayLabel = isTbd
+    ? (describeMatchSource(match.away_source) ?? match.away_team)
+    : match.away_team;
 
   const statusCopy = isLocked
     ? null
@@ -321,14 +405,41 @@ export function MatchCard({
       )}
     >
       <div className="mb-3 flex min-h-6 items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{match.matchday ? `Jornada ${match.matchday}` : match.stage}</span>
-          <span className="font-semibold text-accent">
-            {formatMultiplier(displayMultiplier)}
-          </span>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>{phaseLabel}</span>
+          {formattedTime && (
+            <>
+              <span>·</span>
+              <span suppressHydrationWarning>{formattedTime}</span>
+            </>
+          )}
+          {!isTbd && (
+            <>
+              <span>·</span>
+              <span className="font-semibold text-accent">
+                {formatMultiplier(displayMultiplier)}
+              </span>
+            </>
+          )}
+          {timeLeft && !isLocked && !isTbd && (
+            <>
+              <span>·</span>
+              <span className="text-muted-foreground font-medium" suppressHydrationWarning>
+                {timeLeft}
+              </span>
+            </>
+          )}
         </div>
 
-        {isLocked ? (
+        {isTbd ? (
+          <div
+            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+            role="status"
+          >
+            <Lock className="size-3.5" aria-hidden="true" />
+            {TBD_COPY}
+          </div>
+        ) : isLocked ? (
           <div
             className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
             role="status"
@@ -356,7 +467,14 @@ export function MatchCard({
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <div className="flex flex-col items-start gap-2">
-          <span className="text-sm font-semibold">{match.home_team}</span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold">
+            {flagForTeamCode(match.home_team_code) && (
+              <span aria-hidden="true">
+                {flagForTeamCode(match.home_team_code)}
+              </span>
+            )}
+            {homeLabel}
+          </span>
           {match.home_team_code && (
             <span className="text-xs uppercase text-muted-foreground">
               {match.home_team_code}
@@ -365,7 +483,7 @@ export function MatchCard({
           <GoalPicker
             value={homeScore}
             onChange={handleHomeScoreChange}
-            label={match.home_team}
+            label={homeLabel}
             disabled={controlsDisabled}
             max={MAX_PREDICTION_SCORE}
           />
@@ -374,8 +492,13 @@ export function MatchCard({
         <div className="pt-8 font-display text-xl font-bold text-accent">vs</div>
 
         <div className="flex flex-col items-end gap-2">
-          <span className="text-right text-sm font-semibold">
-            {match.away_team}
+          <span className="flex items-center gap-1.5 text-right text-sm font-semibold">
+            {awayLabel}
+            {flagForTeamCode(match.away_team_code) && (
+              <span aria-hidden="true">
+                {flagForTeamCode(match.away_team_code)}
+              </span>
+            )}
           </span>
           {match.away_team_code && (
             <span className="text-xs uppercase text-muted-foreground">
@@ -385,7 +508,7 @@ export function MatchCard({
           <GoalPicker
             value={awayScore}
             onChange={handleAwayScoreChange}
-            label={match.away_team}
+            label={awayLabel}
             disabled={controlsDisabled}
             max={MAX_PREDICTION_SCORE}
           />

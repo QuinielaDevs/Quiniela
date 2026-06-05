@@ -82,11 +82,17 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 - `[RESUELTO]` Las fechas de `tournament_phases` estaban hardcodeadas (hasta 3h de desfase con el calendario real). La nueva migración `20260605140000_sync_tournament_phases.sql` EJECUTA la función corregida tras el seed de Epic-7, derivando las fronteras de fase del calendario real. `src/config/tournamentPhases.ts` actualizado a los mismos valores; el contract test valida config ↔ BD ↔ calendario.
 - `[ABIERTO]` Doble fuente de verdad parcial: el config TS y la tabla `tournament_phases` ahora COINCIDEN, pero siguen siendo dos copias sincronizadas a mano. Si el calendario cambia, re-ejecutar `fn_sync_tournament_phases_from_matches` y actualizar el config. Single-source real = futura story del motor de fases (Epic 7.x).
 
+## Story 7.2 (code review 2026-06-04)
+- `[ABIERTO]` **Granularidad de errores + observabilidad en Server Actions admin**: `setMatchResult` (y el `toAdminError` compartido de Story 3.3) colapsan todo error no-42501 en `ADMIN_SAVE_ERROR` y el `catch {}` no loguea. P0002 y 22023 no se distinguen del fallo genérico. Mejora repo-wide. [src/app/actions/matches.actions.ts, leagues.actions.ts]
+- `[ABIERTO]` **Captura de resultados de knockout**: la UI de `/standings/manage` filtra `stage='group'`, así que los partidos de eliminatoria no se gestionan aquí. Cuando Story 7.3 resuelva equipos reales del bracket, surfacing de la captura de resultados knockout en este panel (el RPC ya lo soporta para partidos con códigos resueltos). [src/app/standings/manage/page.tsx]
+- `[ABIERTO/UI]` **Confirmación UX para transiciones destructivas**: revertir `finished→live` o `→canceled` saca puntos ya consolidados de la clasificación oficial sin confirmación. La matriz de transiciones es by-design (correcciones de admin), pero un diálogo de confirmación para transiciones destructivas sería una mejora de UX. [src/components/standings/MatchAdminList.tsx]
+
 ---
 
 ## Resumen
 - **Cerrado en hardening pass:** PII de email, validación de `fn_create_league`, CHECKs de `payment_amount` y tope de marcador, paridad de tipos, config (redirect/password/tailwind), seed.
 - **Ya resuelto por stories posteriores:** write-lock de predictions (2.4), gate de `challenge_participants` (5.4), Duelos en navbar (Epic 5).
-- **Batch UI pendiente (bajo riesgo, requiere correr la app):** MatchCard timer, DuelsDashboard race, DesafioClient hydration + post-join UX.
+- **Batch UI pendiente (bajo riesgo, requiere correr la app):** MatchCard timer, DuelsDashboard race, DesafioClient hydration + post-join UX, confirmación UX para transiciones destructivas (7.2).
 - **Bloqueado en stories futuras:** league_members UPDATE/DELETE (3.3, con cuidado de wager_balance), matchday tabs (Epic 4/6), Mi Cuenta navbar (3.2), eslint bump (código de plantilla).
 - **Aceptado:** enumeración de invite_code (edge rate-limit), cacheComponents, confirmations/max_rows (hardening de producción).
+- **Otras deudas / mejoras:** observabilidad/errores genéricos (7.2), captura de resultados de knockout en admin panel (7.2).

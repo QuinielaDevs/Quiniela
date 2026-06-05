@@ -30,9 +30,9 @@ so that **jugar de manera estrategica en base a la antelacion**.
 
 3. **And** si un cambio de marcador sobre una prediccion ya guardada causaria bajar el multiplicador actual, `MatchCard` muestra una advertencia interactiva antes de programar el autosave. Si el usuario cancela, el marcador vuelve al ultimo valor guardado y no se llama `savePrediction`; si confirma, el cambio sigue el debounce existente de 500ms.
 
-4. **And** cuando falte 1 minuto o menos para `match_time`, la UI bloquea los botones `+`/`-`, muestra un candado cerrado con microcopy `Pronostico cerrado`, no programa autosave nuevo, y preserva el contrato anti-teclado de `GoalPicker`.
+4. **And** cuando llegue la hora de `match_time` (kickoff), la UI bloquea los botones `+`/`-`, muestra un candado cerrado con microcopy `Pronostico cerrado`, no programa autosave nuevo, y preserva el contrato anti-teclado de `GoalPicker`.
 
-5. **And** el bloqueo de escritura se valida estrictamente en Supabase/Postgres usando `now()` del servidor. Cualquier `insert`, `update` o RPC de guardado despues de `match_time - interval '1 minute'` falla con un error seguro y no modifica scores ni multiplier.
+5. **And** el bloqueo de escritura y lectura se valida estrictamente en Supabase/Postgres usando `now()` del servidor. Cualquier `insert`, `update` o RPC de guardado después de `match_time` (o si status ya no es scheduled) falla con un error seguro y no modifica scores ni multiplier. La lectura de rivales se desbloquea exactamente en el mismo instante.
 
 6. **And** `src/utils/scoring.ts` expone y prueba la aplicacion final `PuntosObtenidos = PuntosBase * Multiplicador` sin duplicar la logica de puntos base existente; partidos `scheduled`, `live`, `suspended` o `canceled` siguen puntuando `0`.
 
@@ -49,8 +49,9 @@ so that **jugar de manera estrategica en base a la antelacion**.
 
 - [x] **Tarea 2 - Crear migracion SQL de guardado server-authoritative** (AC: #1, #2, #5)
   - [x] Crear migracion con `source ~/.nvm/nvm.sh && nvm use 24 && npx supabase migration new prediction_multiplier_and_kickoff_lock`.
-  - [x] Agregar helper SQL `public.fn_match_editable(p_match_id uuid) returns boolean` o equivalente que use `now() < match_time - interval '1 minute'`, `language sql`, `security definer`, `set search_path = ''`.
-  - [x] Agregar helper SQL para calcular multiplier desde `now()` del servidor y `matches.match_time`. Usar la escala por lotes canonica de esta story: maximo `2.50` a partir de `35 dias`, suficiente para cubrir la ventana oficial del Mundial 2026.
+  - [x] Agregar helper SQL `public.fn_match_editable(p_match_id uuid) returns boolean` o equivalente que use `now() < match_time` y `status = 'scheduled'`, `language sql`, `security definer`, `set search_path = ''`.
+  - [x] Redefinir helper SQL `public.fn_match_unlocked(p_match_id uuid) returns boolean` para que libere la lectura exactamente en `now() >= match_time`.
+  - [x] Agregar helper SQL para calcular multiplier desde `now()` del servidor y el kickoff del primer partido del torneo. Usar la escala por lotes canonica de esta story: maximo `2.50` a partir de `35 dias`.
   - [x] Crear RPC `public.fn_save_prediction(p_league_id uuid, p_match_id uuid, p_home_score_pred int, p_away_score_pred int)` `security definer set search_path = ''` que:
     - lee `auth.uid()` y rechaza anonimos;
     - valida pertenencia con `public.fn_user_in_league(p_league_id)`;
@@ -75,7 +76,7 @@ so that **jugar de manera estrategica en base a la antelacion**.
   - [x] En `src/components/predictions/MatchCard.tsx`, extender `MatchCardPrediction` con `multiplier: number` y conservar compatibilidad inicial solo si realmente se necesita para tests; preferir que todo caller futuro pase la fila `Prediction`.
   - [x] Derivar `currentMultiplier` del `initialPrediction?.multiplier ?? 1`.
   - [x] Calcular `nextMultiplier` para advertencia usando el mismo helper TS de `scoring.ts` con `Date.now()` solo para UI predictiva. El valor autoritativo final siempre viene del backend/RPC.
-  - [x] Derivar `isLocked` con `match.match_time` en cliente para UX inmediata: `Date.now() >= new Date(match.match_time).getTime() - 60_000`. Tratar estados `live`, `finished`, `suspended`, `canceled` como cerrados visualmente.
+  - [x] Derivar `isLocked` con `match.match_time` en cliente para UX inmediata: `Date.now() >= new Date(match.match_time).getTime()`. Tratar estados `live`, `finished`, `suspended`, `canceled` como cerrados visualmente.
   - [x] Pasar `disabled={controlsDisabled || isLocked}` a ambos `GoalPicker`.
   - [x] Mostrar candado con icono `Lock` de `lucide-react` y microcopy `Pronostico cerrado`; evitar emoji de candado para mantener iconografia consistente aunque el AC lo describa como candado cerrado.
   - [x] Mostrar indicador de multiplier con color `text-accent`/Championship Gold; no convertir toda la tarjeta en dorada.
@@ -93,7 +94,7 @@ so that **jugar de manera estrategica en base a la antelacion**.
     - edicion que no degrada no abre advertencia;
     - edicion que degrada abre advertencia y cancelar no llama `savePrediction`;
     - confirmar advertencia llama `savePrediction` tras 500ms;
-    - partido dentro de `match_time - 1min` bloquea botones y muestra `Pronostico cerrado`;
+    - partido en `match_time` bloquea botones y muestra `Pronostico cerrado`;
     - respuesta de kickoff cerrado muestra error seguro y no entra en retry offline;
     - regresion: offline/transient retry sigue funcionando.
   - [x] En `tests/unit/predictions-actions.test.ts`, actualizar mocks al shape de `.rpc(...)`.
@@ -104,7 +105,7 @@ so that **jugar de manera estrategica en base a la antelacion**.
   - [x] Con Supabase local, probar que RPC guarda una prediccion futura con multiplier esperado y retorna fila.
   - [x] Probar que editar via RPC recalcula multiplier hacia abajo cuando el match_time esta mas cerca.
   - [x] Probar que el rol `authenticated` sigue sin poder escribir `multiplier` directo.
-  - [x] Probar que insert/update directo y RPC fallan despues de `match_time - 1 minute`.
+  - [x] Probar que insert/update directo y RPC fallan después de `match_time` o si status no es `scheduled`.
   - [x] Probar que dueño conserva lectura de su prediccion y que la politica de lectura gated de 2.1 no se rompe.
 
 - [x] **Tarea 8 - Verificacion final** (AC: #7)
@@ -123,7 +124,7 @@ so that **jugar de manera estrategica en base a la antelacion**.
 **SI (2.4):**
 - Calculo del multiplier por antelacion en TS y en SQL/RPC.
 - Persistencia de `predictions.multiplier` al crear/editar predicciones.
-- Bloqueo real de escritura por `match_time - 1 minuto` en base de datos y Server Action.
+- Bloqueo real de escritura por `match_time` en base de datos y Server Action.
 - UI en `MatchCard` para candado/estado cerrado y advertencia de degradacion.
 - Tests unitarios e integracion que cierran el diferido de 2.1.
 
@@ -146,7 +147,8 @@ so that **jugar de manera estrategica en base a la antelacion**.
 - `matches.match_time timestamptz not null` es la fuente de kickoff UTC.
 - `predictions.multiplier numeric(3,2) not null default 1.00 check (multiplier >= 1.00)` ya existe.
 - `predictions.points_earned numeric(6,2)` queda nullable y fuera de esta story.
-- `fn_match_unlocked(match_id)` ya existe y usa `now() >= match_time - interval '1 minute'` para lectura gated. Para escritura conviene helper separado de "editable" (`now() < match_time - interval '1 minute'`) para que los nombres no confundan.
+- `fn_match_unlocked(match_id)` ya existe y se redefinió para usar `now() >= match_time` (o status != 'scheduled') para lectura gated, alineándose con el momento de cierre de edición.
+- `fn_match_editable(match_id)` para escritura usa `now() < match_time` y `status = 'scheduled'`.
 - `predictions_select_gated`: dueño siempre puede leer; rivales de la liga solo despues de desbloqueo. No romper.
 - Grants actuales revocan insert/update de tabla y reconceden al rol `authenticated` solo columnas de score. Esto fue un hardening de review para impedir tampering de `points_earned`/`multiplier`; 2.4 debe preservarlo.
 - Hay un hallazgo diferido explicito de 2.1: "Sin bloqueo de escritura por kickoff -1min en INSERT/UPDATE" asignado a Story 2.4. Esta story debe cerrarlo con tests.

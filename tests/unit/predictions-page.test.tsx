@@ -104,8 +104,20 @@ describe("/predictions (PredictionsBoard)", () => {
       league_members: { data: [{ league_id: "league-1" }] },
       matches: {
         data: [
-          { id: "m1", home_team: "Argentina", away_team: "Mexico" },
-          { id: "m2", home_team: "Espana", away_team: "Alemania" },
+          {
+            id: "m1",
+            home_team: "Argentina",
+            away_team: "Mexico",
+            stage: "group",
+            matchday: 1,
+          },
+          {
+            id: "m2",
+            home_team: "Espana",
+            away_team: "Alemania",
+            stage: "group",
+            matchday: 1,
+          },
         ],
       },
       predictions: {

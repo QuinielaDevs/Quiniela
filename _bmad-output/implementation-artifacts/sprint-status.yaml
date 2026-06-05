@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-01T19:12:28-04:00"
-last_updated: "2026-06-05T01:08:00Z"
+last_updated: "2026-06-05T13:15:00Z"
 project: "pija-quiniela"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -77,6 +77,6 @@ development_status:
   # por seed + captura admin + motor de fases. Foundational: priorizar antes de Epic 5/6.
   epic-7: in-progress
   7-1-seed-del-calendario-y-modelo-de-fases-grupos-bracket: done
-  7-2-captura-y-edicion-de-resultados-por-el-administrador: backlog
-  7-3-motor-automatico-de-avance-de-fase-formato-fifa-2026: backlog
+  7-2-captura-y-edicion-de-resultados-por-el-administrador: done
+  7-3-motor-automatico-de-avance-de-fase-formato-fifa-2026: done
   epic-7-retrospective: optional

@@ -726,6 +726,71 @@ export type Database = {
         }
         Returns: string
       }
+      fn_admin_apply_knockout_advancement: {
+        Args: { p_slots: Json }
+        Returns: {
+          away_score: number | null
+          away_source: string | null
+          away_team: string
+          away_team_code: string | null
+          bracket_slot: number | null
+          created_at: string
+          external_ref: string | null
+          group_label: string | null
+          home_score: number | null
+          home_source: string | null
+          home_team: string
+          home_team_code: string | null
+          id: string
+          match_time: string
+          matchday: number | null
+          stage: string | null
+          status: string
+          updated_at: string
+          venue: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "matches"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      fn_admin_set_match_result: {
+        Args: {
+          p_away_score: number
+          p_home_score: number
+          p_match_id: string
+          p_status: string
+        }
+        Returns: {
+          away_score: number | null
+          away_source: string | null
+          away_team: string
+          away_team_code: string | null
+          bracket_slot: number | null
+          created_at: string
+          external_ref: string | null
+          group_label: string | null
+          home_score: number | null
+          home_source: string | null
+          home_team: string
+          home_team_code: string | null
+          id: string
+          match_time: string
+          matchday: number | null
+          stage: string | null
+          status: string
+          updated_at: string
+          venue: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "matches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fn_are_special_predictions_locked: { Args: never; Returns: boolean }
       fn_create_league: {
         Args: {
@@ -892,6 +957,7 @@ export type Database = {
         Returns: undefined
       }
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
+      fn_user_is_any_league_admin: { Args: never; Returns: boolean }
       fn_user_is_league_admin: {
         Args: { p_league_id: string }
         Returns: boolean
