@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/server";
-import { MatchCard } from "@/components/predictions/MatchCard";
+import { PredictionsBoardView } from "@/components/predictions/PredictionsBoardView";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 
 type PredictionsPageProps = {
@@ -52,17 +52,18 @@ export async function PredictionsBoard() {
     );
   }
 
-  // Partidos editables + predicciones propias del usuario en esa liga. La RLS
-  // deja al dueño leer sus propias predicciones siempre (no espera al kickoff).
+  // Partidos programados de todo el torneo + predicciones propias del usuario.
+  // Se incluyen los slots TBD de eliminatoria (equipos aún sin resolver) para
+  // que el usuario navegue las fases; MatchCard los deja en solo-lectura hasta
+  // que el bracket se resuelva (fn_match_editable lo bloquea en DB). La RLS deja
+  // al dueño leer sus propias predicciones siempre (no espera al kickoff).
   const [{ data: matches }, { data: predictions }] = await Promise.all([
     supabase
       .from("matches")
       .select(
-        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday",
+        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday, home_source, away_source, bracket_slot",
       )
       .eq("status", "scheduled")
-      .not("home_team_code", "is", null)
-      .not("away_team_code", "is", null)
       .order("match_time", { ascending: true }),
     supabase
       .from("predictions")
@@ -82,34 +83,12 @@ export async function PredictionsBoard() {
     );
   }
 
-  const predictionByMatch = new Map(
-    (predictions ?? []).map((prediction) => [prediction.match_id, prediction]),
-  );
-
   return (
-    <div className="flex flex-col gap-3">
-      {matches.map((match) => {
-        const prediction = predictionByMatch.get(match.id);
-        return (
-          <MatchCard
-            key={match.id}
-            leagueId={leagueId}
-            match={match}
-            initialPrediction={
-              prediction
-                ? {
-                    id: prediction.id,
-                    homeScorePred: prediction.home_score_pred,
-                    awayScorePred: prediction.away_score_pred,
-                    multiplier: prediction.multiplier,
-                    updatedAt: prediction.updated_at,
-                  }
-                : null
-            }
-          />
-        );
-      })}
-    </div>
+    <PredictionsBoardView
+      leagueId={leagueId}
+      matches={matches}
+      predictions={predictions ?? []}
+    />
   );
 }
 
@@ -140,7 +119,7 @@ function EmptyState({
 
 function BoardSkeleton() {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
       {[0, 1, 2].map((i) => (
         <div
           key={i}
@@ -155,13 +134,15 @@ export default function PredictionsPage({
   searchParams,
 }: PredictionsPageProps) {
   return (
-    <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+    <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:py-10">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
         <header className="space-y-1">
           <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent">
             PIJA Quiniela
           </p>
-          <h1 className="font-display text-2xl font-bold">Pronósticos</h1>
+          <h1 className="font-display text-2xl font-bold lg:text-4xl">
+            Pronósticos
+          </h1>
         </header>
 
         <Suspense fallback={null}>

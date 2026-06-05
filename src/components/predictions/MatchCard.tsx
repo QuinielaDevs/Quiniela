@@ -12,6 +12,7 @@ import {
 import { GoalPicker } from "@/components/predictions/GoalPicker";
 import { calculatePredictionMultiplier, MIN_MULTIPLIER } from "@/utils/scoring";
 import { flagForTeamCode } from "@/utils/team-flags";
+import { describeMatchSource, stageLabel } from "@/utils/tournament";
 import type { Match } from "@/types";
 import { cn } from "@/utils/utils";
 
@@ -23,20 +24,25 @@ type MatchCardPrediction = {
   updatedAt?: string;
 };
 
+export type MatchCardMatch = Pick<
+  Match,
+  | "id"
+  | "home_team"
+  | "away_team"
+  | "home_team_code"
+  | "away_team_code"
+  | "match_time"
+  | "status"
+  | "stage"
+  | "matchday"
+  | "home_source"
+  | "away_source"
+  | "bracket_slot"
+>;
+
 type MatchCardProps = {
   leagueId: string;
-  match: Pick<
-    Match,
-    | "id"
-    | "home_team"
-    | "away_team"
-    | "home_team_code"
-    | "away_team_code"
-    | "match_time"
-    | "status"
-    | "stage"
-    | "matchday"
-  >;
+  match: MatchCardMatch;
   initialPrediction?: MatchCardPrediction | null;
   disabled?: boolean;
 };
@@ -51,12 +57,23 @@ type PendingPrediction = {
 const DEBOUNCE_MS = 500;
 const OFFLINE_COPY = "Sin conexion - Pendiente";
 const LOCKED_COPY = "Pronostico cerrado";
+const TBD_COPY = "Pendiente de clasificacion";
 const KICKOFF_LOCK_MS = 60_000;
 const CLOSED_STATUSES = new Set(["live", "finished", "suspended", "canceled"]);
 
 function isBrowserOnline() {
   if (typeof navigator === "undefined") return true;
   return navigator.onLine;
+}
+
+// Slot de eliminatoria aun sin equipos reales: la DB (fn_match_editable) bloquea
+// la prediccion hasta que Story 7.3 resuelve el bracket. La UI lo refleja
+// mostrando el origen (p.ej. "Ganador 97") y deshabilitando el picker.
+function isMatchTbd(match: MatchCardProps["match"]): boolean {
+  return (
+    match.bracket_slot != null &&
+    (match.home_team_code == null || match.away_team_code == null)
+  );
 }
 
 // Bloqueo de UI: defensivo/ergonómico. La AUTORIDAD del bloqueo es la DB (la RPC
@@ -109,6 +126,7 @@ export function MatchCard({
 
   // Multiplicador: el guardado (saved) y el que se obtendría al editar AHORA.
   // El valor autoritativo final siempre lo calcula el backend; esto es UI.
+  const isTbd = isMatchTbd(match);
   const isLocked = isMatchLocked(match);
   const nextMultiplier = calculatePredictionMultiplier(
     Date.now(),
@@ -298,7 +316,24 @@ export function MatchCard({
   }, []);
 
   const controlsDisabled =
-    disabled || saveState === "saving" || saveState === "offline" || isLocked;
+    disabled ||
+    isTbd ||
+    saveState === "saving" ||
+    saveState === "offline" ||
+    isLocked;
+
+  const phaseLabel = match.matchday
+    ? `Jornada ${match.matchday}`
+    : stageLabel(match.stage);
+
+  // En slots TBD el nombre legible es el origen del bracket (p.ej. "Ganador 97");
+  // se usa tanto para mostrar como para la etiqueta accesible del GoalPicker.
+  const homeLabel = isTbd
+    ? (describeMatchSource(match.home_source) ?? match.home_team)
+    : match.home_team;
+  const awayLabel = isTbd
+    ? (describeMatchSource(match.away_source) ?? match.away_team)
+    : match.away_team;
 
   const statusCopy = isLocked
     ? null
@@ -323,13 +358,23 @@ export function MatchCard({
     >
       <div className="mb-3 flex min-h-6 items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{match.matchday ? `Jornada ${match.matchday}` : match.stage}</span>
-          <span className="font-semibold text-accent">
-            {formatMultiplier(displayMultiplier)}
-          </span>
+          <span>{phaseLabel}</span>
+          {!isTbd && (
+            <span className="font-semibold text-accent">
+              {formatMultiplier(displayMultiplier)}
+            </span>
+          )}
         </div>
 
-        {isLocked ? (
+        {isTbd ? (
+          <div
+            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+            role="status"
+          >
+            <Lock className="size-3.5" aria-hidden="true" />
+            {TBD_COPY}
+          </div>
+        ) : isLocked ? (
           <div
             className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
             role="status"
@@ -363,7 +408,7 @@ export function MatchCard({
                 {flagForTeamCode(match.home_team_code)}
               </span>
             )}
-            {match.home_team}
+            {homeLabel}
           </span>
           {match.home_team_code && (
             <span className="text-xs uppercase text-muted-foreground">
@@ -373,7 +418,7 @@ export function MatchCard({
           <GoalPicker
             value={homeScore}
             onChange={handleHomeScoreChange}
-            label={match.home_team}
+            label={homeLabel}
             disabled={controlsDisabled}
             max={MAX_PREDICTION_SCORE}
           />
@@ -383,7 +428,7 @@ export function MatchCard({
 
         <div className="flex flex-col items-end gap-2">
           <span className="flex items-center gap-1.5 text-right text-sm font-semibold">
-            {match.away_team}
+            {awayLabel}
             {flagForTeamCode(match.away_team_code) && (
               <span aria-hidden="true">
                 {flagForTeamCode(match.away_team_code)}
@@ -398,7 +443,7 @@ export function MatchCard({
           <GoalPicker
             value={awayScore}
             onChange={handleAwayScoreChange}
-            label={match.away_team}
+            label={awayLabel}
             disabled={controlsDisabled}
             max={MAX_PREDICTION_SCORE}
           />
