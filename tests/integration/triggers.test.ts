@@ -1251,4 +1251,599 @@ describe("Duelos y Escrow: RPC create_challenge", () => {
       await assertConservation(userA.id);
     });
   });
+
+  describe("Resolución y Reparto de Pozos (Story 5.3)", () => {
+    async function assertConservation(userId: string) {
+      const { data: isConserved, error } = await admin.rpc("check_conservation_invariant", {
+        p_league_id: leagueId,
+        p_user_id: userId,
+      });
+      expect(error).toBeNull();
+      expect(isConserved).toBe(true);
+    }
+
+    it("(a) Duelo 1v1 directo sin empate: gana el de marcador exacto", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      // userA retador (2-1)
+      const { data: challengeId, error: cErr } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 40,
+        p_type: "direct",
+        p_challenged_id: userB.id,
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+      expect(cErr).toBeNull();
+
+      // userB acepta (1-1)
+      const { error: aErr } = await clientB.rpc("accept_challenge", {
+        p_challenge_id: challengeId,
+        p_prediction_home: 1,
+        p_prediction_away: 1,
+      });
+      expect(aErr).toBeNull();
+
+      // Finalizar partido 2-1
+      const { error: mErr } = await admin
+        .from("matches")
+        .update({ status: "finished", home_score: 2, away_score: 1 })
+        .eq("id", matchId);
+      expect(mErr).toBeNull();
+
+      // Verificar reto completado y ganador userA
+      const { data: challenge } = await admin
+        .from("challenges")
+        .select("*")
+        .eq("id", challengeId)
+        .single();
+      expect(challenge.status).toBe("completed");
+      expect(challenge.winner_ids).toEqual([userA.id]);
+
+      // Balances finales: A recibe 80, balance neto: A (60 + 80 = 140), B (60)
+      const { data: memberA } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      const { data: memberB } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userB.id).single();
+      expect(Number(memberA!.wager_balance)).toBe(140.00);
+      expect(Number(memberB!.wager_balance)).toBe(60.00);
+
+      // Transacción de pago
+      const { data: txs } = await admin.from("point_transactions").select("*").eq("reference_id", challengeId).eq("description", "challenge_payout");
+      expect(txs).toHaveLength(1);
+      expect(txs![0]!.user_id).toBe(userA.id);
+      expect(Number(txs![0]!.amount)).toBe(80.00);
+
+      await assertConservation(userA.id);
+      await assertConservation(userB.id);
+    });
+
+    it("(b) Empate con pozo divisible", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 50,
+        p_type: "open",
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      await clientB.rpc("accept_challenge", {
+        p_challenge_id: challengeId,
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      // Finalizar partido 2-1 (ambos ganan)
+      await admin.from("matches").update({ status: "finished", home_score: 2, away_score: 1 }).eq("id", matchId);
+
+      const { data: challenge } = await admin.from("challenges").select("*").eq("id", challengeId).single();
+      expect(challenge.status).toBe("completed");
+      expect(challenge.winner_ids).toHaveLength(2);
+      expect(challenge.winner_ids).toContain(userA.id);
+      expect(challenge.winner_ids).toContain(userB.id);
+
+      // Ambos reciben 50.00 de vuelta (pozo 100 / 2) -> balances finales 100.00
+      const { data: memberA } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      const { data: memberB } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userB.id).single();
+      expect(Number(memberA!.wager_balance)).toBe(100.00);
+      expect(Number(memberB!.wager_balance)).toBe(100.00);
+
+      await assertConservation(userA.id);
+      await assertConservation(userB.id);
+    });
+
+    it("(b') Empate con pozo NO divisible: reparto con residuo determinista", async () => {
+      // 4 participantes, pozo total 40, 3 ganadores.
+      // Ganador con menor user_id recibe 13.34, los otros 13.33.
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      
+      const userD = await createAuthedUser();
+      const userE = await createAuthedUser();
+      await admin.from("league_members").insert([
+        { league_id: leagueId, user_id: userD.id, role: "member" },
+        { league_id: leagueId, user_id: userE.id, role: "member" }
+      ]);
+
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+      await seedBalance(userD.id, leagueId, 100.00);
+      await seedBalance(userE.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+      const clientD = createAuthedClient(userD.token);
+      const clientE = createAuthedClient(userE.token);
+
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 10,
+        p_type: "open",
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      await clientB.rpc("accept_challenge", { p_challenge_id: challengeId, p_prediction_home: 2, p_prediction_away: 1 });
+      await clientD.rpc("accept_challenge", { p_challenge_id: challengeId, p_prediction_home: 2, p_prediction_away: 1 });
+      await clientE.rpc("accept_challenge", { p_challenge_id: challengeId, p_prediction_home: 0, p_prediction_away: 0 }); // Perdedor
+
+      // Finalizar partido 2-1 (A, B, D ganan. E pierde).
+      await admin.from("matches").update({ status: "finished", home_score: 2, away_score: 1 }).eq("id", matchId);
+
+      const { data: challenge } = await admin.from("challenges").select("*").eq("id", challengeId).single();
+      expect(challenge.status).toBe("completed");
+      expect(challenge.winner_ids).toHaveLength(3);
+
+      // Ordenar ganadores por user_id
+      const sortedWinners = [userA.id, userB.id, userD.id].sort();
+      expect(challenge.winner_ids).toEqual(sortedWinners);
+
+      // Primer ganador (menor user_id) recibe 13.34; los otros 13.33.
+      // Balances finales esperados:
+      // Primer ganador: 90.00 + 13.34 = 103.34
+      // Otros ganadores: 90.00 + 13.33 = 103.33
+      // Perdedor: 90.00
+      const { data: memberFirst } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", sortedWinners[0]!).single();
+      const { data: memberSecond } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", sortedWinners[1]!).single();
+      const { data: memberThird } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", sortedWinners[2]!).single();
+      const { data: memberLoser } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userE.id).single();
+
+      expect(Number(memberFirst!.wager_balance)).toBe(103.34);
+      expect(Number(memberSecond!.wager_balance)).toBe(103.33);
+      expect(Number(memberThird!.wager_balance)).toBe(103.33);
+      expect(Number(memberLoser!.wager_balance)).toBe(90.00);
+
+      // Suma total de los payouts en point_transactions debe ser exactamente 40.00
+      const { data: payouts } = await admin.from("point_transactions").select("amount").eq("reference_id", challengeId).eq("description", "challenge_payout");
+      expect(payouts).toHaveLength(3);
+      const totalPayout = payouts!.reduce((sum, p) => sum + Number(p.amount), 0);
+      expect(totalPayout).toBe(40.00);
+
+      await assertConservation(userA.id);
+      await assertConservation(userB.id);
+      await assertConservation(userD.id);
+      await assertConservation(userE.id);
+    });
+
+    it("(c) Accrual continuo de predicciones normales de liga", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+
+      // Crear predicción normal de liga para userA (marcador 2-1)
+      const { error: pErr } = await admin.from("predictions").insert({
+        league_id: leagueId,
+        match_id: matchId,
+        user_id: userA.id,
+        home_score_pred: 2,
+        away_score_pred: 1,
+        multiplier: 1.50
+      });
+      expect(pErr).toBeNull();
+
+      // Finalizar partido con marcador 2-1 (exacto -> 5 puntos * 1.50 = 7.50)
+      await admin.from("matches").update({ status: "finished", home_score: 2, away_score: 1 }).eq("id", matchId);
+
+      // Verificar que se evaluó la predicción
+      const { data: pred } = await admin.from("predictions").select("*").eq("match_id", matchId).eq("user_id", userA.id).single();
+      expect(pred.evaluated_at).not.toBeNull();
+      expect(Number(pred.points_earned)).toBe(7.50);
+
+      // Verificar wager_balance (100.00 + 7.50 = 107.50)
+      const { data: member } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      expect(Number(member!.wager_balance)).toBe(107.50);
+
+      // Verificar registro de transacción
+      const { data: txs } = await admin.from("point_transactions").select("*").eq("reference_id", matchId).eq("description", "match_accrual");
+      expect(txs).toHaveLength(1);
+      expect(txs![0]!.user_id).toBe(userA.id);
+      expect(Number(txs![0]!.amount)).toBe(7.50);
+
+      await assertConservation(userA.id);
+    });
+
+    it("(d) Sin ganador (max = 0): reembolso total de escrow", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 50,
+        p_type: "open",
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      await clientB.rpc("accept_challenge", {
+        p_challenge_id: challengeId,
+        p_prediction_home: 3,
+        p_prediction_away: 0,
+      });
+
+      // Finalizar partido 0-0 (ambos obtienen 0.00 puntos base)
+      await admin.from("matches").update({ status: "finished", home_score: 0, away_score: 0 }).eq("id", matchId);
+
+      // Verificar reto completado sin ganadores
+      const { data: challenge } = await admin.from("challenges").select("*").eq("id", challengeId).single();
+      expect(challenge.status).toBe("completed");
+      expect(challenge.winner_ids).toEqual([]);
+
+      // Balances restaurados a 100.00
+      const { data: memberA } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      const { data: memberB } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userB.id).single();
+      expect(Number(memberA!.wager_balance)).toBe(100.00);
+      expect(Number(memberB!.wager_balance)).toBe(100.00);
+
+      // Transacciones de reembolso
+      const { data: txs } = await admin.from("point_transactions").select("*").eq("reference_id", challengeId).eq("description", "challenge_escrow_refund");
+      expect(txs).toHaveLength(2);
+      expect(Number(txs![0]!.amount)).toBe(50.00);
+      expect(Number(txs![1]!.amount)).toBe(50.00);
+
+      await assertConservation(userA.id);
+      await assertConservation(userB.id);
+    });
+
+    it("(e) Cancelación y suspensión de partidos (por separado)", async () => {
+      // 1. Caso Cancelación
+      const matchId1 = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      const { data: ch1 } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId1,
+        p_points_bet: 40,
+        p_type: "direct",
+        p_challenged_id: userB.id,
+        p_prediction_home: 1,
+        p_prediction_away: 1,
+      });
+      await clientB.rpc("accept_challenge", { p_challenge_id: ch1, p_prediction_home: 2, p_prediction_away: 2 });
+
+      // Cancelar partido
+      await admin.from("matches").update({ status: "canceled" }).eq("id", matchId1);
+
+      const { data: challenge1 } = await admin.from("challenges").select("*").eq("id", ch1).single();
+      expect(challenge1.status).toBe("canceled");
+
+      const { data: m1A } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      expect(Number(m1A!.wager_balance)).toBe(100.00);
+
+      // 2. Caso Suspensión
+      const matchId2 = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      const { data: ch2 } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId2,
+        p_points_bet: 40,
+        p_type: "direct",
+        p_challenged_id: userB.id,
+        p_prediction_home: 1,
+        p_prediction_away: 1,
+      });
+      await clientB.rpc("accept_challenge", { p_challenge_id: ch2, p_prediction_home: 2, p_prediction_away: 2 });
+
+      // Suspender partido
+      await admin.from("matches").update({ status: "suspended" }).eq("id", matchId2);
+
+      const { data: challenge2 } = await admin.from("challenges").select("*").eq("id", ch2).single();
+      expect(challenge2.status).toBe("canceled"); // El trigger lo transiciona a canceled
+
+      const { data: m2A } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      expect(Number(m2A!.wager_balance)).toBe(100.00);
+
+      await assertConservation(userA.id);
+      await assertConservation(userB.id);
+    });
+
+    it("(f1) Transición directa scheduled -> finished con pozo poblado", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 40,
+        p_type: "open",
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      await clientB.rpc("accept_challenge", {
+        p_challenge_id: challengeId,
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      // Transición directa a finished (el kickoff trigger debe activarlo antes de que el resolve trigger lo finalice)
+      await admin.from("matches").update({ status: "finished", home_score: 2, away_score: 1 }).eq("id", matchId);
+
+      // Debe estar completed
+      const { data: challenge } = await admin.from("challenges").select("*").eq("id", challengeId).single();
+      expect(challenge.status).toBe("completed");
+      expect(challenge.winner_ids).toHaveLength(2);
+
+      await assertConservation(userA.id);
+      await assertConservation(userB.id);
+    });
+
+    it("(f2) Transición directa scheduled -> canceled con pozo poblado", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 40,
+        p_type: "open",
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      await clientB.rpc("accept_challenge", {
+        p_challenge_id: challengeId,
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      // Transición directa a canceled
+      await admin.from("matches").update({ status: "canceled" }).eq("id", matchId);
+
+      // Debe cancelarse y reembolsarse a todos, sin doble reembolso
+      const { data: challenge } = await admin.from("challenges").select("*").eq("id", challengeId).single();
+      expect(challenge.status).toBe("canceled");
+
+      const { data: memberA } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      const { data: memberB } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userB.id).single();
+      expect(Number(memberA!.wager_balance)).toBe(100.00);
+      expect(Number(memberB!.wager_balance)).toBe(100.00);
+
+      await assertConservation(userA.id);
+      await assertConservation(userB.id);
+    });
+
+    it("(g) Accrual + payout en el mismo partido y usuario", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      // Predicción normal de liga para userA (2-1)
+      await admin.from("predictions").insert({
+        league_id: leagueId,
+        match_id: matchId,
+        user_id: userA.id,
+        home_score_pred: 2,
+        away_score_pred: 1,
+        multiplier: 1.00
+      });
+
+      // Crear y aceptar duelo 1v1 directo (A: 2-1, B: 0-0)
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 40,
+        p_type: "direct",
+        p_challenged_id: userB.id,
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+      await clientB.rpc("accept_challenge", { p_challenge_id: challengeId, p_prediction_home: 0, p_prediction_away: 0 });
+
+      // Finalizar match 2-1 (A gana accrual de liga y gana el duelo)
+      await admin.from("matches").update({ status: "finished", home_score: 2, away_score: 1 }).eq("id", matchId);
+
+      // UserA recibe: 5.00 (accrual) + 80.00 (duelo payout) = 85.00 adicionales.
+      // Balance inicial: 100.00 - 40.00 (apuesta) = 60.00.
+      // Balance final esperado: 60.00 + 85.00 = 145.00
+      const { data: memberA } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      expect(Number(memberA!.wager_balance)).toBe(145.00);
+
+      // Verificar ambas transacciones registradas
+      const { data: txs } = await admin.from("point_transactions").select("*").eq("user_id", userA.id).eq("reference_id", challengeId);
+      const { data: accTxs } = await admin.from("point_transactions").select("*").eq("user_id", userA.id).eq("reference_id", matchId).eq("description", "match_accrual");
+
+      expect(txs).not.toBeNull();
+      expect(txs!.some(t => t.description === "challenge_payout")).toBe(true);
+      expect(accTxs).toHaveLength(1);
+
+      await assertConservation(userA.id);
+    });
+
+    it("(h) Idempotencia de re-disparo (accrual y payout)", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 100.00);
+      await seedBalance(userB.id, leagueId, 100.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      // Predicción normal de liga (A: 0-0 legítimo -> 0 puntos)
+      await admin.from("predictions").insert({
+        league_id: leagueId,
+        match_id: matchId,
+        user_id: userA.id,
+        home_score_pred: 0,
+        away_score_pred: 0,
+        multiplier: 1.00
+      });
+
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 40,
+        p_type: "direct",
+        p_challenged_id: userB.id,
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+      await clientB.rpc("accept_challenge", { p_challenge_id: challengeId, p_prediction_home: 1, p_prediction_away: 1 });
+
+      // Disparo 1: finaliza 2-1 (A gana payout de 80.00, A gana 0 en liga)
+      await admin.from("matches").update({ status: "finished", home_score: 2, away_score: 1 }).eq("id", matchId);
+
+      const { data: memberA1 } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      expect(Number(memberA1!.wager_balance)).toBe(140.00);
+
+      // Capturar número de transacciones
+      const { data: txs1 } = await admin.from("point_transactions").select("*").eq("user_id", userA.id);
+
+      // Disparo 2: re-actualización (dummy update de matchday)
+      await admin.from("matches").update({ matchday: 3 }).eq("id", matchId);
+
+      // Balance y transacciones no deben cambiar
+      const { data: memberA2 } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      const { data: txs2 } = await admin.from("point_transactions").select("*").eq("user_id", userA.id);
+
+      expect(Number(memberA2!.wager_balance)).toBe(140.00);
+      expect(txs1).not.toBeNull();
+      expect(txs2).not.toBeNull();
+      expect(txs2!.length).toBe(txs1!.length);
+
+      await assertConservation(userA.id);
+    });
+
+    it("(i) Atomicidad: rollback total si falla el ledger en multi-ganador", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      await seedBalance(userA.id, leagueId, 1000.00);
+      await seedBalance(userB.id, leagueId, 1000.00);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      // Crear reto con apuesta de exactamente 888
+      // Como el trigger reparte 888.00 a cada ganador, el insert en point_transactions violará
+      // chk_point_transactions_refund_rollback_test (que prohíbe 888.00) y causará un rollback.
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: 888,
+        p_type: "open",
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      await clientB.rpc("accept_challenge", {
+        p_challenge_id: challengeId,
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      // Intentar finalizar partido -> Debe fallar y hacer rollback total
+      const { error: mErr } = await admin
+        .from("matches")
+        .update({ status: "finished", home_score: 2, away_score: 1 })
+        .eq("id", matchId);
+
+      expect(mErr).not.toBeNull();
+      expect(mErr?.message).toContain("chk_point_transactions_refund_rollback_test");
+
+      // El partido debe seguir en estado scheduled
+      const { data: match } = await admin.from("matches").select("status").eq("id", matchId).single();
+      expect(match!.status).toBe("scheduled");
+
+      // Reto sigue pending (puesto que se revirtió la transición a active del kickoff)
+      const { data: challenge } = await admin.from("challenges").select("status").eq("id", challengeId).single();
+      expect(challenge!.status).toBe("pending");
+
+      // Balances siguen en 112 (1000 - 888)
+      const { data: memberA } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      expect(Number(memberA!.wager_balance)).toBe(112.00);
+
+      await assertConservation(userA.id);
+    });
+
+    it("(j) Sin overflow en pozo grande", async () => {
+      const matchId = await insertMatch(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString());
+      
+      // Asignar saldo gigante
+      const hugeBalance = 9999999.00;
+      await seedBalance(userA.id, leagueId, hugeBalance);
+      await seedBalance(userB.id, leagueId, hugeBalance);
+
+      const clientA = createAuthedClient(userA.token);
+      const clientB = createAuthedClient(userB.token);
+
+      // Crear reto con points_bet gigante
+      const hugeBet = 5000000;
+      const { data: challengeId } = await clientA.rpc("create_challenge", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_points_bet: hugeBet,
+        p_type: "direct",
+        p_challenged_id: userB.id,
+        p_prediction_home: 2,
+        p_prediction_away: 1,
+      });
+
+      await clientB.rpc("accept_challenge", {
+        p_challenge_id: challengeId,
+        p_prediction_home: 0,
+        p_prediction_away: 0,
+      });
+
+      // Finalizar match -> payout de 10,000,000.00
+      const { error: mErr } = await admin
+        .from("matches")
+        .update({ status: "finished", home_score: 2, away_score: 1 })
+        .eq("id", matchId);
+      expect(mErr).toBeNull(); // No debe fallar por overflow
+
+      const { data: memberA } = await admin.from("league_members").select("wager_balance").eq("league_id", leagueId).eq("user_id", userA.id).single();
+      // userA final balance: 9999999 - 5000000 + 10000000 = 14999999.00
+      expect(Number(memberA!.wager_balance)).toBe(14999999.00);
+
+      await assertConservation(userA.id);
+      await assertConservation(userB.id);
+    });
+  });
 });
