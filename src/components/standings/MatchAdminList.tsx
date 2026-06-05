@@ -77,6 +77,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   // Estado editable local, sembrado de las props. Se reconcilia con la verdad del
   // servidor al terminar la transición (patrón MemberAdminList).
@@ -118,6 +119,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
 
   function save() {
     setError(null);
+    setWarning(null);
     startTransition(async () => {
       const result = await setMatchResult({
         matchId: match.id,
@@ -129,6 +131,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
         setError(result.error);
         return;
       }
+      setWarning(result.warning ?? null);
       router.refresh();
     });
   }
@@ -213,6 +216,15 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
           className="rounded-sm border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
           {error}
+        </p>
+      )}
+
+      {warning && (
+        <p
+          role="status"
+          className="rounded-sm border border-accent/50 bg-accent/10 px-3 py-2 text-sm text-accent"
+        >
+          {warning}
         </p>
       )}
     </li>

@@ -381,6 +381,36 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fn_admin_apply_knockout_advancement: {
+        Args: { p_slots: Json }
+        Returns: {
+          away_score: number | null
+          away_source: string | null
+          away_team: string
+          away_team_code: string | null
+          bracket_slot: number | null
+          created_at: string
+          external_ref: string | null
+          group_label: string | null
+          home_score: number | null
+          home_source: string | null
+          home_team: string
+          home_team_code: string | null
+          id: string
+          match_time: string
+          matchday: number | null
+          stage: string | null
+          status: string
+          updated_at: string
+          venue: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "matches"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       fn_admin_set_match_result: {
         Args: {
           p_away_score: number

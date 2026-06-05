@@ -327,6 +327,27 @@ describe("fn_admin_set_match_result", () => {
     expect(error?.code).toBe(INVALID_INPUT);
   });
 
+  it("bloquea empate finished en knockout hasta modelar penales", async () => {
+    const adminUser = await createAuthedUser();
+    await seedLeague(adminUser);
+    const matchId = await seedMatch({
+      status: "scheduled",
+      bracketSlot: 901,
+      homeTeamCode: "AAA",
+      awayTeamCode: "BBB",
+    });
+    const client = createAuthedClient(adminUser.token);
+
+    const { error } = await client.rpc("fn_admin_set_match_result", {
+      p_match_id: matchId,
+      p_home_score: 1,
+      p_away_score: 1,
+      p_status: "finished",
+    });
+
+    expect(error?.code).toBe(INVALID_INPUT);
+  });
+
   it("partido inexistente → P0002", async () => {
     const adminUser = await createAuthedUser();
     await seedLeague(adminUser);

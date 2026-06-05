@@ -87,10 +87,13 @@ export type LeagueRules = { predictionMode: PredictionMode };
  * Contrato de retorno de TODA Server Action (Story 1.3, primer uso).
  * La acción atrapa con try/catch y NUNCA propaga excepciones al cliente:
  * éxito → { success:true, data, error:null }; fallo → { success:false, data:null, error }.
+ * `warning` es opcional para flujos parcialmente exitosos con acción secundaria
+ * reintentable (p. ej. resultado guardado, pero avance de bracket pendiente).
  * [Source: architecture.md#Format Patterns / #Error Handling Patterns]
  */
 export type ServerActionResult<T> = {
   success: boolean;
   data: T | null;
   error: string | null;
+  warning?: string | null;
 };

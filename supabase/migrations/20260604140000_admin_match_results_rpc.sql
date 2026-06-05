@@ -120,6 +120,11 @@ begin
     if p_home_score < 0 or p_away_score < 0 then
       raise exception 'El marcador no puede ser negativo' using errcode = '22023';
     end if;
+    if v_match.bracket_slot is not null
+       and p_status = 'finished'
+       and p_home_score = p_away_score then
+      raise exception 'Un partido knockout finalizado necesita ganador; registra un marcador no empatado hasta modelar penales' using errcode = '22023';
+    end if;
     v_home := p_home_score;
     v_away := p_away_score;
   else
