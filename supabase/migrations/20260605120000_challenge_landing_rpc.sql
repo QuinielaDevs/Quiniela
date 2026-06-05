@@ -15,16 +15,12 @@ create policy "participants_select_gated"
     user_id = (select auth.uid())
     or (
       -- Otros miembros de la liga sólo pueden verla si el partido comenzó (kickoff - 1min)
-      -- o si el desafío ya terminó / fue cancelado.
       exists (
         select 1 from public.challenges c
         join public.league_members lm on c.league_id = lm.league_id
         where c.id = challenge_participants.challenge_id
           and lm.user_id = (select auth.uid())
-          and (
-            public.fn_match_unlocked(c.match_id)
-            or c.status in ('completed', 'canceled')
-          )
+          and public.fn_match_unlocked(c.match_id)
       )
     )
   );
@@ -122,7 +118,7 @@ begin
   join public.leagues l on c.league_id = l.id
   join public.matches m on c.match_id = m.id
   join public.profiles p_creator on c.creator_id = p_creator.id
-  -- Join dinámico para oponente: challenged_id para directos, o el viewer para abiertos si ya se unió
+  -- Join dinámico para oponente: challenged_id para directos, o el primer participante que no sea el creador para abiertos
   left join public.profiles p_challenged on
     p_challenged.id = (
       case
@@ -130,7 +126,7 @@ begin
         else (
           select cp.user_id
           from public.challenge_participants cp
-          where cp.challenge_id = c.id and cp.user_id = v_viewer
+          where cp.challenge_id = c.id and cp.user_id <> c.creator_id
           limit 1
         )
       end
