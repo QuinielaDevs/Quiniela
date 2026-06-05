@@ -252,7 +252,7 @@ La recompensa máxima asignada por acertar un premio decrece en base a las fases
 ---
 
 ### 4.8 Proyección de Clasificaciones en Vivo (Real-Time Leaderboard)
-**Descripción:** Sincroniza la tabla de posiciones en tiempo real basándose en los partidos que se están jugando en vivo, convirtiendo a la quiniela en un acompañamiento activo de la transmisión.
+**Descripción:** Sincroniza la tabla de posiciones en tiempo real basándose en los partidos que se están jugando en vivo, convirtiendo a la quiniela en un acompañamiento activo de la transmisión. Los datos de goles, marcadores y estados de partidos se reciben automáticamente en tiempo real mediante la integración de la API de Zafronix (vía webhooks), manteniendo la opción de invalidación o edición manual por el administrador en caso de ser necesario.
 *Realiza UJ-4.*
 
 **Requisitos Funcionales:**
