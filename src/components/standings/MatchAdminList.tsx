@@ -103,7 +103,8 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
 
   const localTime = useMemo(
     () =>
-      new Date(match.matchTime).toLocaleString("es", {
+      new Date(match.matchTime).toLocaleString("es-VE", {
+        timeZone: "America/Caracas",
         day: "2-digit",
         month: "short",
         hour: "2-digit",

@@ -155,6 +155,17 @@ describe("calculatePredictionMultiplier — lotes por antelación (Story 2.4)", 
   it("tiempos inválidos → 1.00 (defensivo)", () => {
     expect(calculatePredictionMultiplier("no-date", 0)).toBe(1.0);
   });
+
+  it("calcula en base a firstMatchTime si se especifica", () => {
+    const saved = new Date("2026-05-01T00:00:00.000Z");
+    const firstMatchTime = new Date("2026-06-11T00:00:00.000Z"); // 41 días
+    const kickoff = new Date("2026-06-15T00:00:00.000Z"); // kickoff posterior
+    expect(calculatePredictionMultiplier(saved, kickoff, firstMatchTime)).toBe(2.5);
+
+    // Si el primer partido ya empezó, la antelación es <= 0, dando 1.00
+    const savedAfterStart = new Date("2026-06-12T00:00:00.000Z");
+    expect(calculatePredictionMultiplier(savedAfterStart, kickoff, firstMatchTime)).toBe(1.0);
+  });
 });
 
 describe("calculatePredictionPoints — base * multiplicador (Story 2.4)", () => {

@@ -19,6 +19,7 @@ type PredictionsBoardViewProps = {
   leagueId: string;
   matches: MatchCardMatch[];
   predictions: BoardPrediction[];
+  firstMatchTime?: string;
 };
 
 // Tablero táctil con navegación por fase (UX-DR-7). Agrupa los partidos por
@@ -28,6 +29,7 @@ export function PredictionsBoardView({
   leagueId,
   matches,
   predictions,
+  firstMatchTime,
 }: PredictionsBoardViewProps) {
   const phases = useMemo(() => buildPhases(matches), [matches]);
   const [activeKey, setActiveKey] = useState(() => phases[0]?.key ?? "");
@@ -61,6 +63,7 @@ export function PredictionsBoardView({
               key={match.id}
               leagueId={leagueId}
               match={match}
+              firstMatchTime={firstMatchTime}
               initialPrediction={
                 prediction
                   ? {

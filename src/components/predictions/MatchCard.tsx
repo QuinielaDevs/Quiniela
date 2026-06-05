@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 
 import { savePrediction } from "@/app/actions/predictions.actions";
@@ -45,6 +45,7 @@ type MatchCardProps = {
   match: MatchCardMatch;
   initialPrediction?: MatchCardPrediction | null;
   disabled?: boolean;
+  firstMatchTime?: string;
 };
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "offline" | "error";
@@ -58,7 +59,7 @@ const DEBOUNCE_MS = 500;
 const OFFLINE_COPY = "Sin conexion - Pendiente";
 const LOCKED_COPY = "Pronostico cerrado";
 const TBD_COPY = "Pendiente de clasificacion";
-const KICKOFF_LOCK_MS = 60_000;
+const KICKOFF_LOCK_MS = 0;
 const CLOSED_STATUSES = new Set(["live", "finished", "suspended", "canceled"]);
 
 function isBrowserOnline() {
@@ -77,7 +78,7 @@ function isMatchTbd(match: MatchCardProps["match"]): boolean {
 }
 
 // Bloqueo de UI: defensivo/ergonómico. La AUTORIDAD del bloqueo es la DB (la RPC
-// fn_save_prediction rechaza tras match_time - 1min con la hora del servidor).
+// fn_save_prediction rechaza tras match_time con la hora del servidor).
 function isMatchLocked(match: MatchCardProps["match"]): boolean {
   if (CLOSED_STATUSES.has(match.status)) return true;
   const kickoffMs = new Date(match.match_time).getTime();
@@ -94,6 +95,7 @@ export function MatchCard({
   match,
   initialPrediction,
   disabled = false,
+  firstMatchTime,
 }: MatchCardProps) {
   const hasInitialPrediction =
     initialPrediction !== null && initialPrediction !== undefined;
@@ -131,10 +133,57 @@ export function MatchCard({
   const nextMultiplier = calculatePredictionMultiplier(
     Date.now(),
     match.match_time,
+    firstMatchTime,
   );
   const displayMultiplier = hasInitialPrediction
     ? savedMultiplier
     : nextMultiplier;
+
+  const formattedTime = useMemo(() => {
+    const date = new Date(match.match_time);
+    if (!Number.isFinite(date.getTime())) return "";
+    return date.toLocaleString("es-VE", {
+      timeZone: "America/Caracas",
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, [match.match_time]);
+
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  useEffect(() => {
+    const kickoffMs = new Date(match.match_time).getTime();
+    if (!Number.isFinite(kickoffMs)) return;
+
+    function updateRemaining() {
+      const diffMs = kickoffMs - Date.now();
+      if (diffMs <= 0) {
+        setTimeLeft("");
+        return;
+      }
+
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffSecs / 60);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffDays > 0) {
+        setTimeLeft(`Faltan ${diffDays} ${diffDays === 1 ? "día" : "días"}`);
+      } else if (diffHours > 0) {
+        setTimeLeft(`Falta${diffHours === 1 ? "" : "n"} ${diffHours} h`);
+      } else if (diffMins > 0) {
+        setTimeLeft(`Falta${diffMins === 1 ? "" : "n"} ${diffMins} min`);
+      } else {
+        setTimeLeft("Falta < 1 min");
+      }
+    }
+
+    updateRemaining();
+    const interval = setInterval(updateRemaining, 60_000);
+    return () => clearInterval(interval);
+  }, [match.match_time]);
 
   useEffect(() => {
     const nextInitial = {
@@ -357,12 +406,29 @@ export function MatchCard({
       )}
     >
       <div className="mb-3 flex min-h-6 items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span>{phaseLabel}</span>
+          {formattedTime && (
+            <>
+              <span>·</span>
+              <span suppressHydrationWarning>{formattedTime}</span>
+            </>
+          )}
           {!isTbd && (
-            <span className="font-semibold text-accent">
-              {formatMultiplier(displayMultiplier)}
-            </span>
+            <>
+              <span>·</span>
+              <span className="font-semibold text-accent">
+                {formatMultiplier(displayMultiplier)}
+              </span>
+            </>
+          )}
+          {timeLeft && !isLocked && !isTbd && (
+            <>
+              <span>·</span>
+              <span className="text-muted-foreground font-medium" suppressHydrationWarning>
+                {timeLeft}
+              </span>
+            </>
           )}
         </div>
 

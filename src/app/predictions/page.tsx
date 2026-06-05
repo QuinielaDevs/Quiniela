@@ -57,7 +57,7 @@ export async function PredictionsBoard() {
   // que el usuario navegue las fases; MatchCard los deja en solo-lectura hasta
   // que el bracket se resuelva (fn_match_editable lo bloquea en DB). La RLS deja
   // al dueño leer sus propias predicciones siempre (no espera al kickoff).
-  const [{ data: matches }, { data: predictions }] = await Promise.all([
+  const [{ data: matches }, { data: predictions }, firstMatchResult] = await Promise.all([
     supabase
       .from("matches")
       .select(
@@ -72,6 +72,11 @@ export async function PredictionsBoard() {
       )
       .eq("league_id", leagueId)
       .eq("user_id", userId),
+    supabase
+      .from("matches")
+      .select("match_time")
+      .order("match_time", { ascending: true })
+      .limit(1),
   ]);
 
   if (!matches || matches.length === 0) {
@@ -83,11 +88,14 @@ export async function PredictionsBoard() {
     );
   }
 
+  const firstMatchTime = (firstMatchResult.data as { match_time: string }[] | null)?.[0]?.match_time ?? undefined;
+
   return (
     <PredictionsBoardView
       leagueId={leagueId}
       matches={matches}
       predictions={predictions ?? []}
+      firstMatchTime={firstMatchTime}
     />
   );
 }

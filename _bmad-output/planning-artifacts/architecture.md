@@ -26,7 +26,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - **Autenticación Express (FR-1):** Registro e inicio de sesión de un solo toque con Google OAuth.
 - **Invitación Inteligente (FR-3, FR-4, FR-23, FR-24):** Flujo de invitación mediante enlaces profundos que unen al jugador automáticamente a la liga privada tras autenticarse, mostrando instrucciones de cobro si el administrador activa el pago requerido.
 - **Gestión Logística (FR-5, FR-6):** Marcado manual de pagos (público en la clasificación para presión social) y expulsión de miembros por parte del administrador.
-- **Predicciones Táctiles y Auto-guardado (FR-7, FR-8, FR-9, FR-22):** Interfaz móvil optimizada con botones `+`/`-` de 48x48px que no despliegan teclado nativo. Auto-guardado con debounce de 500ms. Cierre automático de edición 1 minuto antes del inicio.
+- **Predicciones Táctiles y Auto-guardado (FR-7, FR-8, FR-9, FR-22):** Interfaz móvil optimizada con botones `+`/`-` de 48x48px que no despliegan teclado nativo. Auto-guardado con debounce de 500ms. Cierre automático de edición exactamente al inicio (kickoff) del partido.
 - **Multiplicador por Antelación (FR-10, FR-11):** Mecánica de puntuación que incrementa la puntuación base (5 pts por marcador exacto, 2 pts por resultado de ganador/empate) de forma progresiva según la antelación del registro (hasta 2.0x si es >5 semanas antes del partido).
 - **Módulo de Duelos (FR-12, FR-13, FR-14, FR-23):** Apuestas de puntos acumulados en duelos 1v1 directos u abiertos. Retención atómica de puntos en garantía ("escrow") y resolución automatizada del pozo. Compartir con WhatsApp Banter y landing pages dedicadas.
 - **Premios Especiales (FR-15, FR-16):** Predicciones de Campeón, Goleador y MVP del Mundial con puntuación decreciente a medida que avanza el torneo (50/25/10/0 pts) cerrando antes de semifinales.
@@ -51,8 +51,8 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - **Supabase Free Tier Specs:** Límite de 500MB de base de datos y 200 conexiones WebSockets simultáneas.
 - **Football API Quota:** API-Football gratuita permite 100 llamadas diarias. Se requiere un cron selectivo (Pull-and-Cache) ejecutado únicamente durante ventanas activas de juego del Mundial 2026.
 - **Inactividad de Base de Datos:** Supabase pausa proyectos gratuitos tras 1 semana sin uso; se mitiga programando un keep-alive automático (ping diario).
-- **Seguridad de Lectura:** Impedir lectura de predicciones activas hasta el momento del kickoff (`match_time - 1 min`) para preservar la competitividad.
-- **Validación de Kickoff en Servidor:** El bloqueo de edición 1 minuto antes del inicio se validará estrictamente en Supabase (mediante políticas RLS y triggers de escritura) usando la hora UTC del servidor de base de datos, ignorando la hora local del cliente.
+- **Seguridad de Lectura:** Impedir lectura de predicciones activas hasta el momento del kickoff (`match_time`) para preservar la competitividad.
+- **Validación de Kickoff en Servidor:** El bloqueo de edición exactamente al inicio se validará estrictamente en Supabase (mediante políticas RLS y triggers de escritura) usando la hora UTC del servidor de base de datos, ignorando la hora local del cliente.
 - **Devoluciones de Escrow Automatizadas:** La baja de un miembro de la liga (FR-6) debe gatillar un proceso de base de datos que anule sus duelos 1v1 activos y regrese los puntos retenidos en garantía a los rivales sobrevivientes.
 - **Control de Escrow por Creación (No por Aceptación):** Para evitar sobre-compromiso de saldo en desafíos pendientes, los puntos de la apuesta se deducirán del saldo disponible del creador y se moverán a escrow *en el momento de la creación* del reto.
 - **Gestión de Robustez de Auth:** La base de datos y la UI implementarán fallbacks automáticos para nombres y avatares nulos procedentes de Google OAuth para asegurar la integridad de las tablas de perfiles.
@@ -141,7 +141,7 @@ Hot reloading nativo, configuraciones de ESLint estándar y soporte directo para
 ### Authentication & Security
 
 - **Autenticación Única Social (Google OAuth):** Integración nativa de Supabase para evitar flujos de validación de correo y fricciones de onboarding.
-- **Políticas de Row Level Security (RLS):** Las predicciones individuales (`predictions`) se bloquean a lectura pública de rivales y se liberan automáticamente solo cuando la hora del servidor es `>= match_time - 1 minute`.
+- **Políticas de Row Level Security (RLS):** Las predicciones individuales (`predictions`) se bloquean a lectura pública de rivales y se liberan automáticamente solo cuando la hora del servidor es `>= match_time`.
 - **Transacciones de Puntos por Triggers SQL:** Toda deducción de saldo y retención en garantía (*escrow*) se ejecuta mediante funciones PostgreSQL seguras (`SECURITY DEFINER`) para evitar doble gasto en apuestas concurrentes.
 - **Cascada de Expulsión en Postgres:** Un trigger de base de datos que, al eliminar a un miembro, cancela automáticamente sus duelos directos activos y reembolsa los puntos en escrow a sus oponentes de forma transaccional.
 

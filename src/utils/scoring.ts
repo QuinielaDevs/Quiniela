@@ -112,18 +112,20 @@ function toMs(value: Date | string | number): number {
  * sobre milisegundos UTC (no calendario local). Antelación negativa o tiempos
  * inválidos → MIN_MULTIPLIER (1.00). El valor AUTORITATIVO lo calcula el backend
  * con `now()` del servidor; esta versión TS sirve para la UI predictiva.
+ * Si se proporciona `firstMatchTime`, la antelación se mide en relación a ese instante de referencia.
  */
 export function calculatePredictionMultiplier(
   savedAt: Date | string | number,
   matchTime: Date | string | number,
+  firstMatchTime?: Date | string | number,
 ): number {
   const savedAtMs = toMs(savedAt);
-  const matchTimeMs = toMs(matchTime);
-  if (!Number.isFinite(savedAtMs) || !Number.isFinite(matchTimeMs)) {
+  const refTimeMs = firstMatchTime ? toMs(firstMatchTime) : toMs(matchTime);
+  if (!Number.isFinite(savedAtMs) || !Number.isFinite(refTimeMs)) {
     return MIN_MULTIPLIER;
   }
 
-  const days = (matchTimeMs - savedAtMs) / MS_PER_DAY;
+  const days = (refTimeMs - savedAtMs) / MS_PER_DAY;
   for (const tier of MULTIPLIER_TIERS) {
     if (days >= tier.minDays) return tier.value;
   }

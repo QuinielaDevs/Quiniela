@@ -476,8 +476,8 @@ describe("MatchCard", () => {
     );
   });
 
-  it("bloquea la edicion cuando falta <=1min para el kickoff y muestra candado", () => {
-    vi.setSystemTime(new Date("2026-06-11T19:59:30.000Z")); // 30s antes del kickoff
+  it("bloquea la edicion cuando llega la hora del kickoff y muestra candado", () => {
+    vi.setSystemTime(new Date("2026-06-11T20:00:00.000Z")); // hora exacta de kickoff
     renderMatchCard({ initialPrediction: { homeScorePred: 0, awayScorePred: 0 } });
 
     expect(screen.getByText("Pronostico cerrado")).toBeInTheDocument();
@@ -487,6 +487,16 @@ describe("MatchCard", () => {
     expect(
       screen.getByLabelText("Disminuir goles de Mexico"),
     ).toBeDisabled();
+  });
+
+  it("no bloquea la edicion antes de la hora del kickoff", () => {
+    vi.setSystemTime(new Date("2026-06-11T19:59:59.000Z")); // 1 segundo antes del kickoff
+    renderMatchCard({ initialPrediction: { homeScorePred: 0, awayScorePred: 0 } });
+
+    expect(screen.queryByText("Pronostico cerrado")).toBeNull();
+    expect(
+      screen.getByLabelText("Incrementar goles de Argentina"),
+    ).not.toBeDisabled();
   });
 
   it("un error de kickoff del servidor es definitivo y no entra en retry offline", async () => {
