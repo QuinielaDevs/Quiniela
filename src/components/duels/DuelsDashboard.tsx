@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useTransition } from "react";
-import { Plus, Trophy, Coins, Calendar, User, UserPlus, ShieldAlert, History } from "lucide-react";
+import { Plus, Trophy, Coins, Calendar, User, UserPlus, ShieldAlert, History, Share2 } from "lucide-react";
 import { CreateDuelDialog } from "./CreateDuelDialog";
 import { AcceptDuelDialog } from "./AcceptDuelDialog";
 import { rejectChallenge, cancelChallenge } from "@/app/actions/duels.actions";
@@ -168,6 +168,20 @@ export function DuelsDashboard({
     return memberMap.get(userId) || "Usuario Quiniela";
   };
 
+  const handleShareWhatsApp = (challenge: Challenge) => {
+    const isDirect = challenge.type === "direct";
+    const rivalName = isDirect && challenge.challenged_id
+      ? getMemberName(challenge.challenged_id)
+      : "un amigo";
+
+    const text = isDirect
+      ? `¡Ey ${rivalName}! Te he retado a un duelo 1v1 en PIJA Quiniela para el partido ${challenge.match.home_team} vs ${challenge.match.away_team} 🏆. Aposté ${challenge.points_bet} pts de mi saldo. ¿Aceptas el reto o te da miedo perder? Entra aquí para responder: ${window.location.origin}/desafio/${challenge.id}`
+      : `¡Atención grupo! He creado un pozo abierto de ${challenge.points_bet} pts para el partido ${challenge.match.home_team} vs ${challenge.match.away_team} en PIJA Quiniela 💥. ¡Entren y demuestren quién es el verdadero Nostradamus de la liga!: ${window.location.origin}/desafio/${challenge.id}`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
+  };
+
   // Clasificación de retos activos
   const pendingReceived = activeChallenges.filter(
     (c) => c.status === "pending" && c.type === "direct" && c.challenged_id === currentUserId
@@ -330,15 +344,26 @@ export function DuelsDashboard({
               </Button>
             )}
             {challenge.creator_id === currentUserId && (
-              <Button
-                onClick={() => handleCancel(challenge.id)}
-                disabled={isActionPending}
-                variant="outline"
-                size="sm"
-                className="w-full border-border text-destructive hover:bg-destructive/10 font-bold"
-              >
-                Cancelar
-              </Button>
+              <div className="flex gap-2 w-full">
+                <Button
+                  onClick={() => handleShareWhatsApp(challenge)}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 border-border text-success hover:bg-success/10 font-bold flex items-center justify-center gap-1.5"
+                >
+                  <Share2 className="size-4" />
+                  Compartir
+                </Button>
+                <Button
+                  onClick={() => handleCancel(challenge.id)}
+                  disabled={isActionPending}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 border-border text-destructive hover:bg-destructive/10 font-bold"
+                >
+                  Cancelar
+                </Button>
+              </div>
             )}
           </div>
         )}

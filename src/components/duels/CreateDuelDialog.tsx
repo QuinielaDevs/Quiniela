@@ -109,15 +109,15 @@ export function CreateDuelDialog({
   };
 
   const handleShareWhatsApp = () => {
-    if (!selectedMatch) return;
+    if (!selectedMatch || !successChallengeId) return;
     const isDirect = type === "direct";
     const rivalName = isDirect
       ? members.find((m) => m.user_id === challengedId)?.display_name ?? "un amigo"
       : "cualquiera de la liga";
 
     const text = isDirect
-      ? `¡Te he retado a un duelo 1v1 en Pija Quiniela para el partido ${selectedMatch.home_team} vs ${selectedMatch.away_team}! Aposté ${pointsBet} pts. ¿Aceptas el reto? Entra aquí: ${window.location.origin}/duels`
-      : `¡He creado un pozo abierto de ${pointsBet} pts para el partido ${selectedMatch.home_team} vs ${selectedMatch.away_team} en Pija Quiniela! Entra y demuestra tus conocimientos: ${window.location.origin}/duels`;
+      ? `¡Ey ${rivalName}! Te he retado a un duelo 1v1 en PIJA Quiniela para el partido ${selectedMatch.home_team} vs ${selectedMatch.away_team} 🏆. Aposté ${pointsBet} pts de mi saldo. ¿Aceptas el reto o te da miedo perder? Entra aquí para responder: ${window.location.origin}/desafio/${successChallengeId}`
+      : `¡Atención grupo! He creado un pozo abierto de ${pointsBet} pts para el partido ${selectedMatch.home_team} vs ${selectedMatch.away_team} en PIJA Quiniela 💥. ¡Entren y demuestren quién es el verdadero Nostradamus de la liga!: ${window.location.origin}/desafio/${successChallengeId}`;
 
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");

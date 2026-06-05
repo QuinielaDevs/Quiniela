@@ -330,6 +330,7 @@ export type Database = {
         Row: {
           away_score_pred: number
           created_at: string
+          evaluated_at: string | null
           home_score_pred: number
           id: string
           league_id: string
@@ -342,6 +343,7 @@ export type Database = {
         Insert: {
           away_score_pred: number
           created_at?: string
+          evaluated_at?: string | null
           home_score_pred: number
           id?: string
           league_id: string
@@ -354,6 +356,7 @@ export type Database = {
         Update: {
           away_score_pred?: number
           created_at?: string
+          evaluated_at?: string | null
           home_score_pred?: number
           id?: string
           league_id?: string
@@ -416,6 +419,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_challenge: {
+        Args: {
+          p_challenge_id: string
+          p_prediction_away: number
+          p_prediction_home: number
+        }
+        Returns: undefined
+      }
+      cancel_challenge: { Args: { p_challenge_id: string }; Returns: undefined }
+      check_conservation_invariant: {
+        Args: { p_league_id: string; p_user_id: string }
+        Returns: boolean
+      }
       create_challenge: {
         Args: {
           p_challenged_id?: string
@@ -454,6 +470,34 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      fn_get_challenge_landing: {
+        Args: { p_challenge_id: string }
+        Returns: {
+          away_team: string
+          away_team_code: string
+          challenge_id: string
+          challenged_display_name: string
+          challenged_id: string
+          challenged_prediction_away: number
+          challenged_prediction_home: number
+          creator_avatar_url: string
+          creator_display_name: string
+          creator_id: string
+          creator_prediction_away: number
+          creator_prediction_home: number
+          home_team: string
+          home_team_code: string
+          invite_code: string
+          league_id: string
+          league_name: string
+          match_id: string
+          match_status: string
+          match_time: string
+          points_bet: number
+          status: string
+          type: string
+        }[]
       }
       fn_get_invite_landing: {
         Args: { p_invite_code: string }
@@ -501,6 +545,7 @@ export type Database = {
         Returns: {
           away_score_pred: number
           created_at: string
+          evaluated_at: string | null
           home_score_pred: number
           id: string
           league_id: string
@@ -518,6 +563,11 @@ export type Database = {
         }
       }
       fn_user_in_league: { Args: { p_league_id: string }; Returns: boolean }
+      refund_challenge_escrow: {
+        Args: { p_challenge_id: string }
+        Returns: undefined
+      }
+      reject_challenge: { Args: { p_challenge_id: string }; Returns: undefined }
       score_prediction: {
         Args: {
           p_away_pred: number
