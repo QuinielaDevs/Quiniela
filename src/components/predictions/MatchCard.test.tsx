@@ -37,6 +37,7 @@ const SAVED_PREDICTION = {
   away_score_pred: 0,
   multiplier: 1,
   points_earned: null,
+  evaluated_at: null,
   created_at: "2026-06-03T18:00:00.000Z",
   updated_at: "2026-06-03T18:00:00.000Z",
 };

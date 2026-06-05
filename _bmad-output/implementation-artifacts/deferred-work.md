@@ -1,64 +1,77 @@
 # Deferred Work
 
-## Deferred from: code review of story-4.2 (2026-06-04)
+> **Estado al 2026-06-04 (hardening pass + cierre de Epic 5).** Tags: `[RESUELTO]` cerrado · `[ABIERTO]` pendiente accionable · `[BLOQUEADO]` depende de una story aún no construida · `[ACEPTADO]` riesgo asumido conscientemente.
 
+## Hardening pass (2026-06-04) — migración `20260605130000_hardening_pass.sql`
+Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio, 128 unit tests en verde. Falta correr `supabase db reset` + `npm run test:integration` en entorno con Docker.
+
+---
+
+## Story 1.1 (code review 2026-06-01)
+- `[RESUELTO]` `[db.seed]` apuntaba a `seed.sql` inexistente → el archivo `supabase/seed.sql` ya existe (creado en 5.x).
+- `[RESUELTO]` `additional_redirect_urls` con `https://` vs `site_url` `http://` → corregido a `http://127.0.0.1:3000` (`supabase/config.toml:163`).
+- `[ABIERTO/parcial]` Defaults de auth: `minimum_password_length` subido 6→8. `enable_confirmations=false` y `max_rows=1000` se mantienen (decisión de hardening de PRODUCCIÓN; la app es Google-OAuth-first, las confirmaciones de email romperían el signup local sin SMTP). `max_rows` se relaciona con la paginación de standings (ver 3.1).
+- `[ACEPTADO]` `cacheComponents: true` en `next.config.ts` — intencional, válido y en verde. Se deja.
+- `[RESUELTO]` `components.json` con `tailwind.config: ""` → corregido a `"tailwind.config.ts"` (Tailwind v3 confirmado).
+- `[BLOQUEADO]` Bump de `eslint-config-next` a ^16 (flat config nativo): activa `react-hooks/set-state-in-effect` que FALLA en `src/components/theme-switcher.tsx` (código de plantilla). Requiere tocar el código de plantilla del Grupo B; se difiere para no romper el lint.
+
+## Story 1.2 (code review 2026-06-02)
+- `[RESUELTO]` `profiles.email` legible por cualquier autenticado → cerrado por column-grant en el hardening pass (`revoke select on profiles` + `grant select (id, display_name, avatar_url, created_at)`). Verificado que ningún consumidor lee `profiles.email` (el email de sesión viene de `auth.users`).
+- `[BLOQUEADO]` Sin políticas UPDATE/DELETE en `league_members` ni DELETE en `leagues`. Pertenece a **Story 3.3** (control de pagos/expulsión, backlog). ⚠️ INTERACCIÓN CRÍTICA: cualquier policy UPDATE sobre `league_members` debe ser **column-scoped** y NO permitir escribir `wager_balance` (rompería el escrow — ver memoria de economía de duelos). Implementar junto con 3.3.
+- `[ABIERTO]` `profiles.email` no se re-sincroniza (trigger solo `AFTER INSERT`). Añadir `AFTER UPDATE OF email ON auth.users` solo si se requiere email fresco. Baja prioridad (email no se lee desde `profiles`).
+- `[RESUELTO]` `payment_amount` sin `check (>= 0)` ni coherencia con `requires_payment` → CHECK `leagues_payment_amount_nonneg` + validación de coherencia en `fn_create_league` (hardening pass).
+- `[RESUELTO]` `LeagueRole`/`PaymentStatus` duplicados a mano → ahora derivan de arrays-constante (`LEAGUE_ROLES`, `PAYMENT_STATUSES`) en `src/types/index.ts`, con test de paridad `tests/integration/enum-parity.test.ts` contra el CHECK de la BD.
+
+## Story 1.3 (code review 2026-06-03)
+- `[RESUELTO]` `fn_create_league` sin validación a nivel de BD → añadidas guardas (nombre no vacío, `prediction_mode ∈ {dual,jornada,grupos}`, `payment_amount >= 0`, coherencia requires_payment⇒amount) en el hardening pass. Enforced también para llamadas directas al RPC.
+- `[ABIERTO]` Guardia de `/leagues/new` solo comprueba `getClaims()`; un usuario sin fila en `profiles` (fallo del trigger) violaría la FK al crear. Caso raro; mapear el error 23503 a mensaje legible. UI menor.
+- `[RESUELTO/auditado]` `fn_get_invite_landing` concedida a `anon` → auditada: solo expone datos públicos (nombre liga, display_name/avatar del creador, pago), NO email/created_by/IDs. Único riesgo = enumeración por fuerza bruta de `invite_code` (8 chars) → `[ACEPTADO]`, mitigable con rate-limit en el edge, no en SQL. Mismo patrón que se cerró server-side en 5.4 (`fn_get_challenge_landing` SÍ filtra predicciones).
+
+## Story 2.1 (code review 2026-06-03)
+- `[RESUELTO]` Sin bloqueo de escritura por kickoff −1min en INSERT/UPDATE de `predictions` → Story 2.4 reemplazó las policies con versiones gated (server-side, `fn_save_prediction` + RLS con la guarda de kickoff). Confirmado en `20260603201630_*`.
+- `[RESUELTO]` `MatchStatus` en tres lugares a mano → ahora deriva del array-constante `MATCH_STATUSES` en `src/types/index.ts` con test de paridad contra el CHECK. (Nota menor: `src/utils/scoring.ts` aún declara su propia unión `MatchStatus`; alinear o importar desde `@/types` en una limpieza futura — bajo riesgo, cubierto por el test de paridad del lado BD.)
+
+## Story 2.4 (code review 2026-06-03)
+- `[ABIERTO/UI]` UI derivada de tiempo en `MatchCard` evaluada solo en render (sin timer): el candado no se auto-bloquea al cruzar `match_time−1min`, el multiplicador queda stale, el ack de degradación podría tapar una mayor. Sin riesgo de datos (el servidor rechaza con P0001). Solución: un `setInterval` que re-renderice y reseteé el ack. **Batch UI pendiente.**
+- `[RESUELTO]` `fn_save_prediction`/`predictions` sin tope superior de marcador → CHECK `predictions_score_max (<= 99)` en el hardening pass (enforcement de tabla; el RPC hereda el CHECK).
+
+## Story 3.1 (code review 2026-06-03)
+- `[BLOQUEADO]` Tabs por `matchday` no contemplan `matchday=null` ni colisión de fases con el mismo número. Depende del modelado del calendario de eliminatorias (**Epic 4/6**).
+- `[ABIERTO]` Sin paginación en `/standings` — el tope de PostgREST (~1000 filas) puede truncar predicciones en un Mundial completo (liga grande). La clasificación sigue calculándose on-the-fly (5.3 añadió accrual a `wager_balance` pero NO reemplazó el cálculo de ranking, que es independiente por diseño). Implementar paginación/batch si la liga crece. Relacionado con `max_rows` (1.1).
+- `[RESUELTO/parcial]` Items deshabilitados de `BottomNavbar`: **Duelos** ya es destino real (Epic 5). **Mi Cuenta** sigue placeholder → depende de **Story 3.2** (backlog). `[BLOQUEADO]`.
+
+## Story 3.3 (code review 2026-06-04)
+- Admin de una liga que NO es su membresía más reciente no puede gestionarla: `/standings/manage` resuelve la "liga más reciente" igual que `/standings` y `/predictions` (`src/app/standings/manage/page.tsx`). Pre-existente; el selector multi-liga es trabajo futuro de toda la app.
+- Fidelidad de mensajes de error en las server actions de admin: `P0002` (miembro no encontrado), auto-expulsión y único-admin colapsan a `ADMIN_SAVE_ERROR`/`ADMIN_NOT_AUTHORIZED_ERROR` genéricos (`src/app/actions/leagues.actions.ts`). Las guardas funcionan; solo el copy es genérico. Polish de UX.
+- `isPending` (un solo `useTransition`) compartido entre el toggle de pago y el diálogo de baja en `MemberAdminList.tsx`: una operación en vuelo deshabilita la otra. Tradeoff aceptable a esta escala móvil; separar transiciones por acción es polish.
+
+### Story 3.3 (code review ronda 2, 2026-06-04)
+- `FOR UPDATE` en `fn_remove_member` (supabase/migrations/20260604120000_member_admin_management.sql) bloquea solo las filas `role='admin'` existentes; no serializa contra un futuro flujo de promote-to-admin o cambio de rol (hoy inexistente). Revisar el bloqueo cuando se añada promoción de admins.
+- El test de "último admin" (tests/integration/member-admin-management.test.ts) valida el invariante (la liga conserva ≥1 admin) pero no ejercita la rama concurrente `count<=1`+`FOR UPDATE`, que requeriría un test de dos transacciones simultáneas. La carrera es difícil de reproducir en integración.
+
+### Mini-sesión de decisiones post-Epic 3 (2026-06-04)
+- **Historia futura — Editar reglas de liga post-creación**: añadir al panel `/standings/manage` la edición de modo de predicción, monto e instrucciones de cobro (hoy solo se fijan al crear la liga en Story 1.3). Reusa el patrón Server Action + RPC `SECURITY DEFINER` (admin-gated) y `leagues.rules`/`payment_*`. Candidata a story propia cuando se priorice.
+- **Deuda conocida — Transferir/otorgar rol admin (promote-to-admin)**: NO se hace para MVP (1 admin/liga = el creador). Cuando se implemente, endurecer la guarda de "último admin" en `fn_remove_member` (hoy `FOR UPDATE` defensivo) para serializar también contra cambios de rol.
+- **Deuda recurrente — Selector multi-liga**: `/standings`, `/standings/manage`, `/account` y `/predictions` resuelven "liga más reciente". Evaluar una historia de selector multi-liga (diferido ya en 3.1 y 3.3).
+
+## Story 4.2 (code review 2026-06-04)
 - Handler Realtime en `src/components/live/LiveStandingsBoard.tsx` migró de `setSnapshot(updater funcional)` a lectura/escritura directa de `snapshotRef.current`. Para eventos Realtime síncronos es equivalente, pero si `refreshSnapshot({allowWhenLive:true})` (rama de partido nuevo, heredada de 4.1) resuelve mientras llega un evento de marcador, su guarda de versión está bypasseada y puede clobberear el update concurrente. Pre-existente desde 4.1; evaluar serializar refreshSnapshot con el snapshotVersion al tocar este flujo.
 - En modo polling (Realtime caído, `reconnecting`/`polling`) un gol detectado por el `refreshSnapshot` de 60s actualiza la tabla pero NO emite toast ni destello "Impacto de Gol" — la lógica vive solo en `handleMatchUpdate`. Es consistente con AC#6 (el toast se deriva del UPDATE de Realtime), pero degrada el feedback a cero durante la ventana de polling. Enhancement: comparar prev/next snapshot dentro de `refreshSnapshot` para emitir feedback también en polling.
 - `toScore(null)` ⇒ `0` en `src/components/live/goalImpact.ts`: una transición de marcador `null → 1` (backfill de un marcador desconocido, no un gol en juego) cuenta como incremento y podría fabricar un toast/destello fantasma. Baja frecuencia (live suele traer 0-0, y `buildProjectedStandings` ya excluye live con score null) y el fix (exigir prev conocido) podría suprimir goles legítimos vistos primero por Realtime. Revisar si aparecen falsos positivos con datos reales del sync.
 - Swipe del toast (`src/components/live/GoalToast.tsx`) sin gate de eje dominante: un arrastre intencionalmente vertical (scroll) sobre el toast lo desplaza horizontalmente por el jitter en `clientX`. Polish de UX; agregar chequeo `|dy| > |dx|` para ignorar intención vertical.
 
-## Deferred from: code review of story-1.1 (2026-06-01)
+## Story 5.1 (code review 2026-06-04)
+- `[ABIERTO/UI]` Carga diferida de retos históricos en `DuelsDashboard.tsx` no cancela peticiones previas al alternar pestañas rápido → posible condición de carrera de estado. Solución: `AbortController`. **Batch UI pendiente.**
 
-- `[db.seed] enabled=true` apunta a `./seed.sql` inexistente (`supabase/config.toml:71`) — default de plantilla; `supabase start` lo tolera, pero conviene crear un `seed.sql` vacío o desactivar `[db.seed]`.
-- `additional_redirect_urls = ["https://127.0.0.1:3000"]` con `site_url = "http://127.0.0.1:3000"` (`supabase/config.toml:163`) — corregir a `http://` cuando se implemente el flujo de auth/OAuth local.
-- Defaults de auth sin endurecer: `minimum_password_length = 6`, `enable_confirmations = false`, `max_rows = 1000` (`supabase/config.toml`) — endurecer durante el hardening de producción.
-- `cacheComponents: true` en `next.config.ts:4` — confirmar que la activación de esta flag de caché de Next 16 es intencional (válida y en verde, pero cambia el modelo de caché por defecto).
-- `components.json` con `tailwind.config: ""` mientras existe `tailwind.config.ts` (Tailwind v3) — puede provocar configuración incorrecta en futuros `shadcn add`.
-- `eslint-config-next` fijado en `15.3.1` mientras Next es `16.2.7` (`package.json`) — el bump a `eslint-config-next@^16` migra a flat config nativo (quitar `FlatCompat` en `eslint.config.mjs`) PERO activa la regla `react-hooks/set-state-in-effect`, que falla en `src/components/theme-switcher.tsx` (código de plantilla del Grupo B). Alinear la versión y resolver ese error de lint cuando se aborde el código de plantilla.
+## Story 5.4 (code review 2026-06-04)
+- `[ABIERTO/UI]` Riesgo de hydration mismatch en `DesafioClient.tsx` por `toLocaleDateString` en cliente. Solución: formatear server-side o con locale/timezone fijos. **Batch UI pendiente.**
+- `[ABIERTO/UI]` Tras unirse a la liga, la landing refresca pero no abre el modal de aceptación → fricción. Solución: auto-abrir `AcceptDuelDialog` tras el join exitoso. **Batch UI pendiente.**
 
-## Deferred from: code review of story-1.2 (2026-06-02)
+---
 
-- `profiles.email` legible por cualquier usuario autenticado vía `profiles_select_authenticated using (true)` (`supabase/migrations/20260602041455_rls_and_triggers.sql:49`) — PII expuesta. Antes de producción: restringir la exposición (p. ej. una vista pública sin `email`, o sacar `email` de la tabla pública y dejarlo solo en `auth.users`).
-- Sin políticas UPDATE/DELETE en `league_members` y sin DELETE en `leagues` (`supabase/migrations/20260602041455_rls_and_triggers.sql`) — deny-by-default deja sin poder abandonar liga, cambiar `payment_status` ni borrar liga vía cliente. Añadir en Stories 1.3 (admin/pagos), 1.4 (alta/baja por invitación) y 3.3 (control de pagos).
-- `profiles.email` no se re-sincroniza: el trigger es solo `AFTER INSERT` (`...20260602041455_rls_and_triggers.sql:139`). Añadir un trigger `AFTER UPDATE OF email ON auth.users` si se requiere email fresco en `profiles`.
-- `payment_amount numeric(10,2)` sin `check (payment_amount >= 0)` ni coherencia `requires_payment=true ⇒ payment_amount not null` (`supabase/migrations/20260602041410_init_schema.sql`) — endurecer al implementar pagos en Story 1.3.
-- `LeagueRole`/`PaymentStatus` en `src/types/index.ts` duplican manualmente los CHECK de la BD — riesgo de divergencia silenciosa; considerar derivarlos o añadir un test que valide los tipos contra los CHECK.
-
-## Deferred from: code review of story-1.3 (2026-06-03)
-
-- Validación a nivel de BD ausente en `fn_create_league` (`supabase/migrations/20260603014645_add_create_league_fn.sql`): no valida `payment_amount >= 0`, ni `prediction_mode ∈ {dual,jornada,grupos}`, ni `name` no vacío. Cualquier usuario `authenticated` puede invocar el RPC directo por PostgREST y saltarse la validación zod de la Server Action. Endurecer con CHECKs/validación dentro de la función (relacionado con la deuda de `payment_amount` diferida en 1.2).
-- La guardia de sesión de `/leagues/new` (`src/app/leagues/new/page.tsx`) solo comprueba `getClaims()`; un usuario autenticado sin fila en `public.profiles` (p. ej. por fallo del trigger `fn_handle_new_user`) pasa la guardia y, al enviar, el INSERT del RPC viola la FK `created_by → profiles(id)` (Postgres 23503) mostrando un error crudo. Caso raro; mapear el error o garantizar la materialización del perfil.
-- Código de Story 1.4 mezclado en el módulo 1.3 `src/app/actions/leagues.actions.ts` (`joinLeagueByInvite`, `normalizeInviteCode`) y RPCs 1.4 en `src/types/database.types.ts`. Auditar bajo Story 1.4 la superficie `fn_get_invite_landing` concedida a `anon` (posible enumeración de ligas/datos del creador con un `invite_code` de 8 chars).
-
-## Deferred from: code review of story-2.1 (2026-06-03)
-
-- Sin bloqueo de escritura por kickoff −1min en las políticas INSERT/UPDATE de `predictions` (`supabase/migrations/20260603144630_predictions_rls.sql`): el time-gating de LECTURA ya está activo, pero un usuario puede editar su predicción después del kickoff (partido `live`/`finished`). Asignado a Story 2.4 ("cuando falte 1 minuto... la UI bloquea") — pero debe enforcarse en servidor (RLS/trigger con `fn_match_unlocked` en el `with check`), no solo en UI. Exposición práctica nula hasta que existan GoalPicker/autosave (Stories 2.2-2.3).
-- `MatchStatus` definido en tres lugares sincronizados a mano (CHECK de `matches.status` + literal en `src/types/index.ts` + literal en `src/utils/scoring.ts`); los tipos generados lo tipan como `string`. Riesgo de drift silencioso si cambia el set de estados. Mismo patrón ya diferido para `LeagueRole`/`PaymentStatus` en 1.2; considerar una fuente única (constante derivada o test que valide los literales contra el CHECK).
-
-## Deferred from: code review of story-2.4 (2026-06-03)
-
-- UI derivada de tiempo en `MatchCard` (`src/components/predictions/MatchCard.tsx`) evaluada solo en render (sin timer): (a) el candado `isMatchLocked` no se auto-bloquea al cruzar `match_time − 1min` con la tarjeta abierta; (b) el indicador de multiplicador / `nextMultiplier` quedan stale al cruzar un lote de días; (c) `degradeAckRef` (confirmación por sesión) podría tapar una degradación posterior mayor; (d) si la tarjeta se bloquea con la advertencia abierta, el diálogo sigue interactivo. Sin riesgo de datos (el servidor rechaza con RPC P0001). Solución única: un `setInterval` que re-renderice y reseteé el ack al cruzar umbrales. (Code review de 2.4 — Blind + Edge Case Hunter.)
-- `fn_save_prediction` y la tabla `predictions` validan `>= 0` pero NO un tope superior de marcador (`MAX_PREDICTION_SCORE = 99` es solo cliente/zod). Una llamada directa a la RPC por un `authenticated` podría guardar un marcador enorme (cosmético, sin impacto de seguridad). Hardening futuro: CHECK de tope en la tabla + validación en la RPC. (Code review de 2.4 — Edge Case Hunter.)
-
-## Deferred from: code review of story-3.1 (2026-06-03)
-
-- Tabs por `matchday` en la tabla de posiciones (`src/utils/standings.ts` `finishedMatchdays` + `buildStandings`) no contemplan dos casos del esquema (matchday es `int` nullable y sin namespacing por fase): (a) un partido `finished` con `matchday = null` SÍ cuenta en la vista "General" pero NO genera pestaña → la suma de las pestañas de jornada no cuadra con el total General; (b) dos fases distintas con el mismo número de jornada (p. ej. group J1 y un knockout guardado como `matchday=1`) colapsan en una sola pestaña y se suman juntas. Latente: los datos reales (seed/sync) siempre fijan `matchday` de grupos; la story ya difirió las labels compactas por `stage` para knockout. Resolver cuando se modele el calendario de eliminatorias (Epic 4/6). (Code review de 3.1 — Blind + Edge Case Hunter + Acceptance Auditor, convergente.)
-- Sin paginación en `src/app/standings/page.tsx`: los selects de `predictions` (`.in('match_id', finishedIds)`), `matches` (status='finished') y `league_members` no acotan filas ni pagina. El tope por defecto de PostgREST (~1000 filas) puede truncar SILENCIOSAMENTE las predicciones en un Mundial completo (p. ej. 15 miembros × >66 partidos finished > 1000) → puntajes subestimados sin error visible. Solapa con la persistencia oficial de standings (Epic 5.3), que reemplazará el cálculo on-the-fly por `points_earned` agregado en BD. Resolver al implementar 5.3 o antes con paginación/batch si la liga crece. (Code review de 3.1 — Blind + Edge Case Hunter.)
-- Items deshabilitados de `BottomNavbar` (`src/components/layout/BottomNavbar.tsx`): Duelos y Mi Cuenta son placeholders con `aria-disabled="true"` sobre un `<span>` no enfocable (semántica de "disabled" en un elemento no interactivo) y contraste `text-muted-foreground/40` (exento de WCAG por ser control inactivo, pero confuso). Se reemplazan por destinos reales y navegación accesible al aterrizar Epic 5 (Duelos) y Story 3.2 (Mi Cuenta/perfil). (Code review de 3.1 — Blind Hunter.)
-
-## Deferred from: code review of story-3.3 (2026-06-04)
-
-- Admin de una liga que NO es su membresía más reciente no puede gestionarla: `/standings/manage` resuelve la "liga más reciente" igual que `/standings` y `/predictions` (`src/app/standings/manage/page.tsx`). Pre-existente; el selector multi-liga es trabajo futuro de toda la app.
-- Fidelidad de mensajes de error en las server actions de admin: `P0002` (miembro no encontrado), auto-expulsión y único-admin colapsan a `ADMIN_SAVE_ERROR`/`ADMIN_NOT_AUTHORIZED_ERROR` genéricos (`src/app/actions/leagues.actions.ts`). Las guardas funcionan; solo el copy es genérico. Polish de UX.
-- `isPending` (un solo `useTransition`) compartido entre el toggle de pago y el diálogo de baja en `MemberAdminList.tsx`: una operación en vuelo deshabilita la otra. Tradeoff aceptable a esta escala móvil; separar transiciones por acción es polish.
-
-## Deferred from: code review (round 2) of story-3.3 (2026-06-04)
-
-- `FOR UPDATE` en `fn_remove_member` (supabase/migrations/20260604120000_member_admin_management.sql) bloquea solo las filas `role='admin'` existentes; no serializa contra un futuro flujo de promote-to-admin o cambio de rol (hoy inexistente). Revisar el bloqueo cuando se añada promoción de admins.
-- El test de "último admin" (tests/integration/member-admin-management.test.ts) valida el invariante (la liga conserva ≥1 admin) pero no ejercita la rama concurrente `count<=1`+`FOR UPDATE`, que requeriría un test de dos transacciones simultáneas. La carrera es difícil de reproducir en integración.
-
-## Deferred from: mini-sesión de decisiones post-Epic 3 (2026-06-04)
-
-- **Historia futura — Editar reglas de liga post-creación**: añadir al panel `/standings/manage` la edición de modo de predicción, monto e instrucciones de cobro (hoy solo se fijan al crear la liga en Story 1.3). Reusa el patrón Server Action + RPC `SECURITY DEFINER` (admin-gated) y `leagues.rules`/`payment_*`. Candidata a story propia cuando se priorice.
-- **Deuda conocida — Transferir/otorgar rol admin (promote-to-admin)**: NO se hace para MVP (1 admin/liga = el creador). Cuando se implemente, endurecer la guarda de "último admin" en `fn_remove_member` (hoy `FOR UPDATE` defensivo) para serializar también contra cambios de rol.
-- **Deuda recurrente — Selector multi-liga**: `/standings`, `/standings/manage`, `/account` y `/predictions` resuelven "liga más reciente". Evaluar una historia de selector multi-liga (diferido ya en 3.1 y 3.3).
+## Resumen
+- **Cerrado en hardening pass:** PII de email, validación de `fn_create_league`, CHECKs de `payment_amount` y tope de marcador, paridad de tipos, config (redirect/password/tailwind), seed.
+- **Ya resuelto por stories posteriores:** write-lock de predictions (2.4), gate de `challenge_participants` (5.4), Duelos en navbar (Epic 5).
+- **Batch UI pendiente (bajo riesgo, requiere correr la app):** MatchCard timer, DuelsDashboard race, DesafioClient hydration + post-join UX.
+- **Bloqueado en stories futuras:** league_members UPDATE/DELETE (3.3, con cuidado de wager_balance), matchday tabs (Epic 4/6), Mi Cuenta navbar (3.2), eslint bump (código de plantilla).
+- **Aceptado:** enumeración de invite_code (edge rate-limit), cacheComponents, confirmations/max_rows (hardening de producción).
