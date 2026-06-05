@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useTransition } from "react";
-import { Plus, Trophy, Coins, Calendar, User, UserPlus, ShieldAlert, History, Share2 } from "lucide-react";
+import { Plus, Trophy, Coins, Calendar, User, UserPlus, History, Share2 } from "lucide-react";
 import { CreateDuelDialog } from "./CreateDuelDialog";
 import { AcceptDuelDialog } from "./AcceptDuelDialog";
 import { rejectChallenge, cancelChallenge } from "@/app/actions/duels.actions";
@@ -26,7 +26,7 @@ interface Participant {
   prediction_away: number;
 }
 
-interface Challenge {
+export interface Challenge {
   id: string;
   points_bet: number;
   type: "direct" | "open";
@@ -48,7 +48,7 @@ interface DuelsDashboardProps {
   leagueId: string;
   wagerBalance: number;
   initialActiveChallenges: Challenge[];
-  matches: any[];
+  matches: MatchInfo[];
   members: MemberInfo[];
   currentUserId: string;
 }
@@ -198,7 +198,6 @@ export function DuelsDashboard({
   const inGame = activeChallenges.filter((c) => c.status === "active");
 
   const renderChallengeCard = (challenge: Challenge) => {
-    const isCreator = challenge.creator_id === currentUserId;
     const creatorName = getMemberName(challenge.creator_id);
     const rivalName = challenge.challenged_id
       ? getMemberName(challenge.challenged_id)

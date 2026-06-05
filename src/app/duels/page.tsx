@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/server";
-import { DuelsDashboard } from "@/components/duels/DuelsDashboard";
+import { DuelsDashboard, type Challenge } from "@/components/duels/DuelsDashboard";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 
 export async function DuelsBoard() {
@@ -69,17 +69,26 @@ export async function DuelsBoard() {
   ]);
 
   const cleanMembers = (leagueMembers ?? [])
-    .map((lm) => ({
-      user_id: lm.user_id,
-      display_name: (lm.profiles as any)?.display_name ?? "Usuario Quiniela",
-    }))
+    .map((lm) => {
+      // El embebido `profiles(...)` de PostgREST puede tiparse como objeto o array
+      // según infiera supabase-js la cardinalidad; normalizamos a objeto.
+      const prof = lm.profiles as unknown as
+        | { display_name: string | null }
+        | { display_name: string | null }[]
+        | null;
+      const profile = Array.isArray(prof) ? prof[0] : prof;
+      return {
+        user_id: lm.user_id,
+        display_name: profile?.display_name ?? "Usuario Quiniela",
+      };
+    })
     .filter((m) => m.user_id !== userId);
 
   return (
     <DuelsDashboard
       leagueId={leagueId}
       wagerBalance={Number(membership.wager_balance)}
-      initialActiveChallenges={(challenges ?? []) as any}
+      initialActiveChallenges={(challenges ?? []) as unknown as Challenge[]}
       matches={matches ?? []}
       members={cleanMembers}
       currentUserId={userId}

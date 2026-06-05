@@ -65,7 +65,7 @@ describe("Scoring Parity Contract Test", () => {
     // En JS
     const jsBase = calculateBasePoints(
       { home: 2, away: 1 },
-      { home: null as any, away: null as any },
+      { home: null as unknown as number, away: null as unknown as number },
       "finished"
     );
     expect(jsBase).toBe(0);

@@ -15,6 +15,18 @@ const syncMatchItemSchema = z.object({
 
 const syncMatchesSchema = z.array(syncMatchItemSchema).max(100, "El lote no puede superar los 100 partidos");
 
+// Forma de las filas de `matches` que este endpoint lee/mezcla (subconjunto del select).
+type ExistingMatch = {
+  id: string;
+  external_ref: string | null;
+  home_team: string;
+  away_team: string;
+  match_time: string;
+  status: string;
+  home_score: number | null;
+  away_score: number | null;
+};
+
 export async function POST(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   
@@ -37,10 +49,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Parse and validate the body
-  let body: any;
+  let body: unknown;
   try {
     body = await req.json();
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Invalid JSON body" },
       { status: 400 }
@@ -89,7 +101,7 @@ export async function POST(req: NextRequest) {
     const matchIds = deduplicatedMatches.map(m => m.match_id).filter((id): id is string => !!id);
     const externalRefs = deduplicatedMatches.map(m => m.external_ref).filter((ref): ref is string => !!ref);
 
-    let existingMatches: any[] = [];
+    let existingMatches: ExistingMatch[] = [];
     if (matchIds.length > 0 || externalRefs.length > 0) {
       const filters: string[] = [];
       if (matchIds.length > 0) {
@@ -110,8 +122,8 @@ export async function POST(req: NextRequest) {
       existingMatches = data ?? [];
     }
 
-    const existingById = new Map<string, any>();
-    const existingByRef = new Map<string, any>();
+    const existingById = new Map<string, ExistingMatch>();
+    const existingByRef = new Map<string, ExistingMatch>();
     for (const m of existingMatches) {
       if (m.id) existingById.set(m.id, m);
       if (m.external_ref) existingByRef.set(m.external_ref, m);
@@ -163,7 +175,7 @@ export async function POST(req: NextRequest) {
       { success: true, updated },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error syncing matches:", error);
     return NextResponse.json(
       { success: false, error: "Internal Server Error" },

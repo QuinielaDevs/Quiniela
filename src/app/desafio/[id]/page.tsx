@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { createClient } from "@/utils/supabase/server";
-import { DesafioClient } from "./DesafioClient";
+import { DesafioClient, type ChallengeDetails } from "./DesafioClient";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     .rpc("fn_get_challenge_landing", { p_challenge_id: id })
     .maybeSingle();
 
-  const challenge = challengeData as any;
+  const challenge = challengeData as unknown as ChallengeDetails | null;
 
   if (!challenge) {
     return {
@@ -83,7 +83,7 @@ async function DesafioLoader({ params }: PageProps) {
     .rpc("fn_get_challenge_landing", { p_challenge_id: id })
     .maybeSingle();
 
-  const challenge = challengeData as any;
+  const challenge = challengeData as unknown as ChallengeDetails | null;
 
   if (error || !challenge) {
     notFound();
@@ -109,7 +109,7 @@ async function DesafioLoader({ params }: PageProps) {
 
   return (
     <DesafioClient
-      challenge={challenge as any}
+      challenge={challenge}
       currentUserId={userId}
       isMember={isMember}
       wagerBalance={wagerBalance}

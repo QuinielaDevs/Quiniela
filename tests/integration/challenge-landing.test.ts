@@ -40,11 +40,19 @@ async function createAuthedUser(): Promise<{ id: string; token: string }> {
   return { id, token: signIn.session!.access_token };
 }
 
+// Forma del payload de fn_get_challenge_landing que estos tests inspeccionan.
+type LandingRow = {
+  creator_prediction_home: number | null;
+  creator_prediction_away: number | null;
+  challenged_prediction_home: number | null;
+  challenged_prediction_away: number | null;
+  [key: string]: unknown;
+};
+
 // Fixtures
 let userA: { id: string; token: string }; // Creador del reto
 let userB: { id: string; token: string }; // Rival retado
 let userC: { id: string; token: string }; // Miembro de la liga (no participante)
-let userD: { id: string; token: string }; // Usuario ajeno a la liga
 let leagueId: string;
 let matchFutureId: string; // Partido en el futuro (bloqueado)
 let challengeDirectId: string;
@@ -53,7 +61,6 @@ beforeAll(async () => {
   userA = await createAuthedUser();
   userB = await createAuthedUser();
   userC = await createAuthedUser();
-  userD = await createAuthedUser();
 
   // 1) Crear Liga y añadir miembros A, B y C
   const { data: league, error: lErr } = await admin
@@ -157,7 +164,7 @@ describe("fn_get_challenge_landing - Gate de Confidencialidad", () => {
       p_challenge_id: challengeDirectId,
     }).single();
     expect(errA).toBeNull();
-    const dataA = rawA as any;
+    const dataA = rawA as unknown as LandingRow;
     expect(dataA.creator_prediction_home).toBe(2);
     expect(dataA.creator_prediction_away).toBe(1);
     expect(dataA.challenged_prediction_home).toBeNull();
@@ -176,7 +183,7 @@ describe("fn_get_challenge_landing - Gate de Confidencialidad", () => {
       p_challenge_id: challengeDirectId,
     }).single();
     expect(errB).toBeNull();
-    const dataB = rawB as any;
+    const dataB = rawB as unknown as LandingRow;
     expect(dataB.challenged_prediction_home).toBe(1);
     expect(dataB.challenged_prediction_away).toBe(3);
     expect(dataB.creator_prediction_home).toBeNull();
@@ -186,7 +193,7 @@ describe("fn_get_challenge_landing - Gate de Confidencialidad", () => {
       p_challenge_id: challengeDirectId,
     }).single();
     expect(errA2).toBeNull();
-    const dataA2 = rawA2 as any;
+    const dataA2 = rawA2 as unknown as LandingRow;
     expect(dataA2.creator_prediction_home).toBe(2);
     expect(dataA2.creator_prediction_away).toBe(1);
     expect(dataA2.challenged_prediction_home).toBeNull();
@@ -208,7 +215,7 @@ describe("fn_get_challenge_landing - Gate de Confidencialidad", () => {
     }).single();
 
     expect(error).toBeNull();
-    const data = rawData as any;
+    const data = rawData as unknown as LandingRow;
     expect(data.creator_prediction_home).toBe(2);
     expect(data.creator_prediction_away).toBe(1);
     expect(data.challenged_prediction_home).toBe(1);
@@ -251,7 +258,7 @@ describe("fn_get_challenge_landing - Gate de Confidencialidad", () => {
     const { data: rawData61s } = await anon.rpc("fn_get_challenge_landing", {
       p_challenge_id: challengeDirectId,
     }).single();
-    const data61s = rawData61s as any;
+    const data61s = rawData61s as unknown as LandingRow;
     expect(data61s.creator_prediction_home).toBeNull();
     expect(data61s.challenged_prediction_home).toBeNull();
 
@@ -266,7 +273,7 @@ describe("fn_get_challenge_landing - Gate de Confidencialidad", () => {
     const { data: rawData59s } = await anon.rpc("fn_get_challenge_landing", {
       p_challenge_id: challengeDirectId,
     }).single();
-    const data59s = rawData59s as any;
+    const data59s = rawData59s as unknown as LandingRow;
     expect(data59s.creator_prediction_home).toBe(2);
     expect(data59s.challenged_prediction_home).toBe(1);
   });

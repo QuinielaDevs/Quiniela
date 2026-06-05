@@ -946,7 +946,7 @@ describe("Duelos y Escrow: RPC create_challenge", () => {
       let rejected = 0;
 
       for (const res of results) {
-        if (res.status === "fulfilled" && (res.value as any).error === null) {
+        if (res.status === "fulfilled" && (res.value as { error: unknown }).error === null) {
           fulfilled++;
         } else {
           rejected++;
@@ -1133,7 +1133,7 @@ describe("Duelos y Escrow: RPC create_challenge", () => {
       let failure = 0;
 
       for (const res of results) {
-        if (res.status === "fulfilled" && (res.value as any).error === null) {
+        if (res.status === "fulfilled" && (res.value as { error: unknown }).error === null) {
           success++;
         } else {
           failure++;

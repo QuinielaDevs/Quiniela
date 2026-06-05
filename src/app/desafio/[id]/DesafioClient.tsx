@@ -10,7 +10,6 @@ import { AcceptDuelDialog } from "@/components/duels/AcceptDuelDialog";
 import { Button } from "@/components/ui/button";
 import { rejectChallenge, cancelChallenge } from "@/app/actions/duels.actions";
 import { joinLeagueByInvite } from "@/app/actions/leagues.actions";
-import { cn } from "@/utils/utils";
 
 // Helper de bandera de país para estética de equipos (Story 5.4)
 export function getFlagEmoji(countryCode: string | null): string {
@@ -49,7 +48,7 @@ export function getFlagEmoji(countryCode: string | null): string {
   return flagMap[code] || "⚽";
 }
 
-interface ChallengeDetails {
+export interface ChallengeDetails {
   challenge_id: string;
   points_bet: number;
   type: string;
@@ -122,7 +121,7 @@ export function DesafioClient({
         } else {
           setActionError(result.error ?? "No se pudo unir a la liga.");
         }
-      } catch (err) {
+      } catch {
         setActionError("Error de red al unirse a la liga.");
       }
     });
@@ -138,7 +137,7 @@ export function DesafioClient({
         } else {
           setActionError(result.error ?? "No se pudo rechazar el desafío.");
         }
-      } catch (err) {
+      } catch {
         setActionError("Error de red al rechazar el desafío.");
       }
     });
@@ -154,7 +153,7 @@ export function DesafioClient({
         } else {
           setActionError(result.error ?? "No se pudo cancelar el desafío.");
         }
-      } catch (err) {
+      } catch {
         setActionError("Error de red al cancelar el desafío.");
       }
     });
