@@ -99,6 +99,14 @@ export async function createLeague(
       if (error.code !== UNIQUE_VIOLATION) break;
     }
 
+    if (lastError?.code === "23503") {
+      return {
+        success: false,
+        data: null,
+        error: "Tu perfil de usuario no ha sido inicializado completamente. Por favor, intenta cerrar sesión e iniciar sesión de nuevo.",
+      };
+    }
+
     return {
       success: false,
       data: null,
@@ -158,11 +166,22 @@ export async function joinLeagueByInvite(
   }
 }
 
-/** Mapea un error del RPC a un mensaje de UI seguro (no filtra detalles técnicos). */
-function toAdminError(error: { code?: string | null } | null): string {
-  return error?.code === INSUFFICIENT_PRIVILEGE
-    ? ADMIN_NOT_AUTHORIZED_ERROR
-    : ADMIN_SAVE_ERROR;
+/** Mapea un error del RPC a un mensaje de UI seguro y amigable. */
+function toAdminError(error: { code?: string | null; message?: string | null } | null): string {
+  if (!error) return ADMIN_SAVE_ERROR;
+
+  if (error.code === INSUFFICIENT_PRIVILEGE) {
+    if (error.message === "No autorizado" || error.message === "No autenticado") {
+      return ADMIN_NOT_AUTHORIZED_ERROR;
+    }
+    return error.message ?? ADMIN_NOT_AUTHORIZED_ERROR;
+  }
+
+  if (error.code === "P0002") {
+    return "El miembro especificado no existe o ya no pertenece a la liga.";
+  }
+
+  return error.message ?? ADMIN_SAVE_ERROR;
 }
 
 /**
@@ -193,13 +212,15 @@ export async function setMemberPaymentStatus(
       .single();
 
     if (error) {
+      console.error("Error al actualizar estado de pago del miembro:", error);
       return { success: false, data: null, error: toAdminError(error) };
     }
 
     revalidatePath("/standings");
     revalidatePath("/standings/manage");
     return { success: true, data: data as LeagueMember, error: null };
-  } catch {
+  } catch (e) {
+    console.error("Excepción inesperada al actualizar estado de pago del miembro:", e);
     return { success: false, data: null, error: ADMIN_SAVE_ERROR };
   }
 }
@@ -230,13 +251,15 @@ export async function removeMember(
     });
 
     if (error) {
+      console.error("Error al expulsar al miembro:", error);
       return { success: false, data: null, error: toAdminError(error) };
     }
 
     revalidatePath("/standings");
     revalidatePath("/standings/manage");
     return { success: true, data: null, error: null };
-  } catch {
+  } catch (e) {
+    console.error("Excepción inesperada al expulsar al miembro:", e);
     return { success: false, data: null, error: ADMIN_SAVE_ERROR };
   }
 }

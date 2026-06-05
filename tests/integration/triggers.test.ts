@@ -719,7 +719,7 @@ describe("Duelos y Escrow: RPC create_challenge", () => {
       // Actualizar match_time al pasado vía admin
       const { error: mErr } = await admin
         .from("matches")
-        .update({ match_time: new Date(Date.now() - 1000).toISOString() })
+        .update({ match_time: new Date(Date.now() - 3600 * 1000).toISOString() })
         .eq("id", matchId);
       expect(mErr).toBeNull();
 

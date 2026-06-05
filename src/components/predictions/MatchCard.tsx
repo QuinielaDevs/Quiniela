@@ -79,11 +79,11 @@ function isMatchTbd(match: MatchCardProps["match"]): boolean {
 
 // Bloqueo de UI: defensivo/ergonómico. La AUTORIDAD del bloqueo es la DB (la RPC
 // fn_save_prediction rechaza tras match_time con la hora del servidor).
-function isMatchLocked(match: MatchCardProps["match"]): boolean {
+function isMatchLocked(match: MatchCardProps["match"], time: number = Date.now()): boolean {
   if (CLOSED_STATUSES.has(match.status)) return true;
   const kickoffMs = new Date(match.match_time).getTime();
   if (!Number.isFinite(kickoffMs)) return false;
-  return Date.now() >= kickoffMs - KICKOFF_LOCK_MS;
+  return time >= kickoffMs - KICKOFF_LOCK_MS;
 }
 
 function formatMultiplier(value: number): string {
@@ -126,12 +126,14 @@ export function MatchCard({
       : null,
   );
 
+  const [now, setNow] = useState(() => Date.now());
+
   // Multiplicador: el guardado (saved) y el que se obtendría al editar AHORA.
   // El valor autoritativo final siempre lo calcula el backend; esto es UI.
   const isTbd = isMatchTbd(match);
-  const isLocked = isMatchLocked(match);
+  const isLocked = isMatchLocked(match, now);
   const nextMultiplier = calculatePredictionMultiplier(
-    Date.now(),
+    now,
     match.match_time,
     firstMatchTime,
   );
@@ -157,7 +159,10 @@ export function MatchCard({
     if (!Number.isFinite(kickoffMs)) return;
 
     function updateRemaining() {
-      const diffMs = kickoffMs - Date.now();
+      const currentNow = Date.now();
+      setNow(currentNow);
+
+      const diffMs = kickoffMs - currentNow;
       if (diffMs <= 0) {
         setTimeLeft("");
         return;
@@ -180,9 +185,17 @@ export function MatchCard({
     }
 
     updateRemaining();
-    const interval = setInterval(updateRemaining, 60_000);
+    const interval = setInterval(updateRemaining, 10_000);
     return () => clearInterval(interval);
   }, [match.match_time]);
+
+  const prevLockedRef = useRef(isLocked);
+  useEffect(() => {
+    if (isLocked && !prevLockedRef.current) {
+      degradeAckRef.current = false;
+    }
+    prevLockedRef.current = isLocked;
+  }, [isLocked]);
 
   useEffect(() => {
     const nextInitial = {
@@ -201,6 +214,7 @@ export function MatchCard({
     setSaveState("idle");
     setError(null);
     setWarningOpen(false);
+    setNow(Date.now());
   }, [
     hasInitialPrediction,
     initialAwayScore,

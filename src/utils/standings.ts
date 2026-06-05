@@ -14,6 +14,7 @@ import {
   calculatePredictionPoints,
 } from "@/utils/scoring";
 import type { PaymentStatus } from "@/types";
+import { phaseKeyForMatch } from "@/utils/tournament";
 
 export type StandingMember = {
   userId: string;
@@ -27,6 +28,7 @@ export type StandingMatch = {
   id: string;
   status: string; // MatchStatus; solo cuentan los 'finished'
   matchday: number | null;
+  stage?: string | null;
   homeScore: number | null;
   awayScore: number | null;
 };
@@ -61,7 +63,7 @@ function round2(value: number): number {
 /**
  * Construye la tabla de posiciones para el alcance pedido.
  *
- * @param matchday  undefined = acumulado (General); número = solo esa jornada.
+ * @param phaseKeyOrMatchday  undefined = acumulado (General); string/número = fase/jornada específica.
  *
  * Desempate (Story 3.1 AC #5): puntos desc → marcadores exactos desc →
  * puntos de duelos 1v1 desc (Epic 5, hoy constante 0) → joined_at asc.
@@ -70,14 +72,21 @@ export function buildStandings(
   members: StandingMember[],
   matches: StandingMatch[],
   predictions: StandingPrediction[],
-  matchday?: number,
+  phaseKeyOrMatchday?: string | number,
 ): StandingRow[] {
-  // Partidos en alcance: solo 'finished' y, si se filtra, de esa jornada.
-  const matchesInScope = matches.filter(
-    (m) =>
-      m.status === "finished" &&
-      (matchday === undefined || m.matchday === matchday),
-  );
+  const targetPhaseKey =
+    typeof phaseKeyOrMatchday === "number"
+      ? `jornada-${phaseKeyOrMatchday}`
+      : phaseKeyOrMatchday;
+
+  // Partidos en alcance: solo 'finished' y, si se filtra, de esa fase.
+  const matchesInScope = matches.filter((m) => {
+    if (m.status !== "finished") return false;
+    if (targetPhaseKey === undefined || targetPhaseKey === "general") return true;
+    
+    const mStage = m.stage ?? null;
+    return phaseKeyForMatch({ stage: mStage, matchday: m.matchday }) === targetPhaseKey;
+  });
 
   const predictionByKey = new Map(
     predictions.map((p) => [`${p.userId}:${p.matchId}`, p]),

@@ -233,6 +233,24 @@ describe("buildStandings", () => {
 
     expect(rows.map((r) => r.userId)).toEqual(["ana", "zoe"]);
   });
+
+  it("filtra por phaseKey de eliminatoria y aisla los puntos de esa fase", () => {
+    const members = [member("a")];
+    const matches = [
+      match("m1", { matchday: null, stage: "round-16", homeScore: 1, awayScore: 0 }),
+      match("m2", { matchday: null, stage: "quarter", homeScore: 0, awayScore: 3 }),
+    ];
+    const predictions = [
+      prediction("a", "m1", { homeScorePred: 1, awayScorePred: 0 }),
+      prediction("a", "m2", { homeScorePred: 0, awayScorePred: 3 }),
+    ];
+
+    const r16 = buildStandings(members, matches, predictions, "round-16");
+    expect(r16[0]).toMatchObject({ totalPoints: 5, exactCount: 1 });
+
+    const q = buildStandings(members, matches, predictions, "quarter");
+    expect(q[0]).toMatchObject({ totalPoints: 5, exactCount: 1 });
+  });
 });
 
 describe("buildProjectedStandings", () => {

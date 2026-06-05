@@ -11,6 +11,7 @@ import {
 import { PaymentStatusBadge } from "@/components/standings/PaymentStatusBadge";
 import { ScrollableTabs } from "@/components/ui/ScrollableTabs";
 import { cn } from "@/utils/utils";
+import { buildPhases } from "@/utils/tournament";
 
 type StandingsTableProps = {
   members: StandingMember[];
@@ -19,7 +20,7 @@ type StandingsTableProps = {
   matchdays: number[];
 };
 
-type Tab = { key: string; label: string; matchday?: number };
+type Tab = { key: string; label: string };
 
 export function StandingsTable({
   members,
@@ -32,20 +33,19 @@ export function StandingsTable({
   const tabs = useMemo<Tab[]>(
     () => [
       { key: "general", label: "General" },
-      ...matchdays.map((md) => ({
-        key: `jornada-${md}`,
-        label: `Jornada ${md}`,
-        matchday: md,
-      })),
+      ...buildPhases(
+        matches.map((m) => ({
+          stage: m.stage ?? null,
+          matchday: m.matchday,
+        })),
+      ),
     ],
-    [matchdays],
+    [matches],
   );
 
-  const activeTab = tabs.find((t) => t.key === activeKey) ?? tabs[0];
-
   const rows = useMemo(
-    () => buildStandings(members, matches, predictions, activeTab?.matchday),
-    [members, matches, predictions, activeTab?.matchday],
+    () => buildStandings(members, matches, predictions, activeKey),
+    [members, matches, predictions, activeKey],
   );
 
   if (members.length === 0) {
