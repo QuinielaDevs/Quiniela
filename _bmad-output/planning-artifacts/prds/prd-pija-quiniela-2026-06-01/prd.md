@@ -2,7 +2,7 @@
 title: Quiniela Mundial FIFA 2026
 status: final
 created: 2026-06-01
-updated: 2026-06-01
+updated: 2026-06-05
 ---
 
 # PRD: Quiniela Mundial FIFA 2026

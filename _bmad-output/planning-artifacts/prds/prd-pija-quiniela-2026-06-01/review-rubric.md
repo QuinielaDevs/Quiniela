@@ -1,12 +1,12 @@
-# PRD Quality Review — Quiniela Mundial FIFA 2026 (Revisión Final)
+# PRD Quality Review — Quiniela Mundial FIFA 2026
 
 ## Overall verdict
-La incorporación del Módulo de Desafíos unificado (directo 1v1 y abierto grupal), la escala revisada de multiplicadores incrementales por partido, el formulario de cobros del administrador y el flujo viral de compartir por WhatsApp han fortalecido significativamente el documento. Las mecánicas competitivas son ahora más completas y la arquitectura técnica propuesta en el anexo cubre estos flujos de forma coherente con cero coste. El PRD está validado y listo para desarrollo.
+La integración de la API deportiva de Zafronix para el Mundial de la FIFA 2026 proporciona una solución robusta y automatizada que supera la limitación del plan gratuito de API-Football. La arquitectura híbrida propuesta (Webhooks + ETags) garantiza la actualización de marcadores y estados en tiempo real sin salir de la capa gratuita, preservando el objetivo estratégico de costo operativo cero ($0.00 USD). El PRD y el Addendum Técnico están plenamente alineados y listos para la fase de desarrollo.
 
 ---
 
 ## Decision-readiness — strong
-Se tomaron definiciones arquitectónicas claras sobre los desafíos unificados (tabla relacional de desafíos y tabla de participantes), lo que simplifica enormemente la base de datos de Supabase sin perder funcionalidad. La separación explícita de multiplicadores por partidos individuales añade flexibilidad estratégica y las reglas de partidos suspendidos previenen inconsistencias de puntuación.
+Se han tomado definiciones claras de integración de datos: Webhooks en `/api/webhooks/zafronix` como actualizador primario y un Cron Job condicional con ETags (`If-None-Match` / `304 Not Modified`) como respaldo de sincronía. Se documentó que los identificadores de partidos usan `external_ref TEXT UNIQUE` vinculados al ID string de Zafronix (ej. `2026-001`), manteniendo las llaves primarias en UUID para coherencia de base de datos relacional. Asimismo, se mantiene el panel administrativo RPC (`SECURITY DEFINER`) para anulaciones y ediciones de emergencia por el administrador.
 
 ### Findings
 *Ninguno.*
@@ -14,7 +14,7 @@ Se tomaron definiciones arquitectónicas claras sobre los desafíos unificados (
 ---
 
 ## Substance over theater — strong
-Las adiciones funcionales tienen peso real en el juego. El mecanismo de compartir por WhatsApp (Banter Text y Smart Links con OG metatags) ataca directamente el problema real de retención de usuarios en quinielas móviles sin añadir dependencias costosas de notificaciones push nativas.
+La integración de Zafronix aporta valor técnico y operativo inmediato eliminando la necesidad de entrada manual de datos de partidos. Los webhooks son ideales para entornos serverless (Next.js/Vercel) al no requerir cron polling constante, lo cual minimiza llamadas innecesarias y maximiza la velocidad de propagación de eventos como `match.finalized` para la resolución automática de desafíos.
 
 ### Findings
 *Ninguno.*
@@ -22,7 +22,7 @@ Las adiciones funcionales tienen peso real en el juego. El mecanismo de comparti
 ---
 
 ## Strategic coherence — strong
-La coherencia estratégica ha aumentado. Las métricas de éxito (como la adopción de desafíos) se benefician directamente del flujo de invitación viral por WhatsApp, y el "Bono de Torneo Completo (2.0x)" recompensa con precisión el riesgo estratégico máximo que el usuario Cris deseaba incentivar.
+La automatización de resultados en tiempo real robustece la UJ-4 (Proyección de la Tabla en Vivo) sin añadir costos fijos de infraestructura ni mantenimiento de scripts. Las métricas de control (SM-C1) se ven favorecidas al no sobrecargar a la base de datos con peticiones constantes de sincronización activa de API en horas pico.
 
 ### Findings
 *Ninguno.*
@@ -30,7 +30,7 @@ La coherencia estratégica ha aumentado. Las métricas de éxito (como la adopci
 ---
 
 ## Done-ness clarity — strong
-Las consecuencias de `FR-12` a `FR-14` definen con precisión los flujos de creación, bloqueo de puntos en garantía (escrow), unión y reparto matemático de pozos (incluyendo división de pozos en caso de empates). El requisito `FR-23` detalla los requerimientos dinámicos y de metadatos de WhatsApp sharing.
+La definición de transiciones de estado de partidos (`scheduled -> live -> finished -> suspended/canceled`) y su respectiva lógica de anulación de predicciones/desafíos (con devolución del escrow) está totalmente coordinada con el procesamiento de los webhooks de Zafronix. Las consecuencias de los ACs de la Epic 7 están correctamente definidas.
 
 ### Findings
 *Ninguno.*
@@ -38,7 +38,7 @@ Las consecuencias de `FR-12` a `FR-14` definen con precisión los flujos de crea
 ---
 
 ## Scope honesty — strong
-El alcance del MVP detalla de forma explícita las nuevas mecánicas (Desafíos directos/grupales, configuraciones del administrador, WhatsApp sharing y la escala de multiplicadores con bono del 2.0x) y los límites de las integraciones.
+El alcance del MVP sigue siendo independiente de costos externos. Se explicita que la integración de la API corre bajo los límites del plan Free de Zafronix de 250 requests/día y que el bypass del cron mediante ETags asegura la resiliencia sin riesgos de cuotas.
 
 ### Findings
 *Ninguno.*
@@ -46,7 +46,7 @@ El alcance del MVP detalla de forma explícita las nuevas mecánicas (Desafíos 
 ---
 
 ## Downstream usability — strong
-Los nuevos términos del Glosario (como *Desafío Directo*, *Desafío Abierto*, *Bono de Torneo Completo*, *Pozo*) se usan de forma idéntica en las descripciones funcionales del PRD y en las definiciones SQL del Anexo Técnico. Las relaciones son completamente trazables.
+Las tablas del Addendum Técnico (`public.matches`, `public.predictions` y `public.challenges`) se actualizaron para reflejar la relación real de claves UUID y llaves únicas de referencia externa (`external_ref`). Esto permite a los desarrolladores y herramientas de modelado SQL (como Supabase CLI) continuar sin bloqueos o discrepancias de tipos de datos.
 
 ### Findings
 *Ninguno.*
@@ -54,11 +54,11 @@ Los nuevos términos del Glosario (como *Desafío Directo*, *Desafío Abierto*, 
 ---
 
 ## Shape fit — strong
-El documento mantiene un excelente ajuste para una aplicación de quiniela interna, incrementando el nivel de detalle y formalidad exclusivamente en los puntos clave de interacción de usuarios y reglas de base de datos.
+El nivel de detalle se ajusta perfectamente a la infraestructura elegida (Next.js + Supabase + Zafronix API) manteniendo la modularidad y flexibilidad necesarias para un desarrollador independiente.
 
 ---
 
 ## Mechanical notes
-- **Glosario:** Consistencia total en el uso de los términos clave unificados de desafíos y multiplicadores.
-- **Assumptions Index:** Mantiene únicamente el supuesto de guardado automático (debounce 500ms), habiéndose resuelto el supuesto de onboarding de forma definitiva (exclusivo Google OAuth).
-- **Esquema de Base de Datos:** Se ajustó a 8 tablas para reflejar la relación de participantes del desafío y las nuevas columnas de configuración de pago en ligas.
+- **Glosario:** Consistencia en el uso de los términos de la quiniela.
+- **Asociación de IDs:** Los identificadores se coordinan usando claves UUID para las FKs internas (`match_id`) y texto para referencias de la API externa (`external_ref`), evitando conflictos con IDs numéricos anteriores.
+- **Esquema de Base de Datos:** Las definiciones SQL del Addendum Técnico ahora reflejan correctamente el esquema implementado de migraciones en la carpeta `supabase/migrations/`.

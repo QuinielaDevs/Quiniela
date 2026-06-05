@@ -17,18 +17,34 @@ Para garantizar un coste operativo de **cero absoluto ($0.00 USD)** durante la e
 
 ---
 
-## 2. Estrategia de Integración de Datos (API de Fútbol)
+## 2. Estrategia de Integración de Datos (API de Zafronix)
 
-> **SUPERSEDED (2026-06-04 — ver Epic 7 / `sprint-change-proposal-2026-06-04.md`).** El plan Free de API-Football **no da acceso a `season=2026`** (verificado con llamadas reales: error de plan en `/fixtures` y `/leagues`). La estrategia Pull-and-Cache se reemplaza por: **seed del calendario desde datos reales** (`supabase/seed-data/worldcup-2026/`) + **captura de resultados por el administrador** (RPC admin-gated) + **motor automático de avance de fase**. La tabla en vivo (Epic 4) reacciona por Realtime al update del admin. El keep-alive diario se conserva. El texto siguiente queda como referencia histórica.
+Para la actualización automática en tiempo real de marcadores y estados del torneo de la Copa del Mundo de la FIFA 2026, se integra la API deportiva **Zafronix World Cup API (api.zafronix.com)**. Esta integración está diseñada para encajar en el límite diario de 250 llamadas de su capa gratuita, logrando un costo operativo de **cero absoluto ($0.00 USD)**:
 
-Para la actualización de los marcadores, horarios y resultados oficiales de los partidos se adopta el patrón **Pull-and-Cache** con la API externa **API-Football (api-sports.io)**:
+### 2.1 Webhooks en Tiempo Real (Actualización Push Primaria)
+La API de Zafronix notifica los cambios de forma pasiva a través de webhooks. El servidor expone un endpoint HTTP POST en `/api/webhooks/zafronix`.
+1. **Eventos suscritos:**
+   * `match.finalized`: Emitido cuando finaliza un partido y su marcador queda definitivo.
+   * `match.patched`: Emitido ante correcciones de marcadores de partidos ya finalizados.
+   * `match.postponed`: Emitido si un partido es suspendido, cancelado o pospuesto oficialmente.
+2. **Validación de Seguridad (HMAC-SHA256):**
+   * Cada petición HTTP POST de Zafronix incluye la firma HMAC-SHA256 en la cabecera `X-Zafronix-Signature-256` y la marca de tiempo en `X-Zafronix-Timestamp`.
+   * El webhook calcula la firma localmente sobre la cadena `${timestamp}.${rawBody}` utilizando la clave secreta `ZAFRONIX_WEBHOOK_SECRET` y valida que la diferencia temporal no supere los 5 minutos para prevenir ataques de repetición ("replay attacks").
+3. **Persistencia y Reactividad:**
+   * El payload procesado actualiza la fila de `public.matches` correspondiente usando `external_ref` como clave (ej. `2026-073`).
+   * La tabla en vivo (Epic 4) reacciona por Supabase Realtime a este cambio de base de datos.
+   * Los webhooks no realizan solicitudes a la API, por lo que **no consumen la cuota de llamadas diarias**.
 
-1. **Restricción de Capa Gratuita:** API-Football otorga **100 solicitudes diarias** en su plan gratuito.
-2. **Sincronización Selectiva (Cron Job):**
-   * Un cron job programado (ej. vía Vercel Cron o GitHub Actions) consultará el endpoint `/fixtures` para el Mundial de la FIFA 2026 (`league=1`, `season=2026`).
-   * **Filtro de horas activas:** Durante la Fase de Grupos y Eliminatorias, el cron solo se ejecutará cada 30 minutos *únicamente* dentro de las ventanas de tiempo en las que haya partidos activos (según el calendario de juegos). Fuera de los horarios de partidos, el cron no realiza llamadas. Esto asegura no consumir más de 30-40 llamadas en días de alta actividad y 0 llamadas en días de descanso.
-3. **Escritura segura:** Las actualizaciones del cron se escriben directamente en la tabla `public.matches` de Supabase.
-4. **Lectura del Cliente:** Los clientes de la Quiniela **nunca** consultan directamente la API de Fútbol. Consumen exclusivamente los datos de la base de datos de Supabase, eliminando los límites de peticiones de red y protegiendo el sistema de sobrecostes.
+### 2.2 Sincronización Periódica de Respaldo (Conditional GETs con ETags)
+Como mecanismo de contingencia si falla la red o la entrega del webhook:
+1. Un cron job periódico (ej. cada 30 minutos durante las ventanas de partidos activos) realiza una petición condicional a `GET /matches?year=2026`.
+2. Se envía la cabecera HTTP `If-None-Match` incluyendo el último `ETag` (hash SHA-256 de la respuesta) almacenado en la caché o base de datos.
+3. Si los marcadores y el calendario no han cambiado, el servidor de Zafronix responde con un código **`304 Not Modified`** y cuerpo vacío.
+4. **Las respuestas 304 no decrementan la cuota de llamadas diarias**, lo que permite verificar la sincronía infinitas veces de forma gratuita. Si hay cambios, se devuelve `200 OK` con el payload de los partidos para actualizar la base de datos y guardar el nuevo ETag.
+
+### 2.3 Mecanismo de Emergencia (Admin RPC Override)
+Se conserva el panel rápido y el procedimiento almacenado (RPC) `public.fn_admin_update_match_result` (desarrollado en la Epic 7). En caso de corte de red general de la API o errores de la fuente externa, el administrador del sistema puede forzar y anular marcadores manualmente por base de datos como última instancia.
+
 
 ---
 
@@ -235,40 +251,49 @@ CREATE TABLE public.league_members (
     PRIMARY KEY (league_id, user_id)
 );
 
--- 4. Partidos (Sincronizados de la API de fútbol)
+-- 4. Partidos (Sincronizados y sembrados desde la API de Zafronix / Calendario)
 CREATE TABLE public.matches (
-    id INTEGER PRIMARY KEY, -- ID de API-Football para mapeo directo
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    external_ref TEXT UNIQUE, -- ID de partido de Zafronix (ej. "2026-001")
     home_team TEXT NOT NULL,
     away_team TEXT NOT NULL,
-    home_logo TEXT,
-    away_logo TEXT,
-    match_time TIMESTAMP WITH TIME ZONE NOT NULL, -- UTC para validaciones de bloqueo
-    status VARCHAR(20) NOT NULL, -- scheduled, live, finished, canceled, suspended
-    home_score INTEGER,
-    away_score INTEGER,
-    group_name TEXT,
-    round_name TEXT,
-    last_updated TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    home_team_code TEXT, -- ISO3 para banderas
+    away_team_code TEXT,
+    home_score INTEGER CHECK (home_score >= 0),
+    away_score INTEGER CHECK (away_score >= 0),
+    match_time TIMESTAMP WITH TIME ZONE NOT NULL, -- UTC de inicio del partido
+    status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'live', 'finished', 'suspended', 'canceled')),
+    matchday INTEGER, -- Jornada (1, 2, 3)
+    stage TEXT, -- Fase del torneo (group, round-32, round-16, quarter, semi, third-place, final)
+    group_label TEXT CHECK (group_label IS NULL OR group_label IN ('A','B','C','D','E','F','G','H','I','J','K','L')), -- Grupo A-L
+    bracket_slot INTEGER UNIQUE, -- Slot oficial de eliminatoria (73-104)
+    home_source TEXT, -- Origen local si es TBD (ej. "1A", "W73")
+    away_source TEXT, -- Origen visitante si es TBD (ej. "2B", "W73")
+    venue TEXT, -- Estadio / Ciudad sede
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 -- 5. Predicciones de los Usuarios
 CREATE TABLE public.predictions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    league_id UUID REFERENCES public.leagues(id) ON DELETE CASCADE,
+    match_id UUID REFERENCES public.matches(id) ON DELETE CASCADE,
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    match_id INTEGER REFERENCES public.matches(id) ON DELETE CASCADE,
-    home_prediction INTEGER NOT NULL,
-    away_prediction INTEGER NOT NULL,
-    points_earned DECIMAL(5,2) DEFAULT 0.00 NOT NULL,
+    home_score_pred INTEGER NOT NULL CHECK (home_score_pred >= 0),
+    away_score_pred INTEGER NOT NULL CHECK (away_score_pred >= 0),
+    multiplier DECIMAL(3,2) DEFAULT 1.00 NOT NULL CHECK (multiplier >= 1.00), -- Multiplicador por antelación
+    points_earned DECIMAL(5,2), -- Puntos obtenidos reales
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE (user_id, match_id)
+    UNIQUE (league_id, user_id, match_id)
 );
 
 -- 6. Tabla de Desafíos (Directos 1v1 y Abiertos Grupales)
 CREATE TABLE public.challenges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     league_id UUID REFERENCES public.leagues(id) ON DELETE CASCADE,
-    match_id INTEGER REFERENCES public.matches(id) ON DELETE CASCADE,
+    match_id UUID REFERENCES public.matches(id) ON DELETE CASCADE,
     creator_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     points_bet INTEGER NOT NULL CHECK (points_bet > 0),
     type VARCHAR(10) NOT NULL CHECK (type IN ('direct', 'open')), -- direct = 1v1, open = grupal

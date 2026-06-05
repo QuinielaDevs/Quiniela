@@ -39,3 +39,4 @@ Este documento valida que todas las ideas, requisitos técnicos y decisiones aco
 
 * **Supabase & Next.js Schema:** Adaptado para 8 tablas, agregando `public.challenges` y `public.challenge_participants` para el módulo unificado, y campos de configuración en `public.leagues`.
 * **Funciones SQL RPC Transaccionales:** Implementadas las funciones `public.create_challenge` y `public.join_challenge` en PL/pgSQL para asegurar la integridad atómica de los saldos y escrow de puntos.
+* **Integración de Zafronix API (Actualización 2026-06-05):** Sincronización automática de marcadores y estados del torneo de la Copa del Mundo 2026 mediante integración con la API de Zafronix a través de Webhooks (`/api/webhooks/zafronix`) y caching condicional con ETags. Se mantiene la capacidad de edición/anulación manual de marcadores mediante RPC admin-gated como mecanismo de respaldo.
