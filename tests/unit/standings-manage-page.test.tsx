@@ -13,10 +13,15 @@ vi.mock("@/utils/supabase/server", () => ({
   createClient: vi.fn(async () => ({ auth: { getClaims }, from })),
 }));
 
-// El componente cliente se stubbea: el test enfoca el gating server-side.
+// Los componentes cliente se stubbean: el test enfoca el gating server-side.
 vi.mock("@/components/standings/MemberAdminList", () => ({
   MemberAdminList: ({ members }: { members: unknown[] }) => (
     <div data-testid="member-admin-list">miembros: {members.length}</div>
+  ),
+}));
+vi.mock("@/components/standings/MatchAdminList", () => ({
+  MatchAdminList: ({ matches }: { matches: unknown[] }) => (
+    <div data-testid="match-admin-list">partidos: {matches.length}</div>
   ),
 }));
 vi.mock("@/components/layout/BottomNavbar", () => ({
@@ -25,7 +30,7 @@ vi.mock("@/components/layout/BottomNavbar", () => ({
 
 function tableBuilder(result: { data: unknown }) {
   const builder: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "order", "limit", "in"]) {
+  for (const method of ["select", "eq", "order", "limit", "in", "not"]) {
     builder[method] = () => builder;
   }
   builder.single = () => Promise.resolve({ error: null, ...result });
@@ -98,11 +103,33 @@ describe("/standings/manage (ManageBoard)", () => {
     await expect(ManageBoard()).rejects.toThrow("NEXT_REDIRECT:/standings");
   });
 
-  it("renderiza el listado de miembros para un admin", async () => {
-    mockTables({ league_members: { data: MEMBERS_ADMIN } });
+  it("renderiza los paneles de miembros y de partidos para un admin", async () => {
+    mockTables({
+      league_members: { data: MEMBERS_ADMIN },
+      matches: {
+        data: [
+          {
+            id: "M1",
+            home_team: "México",
+            away_team: "Sudáfrica",
+            home_team_code: "MEX",
+            away_team_code: "RSA",
+            match_time: "2026-06-11T19:00:00.000Z",
+            status: "scheduled",
+            home_score: null,
+            away_score: null,
+            group_label: "A",
+            matchday: 1,
+          },
+        ],
+      },
+    });
     await renderBoard();
     expect(screen.getByTestId("member-admin-list")).toHaveTextContent(
       "miembros: 2",
+    );
+    expect(screen.getByTestId("match-admin-list")).toHaveTextContent(
+      "partidos: 1",
     );
   });
 });

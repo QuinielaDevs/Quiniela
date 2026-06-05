@@ -8,7 +8,11 @@ import {
   MemberAdminList,
   type AdminMemberView,
 } from "@/components/standings/MemberAdminList";
-import type { LeagueRole, PaymentStatus } from "@/types";
+import {
+  MatchAdminList,
+  type AdminMatchView,
+} from "@/components/standings/MatchAdminList";
+import type { LeagueRole, MatchStatus, PaymentStatus } from "@/types";
 
 // Fila de league_members embebiendo el perfil (FK user_id → profiles.id).
 type ManageMemberRow = {
@@ -17,6 +21,21 @@ type ManageMemberRow = {
   payment_status: PaymentStatus;
   joined_at: string;
   profiles: { display_name: string; avatar_url: string } | null;
+};
+
+// Fila de matches relevante para la gestión de resultados (Story 7.2).
+type ManageMatchRow = {
+  id: string;
+  home_team: string;
+  away_team: string;
+  home_team_code: string | null;
+  away_team_code: string | null;
+  match_time: string;
+  status: MatchStatus;
+  home_score: number | null;
+  away_score: number | null;
+  group_label: string | null;
+  matchday: number | null;
 };
 
 // Panel rápido de administración (Story 3.3). Resuelve sesión + liga activa,
@@ -72,12 +91,57 @@ export async function ManageBoard() {
     paymentStatus: m.payment_status,
   }));
 
+  // Story 7.2 — partidos gestionables: catálogo GLOBAL del torneo (no por-liga).
+  // Cargamos los de fase de grupos con equipos reales (los knockout TBD se omiten
+  // hasta que Story 7.3 resuelva el bracket). RLS matches_select_authenticated ya
+  // autoriza esta lectura a cualquier miembro autenticado.
+  const { data: matchRows } = await supabase
+    .from("matches")
+    .select(
+      "id, home_team, away_team, home_team_code, away_team_code, match_time, status, home_score, away_score, group_label, matchday",
+    )
+    .eq("stage", "group")
+    .not("home_team_code", "is", null)
+    .not("away_team_code", "is", null)
+    .order("match_time", { ascending: true })
+    .order("id", { ascending: true });
+
+  const matches: AdminMatchView[] = ((matchRows ?? []) as ManageMatchRow[]).map(
+    (m) => ({
+      id: m.id,
+      homeTeam: m.home_team,
+      awayTeam: m.away_team,
+      homeTeamCode: m.home_team_code,
+      awayTeamCode: m.away_team_code,
+      matchTime: m.match_time,
+      status: m.status,
+      homeScore: m.home_score,
+      awayScore: m.away_score,
+      groupLabel: m.group_label,
+      matchday: m.matchday,
+    }),
+  );
+
   return (
-    <MemberAdminList
-      members={members}
-      currentUserId={userId}
-      leagueId={leagueId}
-    />
+    <div className="flex flex-col gap-6">
+      <section className="flex flex-col gap-3">
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">
+          Miembros
+        </h2>
+        <MemberAdminList
+          members={members}
+          currentUserId={userId}
+          leagueId={leagueId}
+        />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">
+          Resultados de partidos
+        </h2>
+        <MatchAdminList matches={matches} />
+      </section>
+    </div>
   );
 }
 
