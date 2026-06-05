@@ -1,10 +1,32 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { basename } from "node:path";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   createAnonClient,
   createAuthedClient,
   createServiceRoleClient,
 } from "./setup";
 import type { Prediction } from "@/types";
+
+function runSql(sql: string): void {
+  const containerName = `supabase_db_${basename(process.cwd())}`;
+  execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      containerName,
+      "psql",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+    ],
+    { input: sql, encoding: "utf8" },
+  );
+}
 
 // `.rpc(...).single()` infiere la fila como {}; la RPC retorna public.predictions.
 function asPrediction(row: unknown): Prediction {
@@ -118,9 +140,15 @@ beforeAll(async () => {
     .from("league_members")
     .insert({ league_id: leagueId, user_id: userA.id, role: "admin" });
   expect(mErr).toBeNull();
+
+  // Shift all matches 100 days into the future so seeded matches don't lock min(match_time) near-current time
+  runSql("update public.matches set match_time = match_time + interval '100 days';");
 });
 
 afterAll(async () => {
+  // Restore matches
+  runSql("update public.matches set match_time = match_time - interval '100 days';");
+
   for (const id of createdMatchIds) {
     await admin.from("matches").delete().eq("id", id);
   }
@@ -131,6 +159,13 @@ afterAll(async () => {
     const id = createdUserIds.pop()!;
     await admin.auth.admin.deleteUser(id);
   }
+});
+
+afterEach(async () => {
+  for (const id of createdMatchIds) {
+    await admin.from("matches").delete().eq("id", id);
+  }
+  createdMatchIds.length = 0;
 });
 
 describe("fn_save_prediction: multiplicador y upsert", () => {
@@ -238,9 +273,9 @@ describe("fn_save_prediction: bloqueo por kickoff (cierra diferido de 2.1)", () 
     expect(error?.message ?? "").toContain("cerrado");
   });
 
-  it("la RPC falla cuando falta <=1min para el kickoff", async () => {
+  it("la RPC falla cuando el kickoff ya ocurrió (exact match_time threshold)", async () => {
     const matchId = await insertMatch(
-      new Date(Date.now() + 30 * 1000).toISOString(), // 30s → dentro del umbral
+      new Date(Date.now() - 5 * 1000).toISOString(), // 5s en el pasado
     );
     const clientA = createAuthedClient(userA.token);
     const { error } = await clientA
@@ -257,7 +292,7 @@ describe("fn_save_prediction: bloqueo por kickoff (cierra diferido de 2.1)", () 
 
   it("la escritura DIRECTA (insert) tambien falla tras el umbral de kickoff", async () => {
     const matchId = await insertMatch(
-      new Date(Date.now() + 30 * 1000).toISOString(),
+      new Date(Date.now() - 5 * 1000).toISOString(), // 5s en el pasado
     );
     const clientA = createAuthedClient(userA.token);
     const { error } = await clientA.from("predictions").insert({

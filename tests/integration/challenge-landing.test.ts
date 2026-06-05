@@ -245,36 +245,36 @@ describe("fn_get_challenge_landing - Gate de Confidencialidad", () => {
     expect(data).toHaveLength(0);
   });
 
-  it("(e) Frontera del umbral: a falta de 61 segundos (futuro) está protegido; a falta de 59 segundos (futuro) ya está liberado", async () => {
-    // Caso 1: now() + 61s -> Aún oculto (fn_match_unlocked devuelve false)
-    const kickoff61s = new Date(Date.now() + 61 * 1000).toISOString();
+  it("(e) Frontera del umbral: en el futuro (a falta de 5s) está protegido; en el pasado (hace 5s) ya está liberado (exact match_time threshold)", async () => {
+    // Caso 1: now() + 5s -> Aún oculto (fn_match_unlocked devuelve false)
+    const kickoff5sFuture = new Date(Date.now() + 5 * 1000).toISOString();
     const { error: updErr1 } = await admin
       .from("matches")
-      .update({ match_time: kickoff61s })
+      .update({ match_time: kickoff5sFuture })
       .eq("id", matchFutureId);
     expect(updErr1).toBeNull();
 
     const anon = createAnonClient();
-    const { data: rawData61s } = await anon.rpc("fn_get_challenge_landing", {
+    const { data: rawData5sFuture } = await anon.rpc("fn_get_challenge_landing", {
       p_challenge_id: challengeDirectId,
     }).single();
-    const data61s = rawData61s as unknown as LandingRow;
-    expect(data61s.creator_prediction_home).toBeNull();
-    expect(data61s.challenged_prediction_home).toBeNull();
+    const data5sFuture = rawData5sFuture as unknown as LandingRow;
+    expect(data5sFuture.creator_prediction_home).toBeNull();
+    expect(data5sFuture.challenged_prediction_home).toBeNull();
 
-    // Caso 2: now() + 59s (menos de 1 minuto para kickoff) -> Desbloqueado (fn_match_unlocked devuelve true)
-    const kickoff59s = new Date(Date.now() + 59 * 1000).toISOString();
+    // Caso 2: now() - 5s (kickoff pasado) -> Desbloqueado (fn_match_unlocked devuelve true)
+    const kickoff5sPast = new Date(Date.now() - 5 * 1000).toISOString();
     const { error: updErr2 } = await admin
       .from("matches")
-      .update({ match_time: kickoff59s })
+      .update({ match_time: kickoff5sPast })
       .eq("id", matchFutureId);
     expect(updErr2).toBeNull();
 
-    const { data: rawData59s } = await anon.rpc("fn_get_challenge_landing", {
+    const { data: rawData5sPast } = await anon.rpc("fn_get_challenge_landing", {
       p_challenge_id: challengeDirectId,
     }).single();
-    const data59s = rawData59s as unknown as LandingRow;
-    expect(data59s.creator_prediction_home).toBe(2);
-    expect(data59s.challenged_prediction_home).toBe(1);
+    const data5sPast = rawData5sPast as unknown as LandingRow;
+    expect(data5sPast.creator_prediction_home).toBe(2);
+    expect(data5sPast.challenged_prediction_home).toBe(1);
   });
 });
