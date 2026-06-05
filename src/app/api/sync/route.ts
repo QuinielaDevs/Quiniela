@@ -11,18 +11,18 @@ const syncMatchItemSchema = z.object({
   away_score: z.number().int().nonnegative().nullable().optional(),
 }).refine(data => data.match_id || data.external_ref, {
   message: "Debe proporcionar match_id o external_ref",
-  path: ["match_id", "external_ref"],
 });
 
-const syncMatchesSchema = z.array(syncMatchItemSchema);
+const syncMatchesSchema = z.array(syncMatchItemSchema).max(100, "El lote no puede superar los 100 partidos");
 
 export async function POST(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   
   // 500 error if CRON_SECRET is not configured on the server
   if (!cronSecret) {
+    console.error("CRON_SECRET is not configured on the server");
     return NextResponse.json(
-      { success: false, error: "CRON_SECRET is not configured on the server" },
+      { success: false, error: "Internal Server Error" },
       { status: 500 }
     );
   }
@@ -61,8 +61,9 @@ export async function POST(req: NextRequest) {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
+    console.error("Database configuration missing (SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY)");
     return NextResponse.json(
-      { success: false, error: "Database configuration missing" },
+      { success: false, error: "Internal Server Error" },
       { status: 500 }
     );
   }
@@ -73,51 +74,89 @@ export async function POST(req: NextRequest) {
   });
 
   try {
-    const withId = matchesToSync
-      .filter(m => m.match_id !== undefined)
-      .map(m => ({
-        id: m.match_id,
-        external_ref: m.external_ref,
-        status: m.status,
-        home_score: m.home_score !== undefined ? m.home_score : null,
-        away_score: m.away_score !== undefined ? m.away_score : null,
-        updated_at: new Date().toISOString(),
-      }));
+    // 1. Deduplicate input payload to prevent unique constraint failures on bulk operations
+    const seenKeys = new Set<string>();
+    const deduplicatedMatches: typeof matchesToSync = [];
+    for (const m of matchesToSync) {
+      const key = m.match_id || `ref:${m.external_ref}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        deduplicatedMatches.push(m);
+      }
+    }
 
-    const withoutId = matchesToSync
-      .filter(m => m.match_id === undefined && m.external_ref !== undefined)
-      .map(m => ({
-        external_ref: m.external_ref,
+    // 2. Fetch existing match records to preserve NOT NULL constraints and avoid null overwrites
+    const matchIds = deduplicatedMatches.map(m => m.match_id).filter((id): id is string => !!id);
+    const externalRefs = deduplicatedMatches.map(m => m.external_ref).filter((ref): ref is string => !!ref);
+
+    let existingMatches: any[] = [];
+    if (matchIds.length > 0 || externalRefs.length > 0) {
+      const filters: string[] = [];
+      if (matchIds.length > 0) {
+        filters.push(`id.in.(${matchIds.join(",")})`);
+      }
+      if (externalRefs.length > 0) {
+        filters.push(`external_ref.in.(${externalRefs.map(ref => `"${ref}"`).join(",")})`);
+      }
+
+      const { data, error } = await supabase
+        .from("matches")
+        .select("id, external_ref, home_team, away_team, match_time, status, home_score, away_score")
+        .or(filters.join(","));
+
+      if (error) {
+        throw error;
+      }
+      existingMatches = data ?? [];
+    }
+
+    const existingById = new Map<string, any>();
+    const existingByRef = new Map<string, any>();
+    for (const m of existingMatches) {
+      if (m.id) existingById.set(m.id, m);
+      if (m.external_ref) existingByRef.set(m.external_ref, m);
+    }
+
+    // 3. Map and merge sync data with database records
+    const mergedMatches = deduplicatedMatches.map(m => {
+      const existing = (m.match_id ? existingById.get(m.match_id) : null) || 
+                       (m.external_ref ? existingByRef.get(m.external_ref) : null);
+      
+      if (!existing) {
+        // Skip match if it does not exist in DB (as we cannot construct the required NOT NULL fields)
+        return null;
+      }
+
+      // Preserve existing score if it is not provided in payload
+      const home_score = m.home_score !== undefined ? m.home_score : existing.home_score;
+      const away_score = m.away_score !== undefined ? m.away_score : existing.away_score;
+
+      return {
+        id: existing.id,
+        external_ref: m.external_ref || existing.external_ref,
+        home_team: existing.home_team,
+        away_team: existing.away_team,
+        match_time: existing.match_time,
         status: m.status,
-        home_score: m.home_score !== undefined ? m.home_score : null,
-        away_score: m.away_score !== undefined ? m.away_score : null,
+        home_score,
+        away_score,
         updated_at: new Date().toISOString(),
-      }));
+      };
+    }).filter((m): m is NonNullable<typeof m> => m !== null);
 
     let updated = 0;
 
-    if (withId.length > 0) {
+    if (mergedMatches.length > 0) {
+      // Upsert all merged matches in one bulk call
       const { data, error } = await supabase
         .from("matches")
-        .upsert(withId, { onConflict: "id" })
+        .upsert(mergedMatches, { onConflict: "id" })
         .select("id");
       
       if (error) {
         throw error;
       }
-      updated += data?.length ?? 0;
-    }
-
-    if (withoutId.length > 0) {
-      const { data, error } = await supabase
-        .from("matches")
-        .upsert(withoutId, { onConflict: "external_ref" })
-        .select("id");
-      
-      if (error) {
-        throw error;
-      }
-      updated += data?.length ?? 0;
+      updated = data?.length ?? 0;
     }
 
     return NextResponse.json(
@@ -125,8 +164,9 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (error: any) {
+    console.error("Error syncing matches:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to update matches in database" },
+      { success: false, error: "Internal Server Error" },
       { status: 500 }
     );
   }

@@ -3,11 +3,16 @@ import { POST } from "../../src/app/api/sync/route";
 import { NextRequest } from "next/server";
 
 // Mock @supabase/supabase-js
-const mockSelect = vi.fn();
+const mockOr = vi.fn();
+const mockSelect = vi.fn(() => ({
+  or: mockOr,
+}));
+const mockUpsertSelect = vi.fn();
 const mockUpsert = vi.fn(() => ({
-  select: mockSelect,
+  select: mockUpsertSelect,
 }));
 const mockFrom = vi.fn(() => ({
+  select: mockSelect,
   upsert: mockUpsert,
 }));
 const mockSupabase = {
@@ -28,8 +33,10 @@ describe("API /api/sync POST handler", () => {
     process.env.SUPABASE_URL = "http://localhost:54321";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "servicekey";
     
+    mockOr.mockReset();
+    mockSelect.mockClear();
     mockUpsert.mockClear();
-    mockSelect.mockReset();
+    mockUpsertSelect.mockReset();
     mockFrom.mockClear();
   });
 
@@ -49,7 +56,7 @@ describe("API /api/sync POST handler", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.success).toBe(false);
-    expect(body.error).toContain("CRON_SECRET");
+    expect(body.error).toContain("Internal Server Error");
   });
 
   it("should return 401 if Authorization header is missing or incorrect", async () => {
@@ -96,7 +103,26 @@ describe("API /api/sync POST handler", () => {
   });
 
   it("should return 200 and sync matches successfully", async () => {
-    mockSelect.mockResolvedValue({ data: [{ id: "uuid-1" }], error: null });
+    // Mock the initial select query to return the existing match in database
+    mockOr.mockResolvedValue({
+      data: [
+        {
+          id: "a3fa80ec-2016-4359-bb99-317139d67568",
+          home_team: "Team A",
+          away_team: "Team B",
+          match_time: "2026-06-01T00:00:00Z",
+          status: "scheduled",
+          home_score: null,
+          away_score: null,
+        },
+      ],
+      error: null,
+    });
+    // Mock the upsert query return
+    mockUpsertSelect.mockResolvedValue({
+      data: [{ id: "a3fa80ec-2016-4359-bb99-317139d67568" }],
+      error: null,
+    });
 
     const payload = [
       {
@@ -120,6 +146,8 @@ describe("API /api/sync POST handler", () => {
     expect(body.updated).toBe(1);
 
     expect(mockFrom).toHaveBeenCalledWith("matches");
+    expect(mockSelect).toHaveBeenCalled();
+    expect(mockOr).toHaveBeenCalled();
     expect(mockUpsert).toHaveBeenCalled();
   });
 });

@@ -3,7 +3,7 @@ baseline_commit: dff538904fe8684b61fad1b281376a00fbe2f424
 ---
 # Story 5.3: Resolución y Reparto Automatizado del Pozo de Puntos
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -104,6 +104,18 @@ so that **recibir mis ganancias de forma inmediata e indiscutible**.
 - [x] **Tarea 4 — Validación del Proyecto y Tests** (AC: #7)
   - [x] Correr `npm run typecheck` y verificar que no existan errores de compilación de TypeScript.
   - [x] Correr `npm run test:integration` and `npm run test:unit` para verificar que la suite completa pase en verde.
+
+### Review Findings
+
+- [x] [Review][Patch] Omission of optional home_score and away_score in /api/sync payload overwrites database values with NULL [src/app/api/sync/route.ts:437-448]
+- [x] [Review][Patch] Database upsert in /api/sync endpoint fails due to missing NOT NULL columns on matches table [src/app/api/sync/route.ts:454-476]
+- [x] [Review][Patch] Score updates on a match already in finished status are never resolved [supabase/migrations/20260604195000_resolve_challenges.sql:315-319]
+- [x] [Review][Patch] Deadlock risk in unordered predictions loop [supabase/migrations/20260604195000_resolve_challenges.sql:197-225]
+- [x] [Review][Patch] Invalid Zod path array in refine [src/app/api/sync/route.ts:12-15]
+- [x] [Review][Patch] Information leakage in HTTP 500 error messages [src/app/api/sync/route.ts:25, 65]
+- [x] [Review][Patch] Duplicate match records in the input sync payload [src/app/api/sync/route.ts:431-450]
+- [x] [Review][Patch] No payload size limits on batch sync [src/app/api/sync/route.ts:50]
+- [x] [Review][Patch] Unhandled null max score crashes the trigger [supabase/migrations/20260604195000_resolve_challenges.sql:235-245]
 
 ## Dev Notes
 

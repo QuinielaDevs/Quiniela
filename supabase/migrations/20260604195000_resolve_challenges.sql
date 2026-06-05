@@ -189,16 +189,17 @@ declare
   v_total_pot    numeric(12, 2);
   v_payout       numeric(12, 2);
 begin
-  -- 1. Cuando el partido pasa a 'finished' desde un estado previo distinto
-  if new.status = 'finished' and old.status is distinct from 'finished' then
+  -- 1. Cuando el partido está o pasa a 'finished'
+  if new.status = 'finished' then
     if new.home_score is not null and new.away_score is not null then
       
-      -- (a) Accrual continuo de predicciones normales de liga
+      -- (a) Accrual continuo de predicciones normales de liga (ordenados por user_id para evitar deadlocks)
       for v_pred in 
         select id, league_id, user_id, home_score_pred, away_score_pred, multiplier
         from public.predictions
         where match_id = new.id
           and evaluated_at is null   -- guarda de idempotencia por ESTADO, no por monto
+        order by user_id
       loop
         declare
           v_points numeric(12, 2);
@@ -237,7 +238,7 @@ begin
         from public.challenge_participants cp
         where cp.challenge_id = v_challenge.id;
 
-        if v_max_score = 0.00 then
+        if v_max_score is null or v_max_score = 0.00 then
           -- Sin ganador (nadie acertó): NO se liquida, se reembolsa a todos (idempotente, etiqueta refund).
           perform public.refund_challenge_escrow(v_challenge.id);
           update public.challenges
@@ -313,7 +314,11 @@ $$;
 -- tr_cancel_pending_challenges_on_match_start corre antes que tr_resolve_challenges_on_match_status_change,
 -- garantizando que un pozo poblado se active antes de resolverse en una transición directa scheduled→finished.
 create trigger tr_resolve_challenges_on_match_status_change
-  after update of status on public.matches
+  after update on public.matches
   for each row
-  when (old.status is distinct from new.status)
+  when (
+    (old.status is distinct from new.status) or
+    (old.home_score is distinct from new.home_score) or
+    (old.away_score is distinct from new.away_score)
+  )
   execute function public.fn_resolve_challenges_on_match_status_change();
