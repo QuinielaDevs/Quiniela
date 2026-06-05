@@ -132,4 +132,38 @@ describe("MatchAdminList", () => {
       .map((o) => (o as HTMLOptionElement).value);
     expect(options).toEqual(["finished", "live"]);
   });
+
+  it("muestra diálogo de confirmación para transición destructiva (finished -> live) y cancela/guarda", async () => {
+    const user = userEvent.setup();
+    render(
+      <MatchAdminList
+        matches={[makeMatch({ status: "finished", homeScore: 2, awayScore: 0 })]}
+      />,
+    );
+
+    const select = screen.getByRole("combobox");
+    await user.selectOptions(select, "live");
+
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(screen.getByText("¿Confirmar cambio destructivo?")).toBeInTheDocument();
+    expect(setMatchResult).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByText("¿Confirmar cambio destructivo?")).not.toBeInTheDocument();
+    expect(setMatchResult).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+    await user.click(screen.getByRole("button", { name: "Sí, cambiar" }));
+
+    await waitFor(() => {
+      expect(setMatchResult).toHaveBeenCalledWith({
+        matchId: "M1",
+        homeScore: 2,
+        awayScore: 0,
+        status: "live",
+      });
+    });
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
 });

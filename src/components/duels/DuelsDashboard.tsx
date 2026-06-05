@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useState, useEffect, useTransition, useRef } from "react";
 import { Plus, Trophy, Coins, Calendar, User, UserPlus, History, Share2 } from "lucide-react";
 import { CreateDuelDialog } from "./CreateDuelDialog";
 import { AcceptDuelDialog } from "./AcceptDuelDialog";
@@ -71,6 +71,7 @@ export function DuelsDashboard({
   const [isAcceptOpen, setIsAcceptOpen] = useState(false);
   const [isActionPending, startActionTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+  const requestCountRef = useRef(0);
 
   // Sincronizar retos iniciales si cambian en el server
   useEffect(() => {
@@ -85,6 +86,7 @@ export function DuelsDashboard({
   }, [activeTab]);
 
   const loadHistory = async () => {
+    const requestId = ++requestCountRef.current;
     setIsHistoryLoading(true);
     try {
       const supabase = createClient();
@@ -106,13 +108,17 @@ export function DuelsDashboard({
         .in("status", ["completed", "canceled"])
         .order("created_at", { ascending: false });
 
+      if (requestId !== requestCountRef.current) return;
+
       if (!error && data) {
         setHistoryChallenges(data as unknown as Challenge[]);
       }
     } catch (err) {
       console.error("Error al cargar retos históricos:", err);
     } finally {
-      setIsHistoryLoading(false);
+      if (requestId === requestCountRef.current) {
+        setIsHistoryLoading(false);
+      }
     }
   };
 

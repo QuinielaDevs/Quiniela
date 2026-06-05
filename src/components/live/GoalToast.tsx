@@ -31,6 +31,8 @@ function GoalToast({ toast, onDismiss }: GoalToastProps) {
   const [offsetX, setOffsetX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const startXRef = useRef<number | null>(null);
+  const startYRef = useRef<number | null>(null);
+  const isScrollingRef = useRef<boolean>(false);
   const activePointerRef = useRef<number | null>(null);
   const reduceMotion = prefersReducedMotion();
 
@@ -44,6 +46,8 @@ function GoalToast({ toast, onDismiss }: GoalToastProps) {
     // para no sobreescribir el origen del gesto.
     if (startXRef.current !== null) return;
     startXRef.current = event.clientX;
+    startYRef.current = event.clientY;
+    isScrollingRef.current = false;
     activePointerRef.current = event.pointerId;
     setDragging(true);
     try {
@@ -57,7 +61,23 @@ function GoalToast({ toast, onDismiss }: GoalToastProps) {
     if (startXRef.current === null || event.pointerId !== activePointerRef.current) {
       return;
     }
-    setOffsetX(event.clientX - startXRef.current);
+    if (isScrollingRef.current) return;
+
+    const dx = event.clientX - startXRef.current;
+    const dy = event.clientY - (startYRef.current ?? event.clientY);
+
+    // Si hay movimiento suficiente, resolvemos el eje dominante
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance > 5) {
+      if (Math.abs(dy) > Math.abs(dx)) {
+        isScrollingRef.current = true;
+        setOffsetX(0);
+        setDragging(false);
+        return;
+      }
+    }
+
+    setOffsetX(dx);
   };
 
   const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
@@ -65,10 +85,15 @@ function GoalToast({ toast, onDismiss }: GoalToastProps) {
       return;
     }
     const delta = event.clientX - startXRef.current;
+    const isScroll = isScrollingRef.current;
+
     startXRef.current = null;
+    startYRef.current = null;
+    isScrollingRef.current = false;
     activePointerRef.current = null;
     setDragging(false);
-    if (Math.abs(delta) >= SWIPE_DISMISS_THRESHOLD_PX) {
+
+    if (!isScroll && Math.abs(delta) >= SWIPE_DISMISS_THRESHOLD_PX) {
       onDismiss(toast.id);
       return;
     }

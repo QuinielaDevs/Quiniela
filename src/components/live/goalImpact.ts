@@ -46,7 +46,7 @@ export function hasScoreIncrease(
   prev: LiveMatch | undefined,
   next: LiveMatch,
 ): boolean {
-  if (!prev) return false;
+  if (!prev || prev.homeScore === null || prev.awayScore === null) return false;
   return (
     toScore(next.homeScore) > toScore(prev.homeScore) ||
     toScore(next.awayScore) > toScore(prev.awayScore)

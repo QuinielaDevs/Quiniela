@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from "react";
 import { Coins, Calendar, Trophy, ShieldAlert, Share2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { GoogleSignInButton } from "@/components/google-signin-button";
 import { AcceptDuelDialog } from "@/components/duels/AcceptDuelDialog";
@@ -88,9 +88,22 @@ export function DesafioClient({
   wagerBalance,
 }: DesafioClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isAcceptOpen, setIsAcceptOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  React.useEffect(() => {
+    if (isMember && (searchParams.get("joined") === "true" || searchParams.get("autoOpen") === "true" || searchParams.get("accept") === "true")) {
+      setIsAcceptOpen(true);
+      const params = new URLSearchParams(window.location.search);
+      params.delete("joined");
+      params.delete("autoOpen");
+      params.delete("accept");
+      const nextQuery = params.toString() ? `?${params.toString()}` : "";
+      router.replace(`/desafio/${challenge.challenge_id}${nextQuery}`, { scroll: false });
+    }
+  }, [isMember, searchParams, router, challenge.challenge_id]);
 
   const isCreator = currentUserId === challenge.creator_id;
   const isChallenged = currentUserId && challenge.challenged_id === currentUserId;
@@ -117,6 +130,7 @@ export function DesafioClient({
       try {
         const result = await joinLeagueByInvite(challenge.invite_code!);
         if (result.success) {
+          setIsAcceptOpen(true);
           router.refresh();
         } else {
           setActionError(result.error ?? "No se pudo unir a la liga.");
@@ -231,7 +245,7 @@ export function DesafioClient({
             <span className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">Fecha del Encuentro</span>
             <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-300">
               <Calendar className="size-3.5 text-[#E9C46A]" />
-              <span className="capitalize">{dateStr}</span>
+              <span className="capitalize" suppressHydrationWarning>{dateStr}</span>
             </div>
             {challenge.match_status !== "scheduled" && (
               <span className="text-xs text-[#10B981] font-bold uppercase">Partido: {challenge.match_status}</span>

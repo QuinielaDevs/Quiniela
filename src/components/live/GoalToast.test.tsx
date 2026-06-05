@@ -81,4 +81,15 @@ describe("GoalToastStack", () => {
     });
     expect(onDismiss).toHaveBeenCalledWith("t1");
   });
+
+  it("ignora el swipe horizontal si el desplazamiento vertical es dominante", () => {
+    const onDismiss = vi.fn();
+    render(<GoalToastStack toasts={toasts} onDismiss={onDismiss} />);
+    const toast = screen.getByTestId("goal-toast");
+    fireEvent.pointerDown(toast, { clientX: 0, clientY: 0, pointerId: 1 });
+    fireEvent.pointerMove(toast, { clientX: 5, clientY: 15, pointerId: 1 });
+    fireEvent.pointerMove(toast, { clientX: 120, clientY: 120, pointerId: 1 });
+    fireEvent.pointerUp(toast, { clientX: 120, clientY: 120, pointerId: 1 });
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
 });

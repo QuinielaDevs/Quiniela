@@ -100,7 +100,6 @@ export async function ManageBoard() {
     .select(
       "id, home_team, away_team, home_team_code, away_team_code, match_time, status, home_score, away_score, group_label, matchday",
     )
-    .eq("stage", "group")
     .not("home_team_code", "is", null)
     .not("away_team_code", "is", null)
     .order("match_time", { ascending: true })

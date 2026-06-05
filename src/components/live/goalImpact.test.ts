@@ -101,6 +101,21 @@ describe("hasScoreIncrease", () => {
       hasScoreIncrease(liveMatch({ homeScore: 1 }), liveMatch({ homeScore: 1 })),
     ).toBe(false);
   });
+
+  it("false si el marcador previo contiene null", () => {
+    expect(
+      hasScoreIncrease(
+        liveMatch({ homeScore: null, awayScore: 0 }),
+        liveMatch({ homeScore: 1, awayScore: 0 }),
+      ),
+    ).toBe(false);
+    expect(
+      hasScoreIncrease(
+        liveMatch({ homeScore: 0, awayScore: null }),
+        liveMatch({ homeScore: 0, awayScore: 1 }),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("findMovers", () => {

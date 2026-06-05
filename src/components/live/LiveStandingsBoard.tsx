@@ -249,11 +249,55 @@ export function LiveStandingsBoard({
           multiplier: prediction.multiplier,
         })),
       };
+
+      if (connectionRef.current !== "live") {
+        let hasGoal = false;
+        const current = snapshotRef.current;
+        const prevMatches = current.matches;
+        for (const nextMatch of nextMatches) {
+          const prevMatch = prevMatches.find((m) => m.id === nextMatch.id);
+          const isRelevant = RELEVANT_MATCH_STATUSES.has(nextMatch.status);
+          if (isRelevant && prevMatch && hasScoreIncrease(prevMatch, nextMatch)) {
+            hasGoal = true;
+            break;
+          }
+        }
+
+        if (hasGoal) {
+          const prevRows = buildProjectedStandings(
+            members,
+            prevMatches,
+            current.predictions,
+          );
+          const nextRows = buildProjectedStandings(
+            members,
+            nextMatches,
+            nextSnapshot.predictions,
+          );
+          const movers = findMovers(prevRows, nextRows);
+          if (movers.length > 0) {
+            for (const nextMatch of nextMatches) {
+              const prevMatch = prevMatches.find((m) => m.id === nextMatch.id);
+              const isRelevant = RELEVANT_MATCH_STATUSES.has(nextMatch.status);
+              if (isRelevant && prevMatch && hasScoreIncrease(prevMatch, nextMatch)) {
+                const announced = selectAnnouncedMover(movers, currentUserId);
+                if (announced) {
+                  const scoringTeam = resolveScoringTeam(prevMatch, nextMatch);
+                  pushToast(buildGoalToastMessage(announced, scoringTeam));
+                  flashRows(movers.map((mover) => mover.userId));
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
       snapshotVersionRef.current += 1;
       snapshotRef.current = nextSnapshot;
       setSnapshot(nextSnapshot);
     },
-    [leagueId],
+    [leagueId, members, currentUserId, pushToast, flashRows],
   );
 
   const startPolling = useCallback(() => {

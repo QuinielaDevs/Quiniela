@@ -79,6 +79,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Estado editable local, sembrado de las props. Se reconcilia con la verdad del
   // servidor al terminar la transición (patrón MemberAdminList).
@@ -118,7 +119,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
       (homeScore !== (match.homeScore ?? 0) ||
         awayScore !== (match.awayScore ?? 0)));
 
-  function save() {
+  function executeSave() {
     setError(null);
     setWarning(null);
     startTransition(async () => {
@@ -137,8 +138,46 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
     });
   }
 
+  function save() {
+    const isDestructive = match.status === "finished" && status !== "finished";
+    if (isDestructive) {
+      setShowConfirm(true);
+    } else {
+      executeSave();
+    }
+  }
+
   return (
-    <li className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
+    <li className="flex flex-col gap-3 rounded-md border border-border bg-card p-3 relative">
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-md border border-border bg-card p-5 shadow-2xl space-y-4">
+            <h3 className="font-display text-lg font-bold text-white">¿Confirmar cambio destructivo?</h3>
+            <p className="text-sm text-muted-foreground">
+              Estás revirtiendo un partido finalizado. Esto recalculará de inmediato las posiciones oficiales de la liga y podría remover los puntos acumulados por los usuarios.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirm(false);
+                  executeSave();
+                }}
+                className="flex-1 rounded-sm bg-destructive px-4 py-2.5 text-sm font-semibold text-white hover:bg-destructive/90"
+              >
+                Sí, cambiar
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 rounded-sm border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary/80"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Cabecera: equipos + metadatos */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

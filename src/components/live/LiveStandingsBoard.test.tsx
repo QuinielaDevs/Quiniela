@@ -565,4 +565,45 @@ describe("LiveStandingsBoard", () => {
 
     expect(screen.queryByTestId("goal-toast")).not.toBeInTheDocument();
   });
+
+  it("emite toast de 'Impacto de Gol' y destello en modo polling", async () => {
+    const mock = makeSupabaseMock({
+      matchRows: [
+        {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_team: "Local FC",
+          away_team: "Visitante FC",
+          home_score: 0,
+          away_score: 1,
+        },
+      ],
+    });
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        currentUserId="beto"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    await act(async () => {
+      mock.getStatusHandler()?.("CHANNEL_ERROR");
+    });
+    expect(screen.getByText("Reconectando...")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(
+      screen.getByText("¡Gol de Visitante FC! Beto sube al 1er puesto proyectado 🎉"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId("live-row")[0]).toHaveAttribute("data-flash", "gold");
+  });
 });
