@@ -80,3 +80,12 @@ development_status:
   7-2-captura-y-edicion-de-resultados-por-el-administrador: done
   7-3-motor-automatico-de-avance-de-fase-formato-fifa-2026: done
   epic-7-retrospective: optional
+
+  # Epic 8: Sincronización Automática con Zafronix World Cup API
+  epic-8: backlog
+  8-1-endpoint-de-webhook-para-sincronizacion-de-partidos-en-tiempo-real-zafronix-api: backlog
+  8-2-sincronizacion-periodica-de-respaldo-con-etags-github-actions-cron-job: backlog
+  8-3-script-administrativo-de-sincronizacion-y-restauracion-completa: backlog
+  8-4-entorno-de-pruebas-integradas-con-el-sandbox-de-zafronix-ano-9999: backlog
+  epic-8-retrospective: optional
+

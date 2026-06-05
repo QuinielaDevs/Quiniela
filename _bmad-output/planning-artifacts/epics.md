@@ -128,7 +128,7 @@ This document provides the complete epic and story breakdown for pija-quiniela, 
 - FR-14: Epic 5 - Resolución y Reparto del Pozo
 - FR-15: Epic 6 - Pronóstico de Premios Especiales (Campeón, Goleador, MVP)
 - FR-16: Epic 6 - Sistema de Recompensa Decreciente
-- FR-17: Epic 4 - Tabla de Posiciones Proyectada en Vivo (WebSockets)
+- FR-17: Epic 4 - Tabla de Posiciones Proyectada en Vivo (WebSockets) & Epic 8 - Sincronización Zafronix API
 - FR-18: Epic 3 - Clasificación por Jornada
 - FR-19: Epic 3 - Insignias y Medallas Humorísticas Automáticas
 - FR-20: Epic 3 - Criterio de Desempate Estructurado
@@ -164,7 +164,12 @@ Los usuarios pueden pronosticar el Campeón, Goleador y MVP del torneo, ganando 
 **FRs covered:** FR-15, FR-16
 
 ### Epic 7: Datos del Torneo — Seed, Captura de Resultados (Admin) y Avance de Fase
-Reemplaza la sincronización automática con API-Football (inviable en plan Free para `season=2026`, verificado el 2026-06-04). El calendario del Mundial 2026 se siembra desde datos reales (`supabase/seed-data/worldcup-2026/`), el administrador captura/edita resultados, y un motor automático calcula la clasificación de grupos y el avance de eliminatorias con las reglas FIFA del formato 2026. **Foundational: se ejecuta antes de Epics 5 y 6** (Epic 6 depende de los límites de fase que produce este motor).
+El calendario del Mundial 2026 se siembra desde datos reales (`supabase/seed-data/worldcup-2026/`), el administrador captura/edita resultados, y un motor automático calcula la clasificación de grupos y el avance de eliminatorias con las reglas FIFA del formato 2026. **Foundational: se ejecuta antes de Epics 5 y 6** (Epic 6 depende de los límites de fase que produce este motor).
+**Reescopa:** NFR-5 (mapeo de partidos); soporte de datos para FR-7…FR-11, FR-15…FR-17. Surgió del correct-course del 2026-06-04 (ver `sprint-change-proposal-2026-06-04.md`).
+
+### Epic 8: Sincronización Automática con Zafronix World Cup API
+Automatiza la sincronización en tiempo real de marcadores, estados y cruces del Mundial 2026 mediante la integración con la API deportiva de Zafronix (webhooks HMAC y cron de respaldo condicional con ETags) a coste cero.
+**FRs covered:** FR-17 (integración API), NFR-1, NFR-5).
 **Reescopa:** NFR-5 (mapeo de partidos); soporte de datos para FR-7…FR-11, FR-15…FR-17. Surgió del correct-course del 2026-06-04 (ver `sprint-change-proposal-2026-06-04.md`).
 
 ## Epic 1: Inicialización del Proyecto, Configuración de Testing y Autenticación Express
@@ -494,19 +499,87 @@ So that la clasificación, la tabla en vivo y el scoring se actualicen con resul
 **And** la UI es mobile-first con tokens Championship Gold, tap targets >=48px, y maneja error/permiso (no-admin bloqueado)
 **And** existen pruebas del RPC (admin sí / no-admin no / validaciones) e integración con el flujo de standings
 
-### Story 7.3: Motor Automático de Avance de Fase (Formato FIFA 2026)
+### Story 7.3: Sincronización e Integración de Clasificaciones y Bracket desde Zafronix API
 
 As a sistema de la quiniela,
-I want calcular automáticamente la clasificación de cada grupo y el avance a eliminatorias según las reglas FIFA del formato 2026,
-So that el bracket se llene solo conforme el admin registra resultados, sin intervención manual.
+I want integrar la resolución de las clasificaciones y cruces eliminatorios desde los endpoints de standings y bracket de la API de Zafronix,
+So that los nombres de los equipos y avances de fase en los partidos eliminatorios se actualicen en base de datos sin necesidad de calcular localmente la lógica de desempates de la FIFA.
 
 **Acceptance Criteria:**
 
-**Given** los 72 partidos de grupos con resultados `finished`
-**When** se recalcula
-**Then** por cada grupo se ordena con desempates FIFA: puntos → diferencia de goles → goles a favor → enfrentamiento directo (pts, DG, GF entre empatados) → desempate determinista de respaldo (seed/orden estable) para criterios no computables (juego limpio, sorteo)
-**And** clasifican los 2 primeros de cada grupo (24) + los 8 mejores terceros (ranking de los 12 terceros: pts → DG → GF → respaldo determinista)
-**And** el motor resuelve los códigos de slot del JSON: `1X`/`2X` desde las tablas de grupo, los slots `3X/Y/Z` desde la lookup-table oficial FIFA de mejores terceros, y `W##`/`L##` desde ganador/perdedor del partido `num=##`, propagando R32→R16→Cuartos→Semis→Final (+ 3.º lugar) conforme hay resultados `finished`
-**And** mientras una fase no esté completa, los slots dependientes permanecen TBD; el motor es idempotente y recalcula de forma estable
-**And** el cálculo es puro/testeable (sin DOM/DB), análogo a `standings.ts`, y expone los límites de fase (inicio de Octavos, de Semis) que Epic 6 consume para su puntuación decreciente
-**And** existen pruebas unitarias exhaustivas: desempates, mejores terceros, llenado de bracket, idempotencia y respaldo determinista
+**Given** partidos de la fase de grupos marcados como `finished`
+**When** el sincronizador (cron o webhook) detecta actualizaciones y consulta los endpoints `GET /standings?year=2026` y `GET /bracket?year=2026` de la API de Zafronix
+**Then** el sistema extrae las posiciones finales de los grupos y el ranking de mejores terceros computados por la API
+**And** actualiza automáticamente las columnas `home_team` y `away_team` en la tabla `public.matches` resolviendo los códigos de slot (ej. `1A`, `2B`, `3ABCDF`, `W73`) con los países correspondientes provistos por el endpoint del bracket
+**And** el proceso de resolución es idempotente y se ejecuta de forma segura e incremental sin corromper registros de partidos existentes ni predicciones de usuarios
+**And** el script expone y calcula los límites de fase del torneo (inicio de la ronda de Octavos, de Semis) a partir de los datos sincronizados para consumo del motor de puntuación decreciente de la Epic 6
+**And** se implementan pruebas de integración en `tests/integration/bracket-resolution.test.ts` que validen la correcta resolución de los cruces de fase de eliminación directa usando fixtures mockeados de la API
+
+## Epic 8: Sincronización Automática con Zafronix World Cup API
+
+Automatiza la sincronización en tiempo real de marcadores, estados y cruces del Mundial 2026 mediante la integración con la API deportiva de Zafronix (webhooks HMAC y cron de respaldo condicional con ETags) a coste cero.
+
+### Story 8.1: Endpoint de Webhook para Sincronización de Partidos en Tiempo Real (Zafronix API)
+
+As a sistema de la quiniela,
+I want exponer un endpoint seguro de webhook HTTP POST en `/api/webhooks/zafronix`,
+So que el sistema reciba y procese notificaciones en tiempo real sobre la finalización y estados de los partidos del Mundial.
+
+**Acceptance Criteria:**
+
+**Given** una solicitud HTTP POST entrante en el endpoint `/api/webhooks/zafronix`
+**When** se valida la firma HMAC-SHA256 en la cabecera `X-Zafronix-Signature-256` con el timestamp `X-Zafronix-Timestamp` usando la clave secreta `ZAFRONIX_WEBHOOK_SECRET`
+**Then** el sistema calcula la firma localmente sobre la cadena `${timestamp}.${rawBody}` y verifica que coincida exactamente con la cabecera provista
+**And** el sistema rechaza solicitudes cuya diferencia de marca de tiempo (`X-Zafronix-Timestamp` vs reloj local del servidor) supere los 5 minutos (replay attack prevention) retornando un estado `401 Unauthorized` o `400 Bad Request` en formato JSON `{ error: string, message: string }`
+**And** si la firma es válida, procesa los eventos `match.finalized`, `match.patched` y `match.postponed`
+**And** para eventos `match.finalized` y `match.patched`, actualiza en la tabla `public.matches` las columnas `home_score`, `away_score` y `status` (`'finished'`) correspondientes, buscando por la clave `external_ref`
+**And** si el partido actualizado pertenece a una fase eliminatoria y contiene la resolución de equipos, actualiza `home_team` y `away_team` en la tabla `public.matches`
+**And** para eventos `match.postponed`, actualiza el `status` a `'suspended'` o `'canceled'` y gatilla la anulación automática de predicciones (0 pts) y duelos asociados (retornando el escrow) de forma transaccional
+**And** se implementan pruebas unitarias y de integración de firma HMAC en `tests/integration/zafronix-webhook.test.ts` con payloads y firmas simuladas correctas e incorrectas.
+
+### Story 8.2: Sincronización Periódica de Respaldo con ETags (GitHub Actions Cron Job)
+
+As a sistema de la quiniela,
+I want configurar un cron job periódico que realice peticiones HTTP condicionales utilizando cabeceras `If-None-Match` con ETags a la API de Zafronix,
+So que los marcadores de respaldo se sincronicen sin consumir la cuota de llamadas diarias del plan gratuito.
+
+**Acceptance Criteria:**
+
+**Given** un workflow programado de GitHub Actions (`.github/workflows/sync-matches.yml`) ejecutándose cada 30 minutos durante el periodo de partidos
+**When** el script de sincronización realiza una solicitud HTTP GET a `https://api.zafronix.com/fifa/worldcup/v1/matches?year=2026`
+**Then** incluye en la cabecera `If-None-Match` el último `ETag` (hash) guardado en la base de datos (por ejemplo, en la tabla de configuración del sistema `public.system_config`)
+**And** si el servidor de Zafronix responde con `304 Not Modified`, el script finaliza sin consumir cuota de llamadas ni realizar escrituras en la base de datos
+**And** si el servidor responde con `200 OK`, el script lee el body, actualiza los marcadores, equipos y estados en la tabla `public.matches` (mediante upsert buscando por `external_ref`), y almacena el nuevo `ETag` retornado en la base de datos para la siguiente llamada
+**And** se implementan pruebas unitarias y de integración que utilicen mocks para simular las respuestas `200 OK` (con actualización de datos y ETag) y `304 Not Modified` (comprobando que no hay cambios ni consumo), validando el comportamiento esperado
+**And** la llamada se realiza de manera segura inyectando el token `WC_API_KEY` desde los secretos de GitHub Actions en la cabecera `X-API-Key`
+
+### Story 8.3: Script Administrativo de Sincronización y Restauración Completa
+
+As a administrador de la quiniela,
+I want contar con un script ejecutable de restauración y sincronización completa desde la consola que cargue todos los datos vigentes de la API de Zafronix,
+So que el calendario y resultados del Mundial se puedan resembrar, validar o corregir de golpe si es necesario.
+
+**Acceptance Criteria:**
+
+**Given** un script administrativo de Node/TypeScript en `scripts/restore-zafronix-data.ts`
+**When** el administrador ejecuta el script con las credenciales apropiadas (usando la variable `SUPABASE_SERVICE_ROLE_KEY` o mediante una función RPC admin-gated)
+**Then** realiza una solicitud GET directa a la API de Zafronix sin cabeceras condicionales para traer el listado completo de partidos del Mundial 2026
+**And** procesa e inserta o actualiza todos los registros de partidos en `public.matches` asociándolos por `external_ref`, respetando las relaciones y claves foráneas existentes
+**And** si hay diferencias con los marcadores locales, actualiza los datos y recalcula las clasificaciones oficiales correspondientes
+**And** el script incluye logs informativos detallados (ej. "Partidos actualizados: X, Partidos creados: Y, Errores: Z")
+**And** se verifica mediante pruebas de integración que la ejecución del script sobre una base de datos limpia o parcialmente poblada restaura el estado exacto de la Copa del Mundo reportada por la API de Zafronix sin duplicar registros ni corromper las predicciones de los usuarios
+
+### Story 8.4: Entorno de Pruebas Integradas con el Sandbox de Zafronix (Año 9999)
+
+As a desarrollador del proyecto,
+I want configurar un entorno de pruebas de integración automatizadas que interactúe con el Sandbox de Zafronix del año 9999,
+So que el ciclo de vida completo de un partido se pueda probar de manera fiel y controlada.
+
+**Acceptance Criteria:**
+
+**Given** la suite de pruebas automatizadas E2E de Playwright y de integración de Vitest
+**When** se ejecutan las pruebas del flujo de sincronización y webhooks
+**Then** las solicitudes de escritura de resultados se dirigen a los partidos del año 9999 de Zafronix usando un token de sandbox `ZAFRONIX_SANDBOX_KEY` (`zwc_skt_...`)
+**And** la suite de pruebas realiza una llamada a `POST /sandbox/reset` antes de comenzar para garantizar un estado consistente de los fixtures ficticios
+**And** se verifica que al simular un resultado deportivo en el sandbox de Zafronix, el webhook local recibe la firma HMAC válida, actualiza la base de datos local y propaga el cambio en tiempo real (Supabase Realtime) permitiendo verificar la tabla de clasificaciones proyectada en el cliente
+**And** no se ejecutan operaciones de escritura sobre partidos reales del año 2026 durante las pruebas
