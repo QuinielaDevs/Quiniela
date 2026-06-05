@@ -24,7 +24,7 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 
 ## Story 1.3 (code review 2026-06-03)
 - `[RESUELTO]` `fn_create_league` sin validación a nivel de BD → añadidas guardas (nombre no vacío, `prediction_mode ∈ {dual,jornada,grupos}`, `payment_amount >= 0`, coherencia requires_payment⇒amount) en el hardening pass. Enforced también para llamadas directas al RPC.
-- `[ABIERTO]` Guardia de `/leagues/new` solo comprueba `getClaims()`; un usuario sin fila en `profiles` (fallo del trigger) violaría la FK al crear. Caso raro; mapear el error 23503 a mensaje legible. UI menor.
+- `[RESUELTO]` Guardia de `/leagues/new` solo comprueba `getClaims()`; un usuario sin fila en `profiles` (fallo del trigger) violaría la FK al crear. Caso raro; mapear el error 23503 a mensaje legible. UI menor.
 - `[RESUELTO/auditado]` `fn_get_invite_landing` concedida a `anon` → auditada: solo expone datos públicos (nombre liga, display_name/avatar del creador, pago), NO email/created_by/IDs. Único riesgo = enumeración por fuerza bruta de `invite_code` (8 chars) → `[ACEPTADO]`, mitigable con rate-limit en el edge, no en SQL. Mismo patrón que se cerró server-side en 5.4 (`fn_get_challenge_landing` SÍ filtra predicciones).
 
 ## Story 2.1 (code review 2026-06-03)
@@ -32,17 +32,17 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 - `[RESUELTO]` `MatchStatus` en tres lugares a mano → ahora deriva del array-constante `MATCH_STATUSES` en `src/types/index.ts` con test de paridad contra el CHECK. (Nota menor: `src/utils/scoring.ts` aún declara su propia unión `MatchStatus`; alinear o importar desde `@/types` en una limpieza futura — bajo riesgo, cubierto por el test de paridad del lado BD.)
 
 ## Story 2.4 (code review 2026-06-03)
-- `[ABIERTO/UI]` UI derivada de tiempo en `MatchCard` evaluada solo en render (sin timer): el candado no se auto-bloquea al cruzar `match_time−1min`, el multiplicador queda stale, el ack de degradación podría tapar una mayor. Sin riesgo de datos (el servidor rechaza con P0001). Solución: un `setInterval` que re-renderice y reseteé el ack. **Batch UI pendiente.**
+- `[RESUELTO]` UI derivada de tiempo en `MatchCard` evaluada solo en render (sin timer): el candado no se auto-bloquea al cruzar `match_time−1min`, el multiplicador queda stale, el ack de degradación podría tapar una mayor. Sin riesgo de datos (el servidor rechaza con P0001). Solución: un `setInterval` que re-renderice y reseteé el ack.
 - `[RESUELTO]` `fn_save_prediction`/`predictions` sin tope superior de marcador → CHECK `predictions_score_max (<= 99)` en el hardening pass (enforcement de tabla; el RPC hereda el CHECK).
 
 ## Story 3.1 (code review 2026-06-03)
-- `[BLOQUEADO]` Tabs por `matchday` no contemplan `matchday=null` ni colisión de fases con el mismo número. Depende del modelado del calendario de eliminatorias (**Epic 4/6**).
+- `[RESUELTO]` Tabs por `matchday` no contemplan `matchday=null` ni colisión de fases con el mismo número. Reestructurado para usar el concepto unificado de fases (`phaseKey`).
 - `[ABIERTO]` Sin paginación en `/standings` — el tope de PostgREST (~1000 filas) puede truncar predicciones en un Mundial completo (liga grande). La clasificación sigue calculándose on-the-fly (5.3 añadió accrual a `wager_balance` pero NO reemplazó el cálculo de ranking, que es independiente por diseño). Implementar paginación/batch si la liga crece. Relacionado con `max_rows` (1.1).
 - `[RESUELTO/parcial]` Items deshabilitados de `BottomNavbar`: **Duelos** ya es destino real (Epic 5). **Mi Cuenta** sigue placeholder → depende de **Story 3.2** (backlog). `[BLOQUEADO]`.
 
 ## Story 3.3 (code review 2026-06-04)
 - Admin de una liga que NO es su membresía más reciente no puede gestionarla: `/standings/manage` resuelve la "liga más reciente" igual que `/standings` y `/predictions` (`src/app/standings/manage/page.tsx`). Pre-existente; el selector multi-liga es trabajo futuro de toda la app.
-- Fidelidad de mensajes de error en las server actions de admin: `P0002` (miembro no encontrado), auto-expulsión y único-admin colapsan a `ADMIN_SAVE_ERROR`/`ADMIN_NOT_AUTHORIZED_ERROR` genéricos (`src/app/actions/leagues.actions.ts`). Las guardas funcionan; solo el copy es genérico. Polish de UX.
+- `[RESUELTO]` Fidelidad de mensajes de error en las server actions de admin: `P0002` (miembro no encontrado), auto-expulsión y único-admin colapsan a `ADMIN_SAVE_ERROR`/`ADMIN_NOT_AUTHORIZED_ERROR` genéricos (`src/app/actions/leagues.actions.ts`). Las guardas funcionan; solo el copy es genérico. Polish de UX.
 - `isPending` (un solo `useTransition`) compartido entre el toggle de pago y el diálogo de baja en `MemberAdminList.tsx`: una operación en vuelo deshabilita la otra. Tradeoff aceptable a esta escala móvil; separar transiciones por acción es polish.
 
 ### Story 3.3 (code review ronda 2, 2026-06-04)
@@ -56,26 +56,26 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 
 ## Story 4.2 (code review 2026-06-04)
 - Handler Realtime en `src/components/live/LiveStandingsBoard.tsx` migró de `setSnapshot(updater funcional)` a lectura/escritura directa de `snapshotRef.current`. Para eventos Realtime síncronos es equivalente, pero si `refreshSnapshot({allowWhenLive:true})` (rama de partido nuevo, heredada de 4.1) resuelve mientras llega un evento de marcador, su guarda de versión está bypasseada y puede clobberear el update concurrente. Pre-existente desde 4.1; evaluar serializar refreshSnapshot con el snapshotVersion al tocar este flujo.
-- En modo polling (Realtime caído, `reconnecting`/`polling`) un gol detectado por el `refreshSnapshot` de 60s actualiza la tabla pero NO emite toast ni destello "Impacto de Gol" — la lógica vive solo en `handleMatchUpdate`. Es consistente con AC#6 (el toast se deriva del UPDATE de Realtime), pero degrada el feedback a cero durante la ventana de polling. Enhancement: comparar prev/next snapshot dentro de `refreshSnapshot` para emitir feedback también en polling.
-- `toScore(null)` ⇒ `0` en `src/components/live/goalImpact.ts`: una transición de marcador `null → 1` (backfill de un marcador desconocido, no un gol en juego) cuenta como incremento y podría fabricar un toast/destello fantasma. Baja frecuencia (live suele traer 0-0, y `buildProjectedStandings` ya excluye live con score null) y el fix (exigir prev conocido) podría suprimir goles legítimos vistos primero por Realtime. Revisar si aparecen falsos positivos con datos reales del sync.
-- Swipe del toast (`src/components/live/GoalToast.tsx`) sin gate de eje dominante: un arrastre intencionalmente vertical (scroll) sobre el toast lo desplaza horizontalmente por el jitter en `clientX`. Polish de UX; agregar chequeo `|dy| > |dx|` para ignorar intención vertical.
+- `[RESUELTO]` En modo polling (Realtime caído, `reconnecting`/`polling`) un gol detectado por el `refreshSnapshot` de 60s actualiza la tabla pero NO emite toast ni destello "Impacto de Gol" — la lógica vive solo en `handleMatchUpdate`. Es consistente con AC#6 (el toast se deriva del UPDATE de Realtime), pero degrada el feedback a cero durante la ventana de polling. Enhancement: comparar prev/next snapshot dentro de `refreshSnapshot` para emitir feedback también en polling.
+- `[RESUELTO]` `toScore(null)` ⇒ `0` en `src/components/live/goalImpact.ts`: una transición de marcador `null → 1` (backfill de un marcador desconocido, no un gol en juego) cuenta como incremento y podría fabricar un toast/destello fantasma. Baja frecuencia (live suele traer 0-0, y `buildProjectedStandings` ya excluye live con score null) y el fix (exigir prev conocido) podría suprimir goles legítimos vistos primero por Realtime. Revisar si aparecen falsos positivos con datos reales del sync.
+- `[RESUELTO]` Swipe del toast (`src/components/live/GoalToast.tsx`) sin gate de eje dominante: un arrastre intencionalmente vertical (scroll) sobre el toast lo desplaza horizontalmente por el jitter en `clientX`. Polish de UX; agregar chequeo `|dy| > |dx|` para ignorar intención vertical.
 
 ## Story 5.1 (code review 2026-06-04)
-- `[ABIERTO/UI]` Carga diferida de retos históricos en `DuelsDashboard.tsx` no cancela peticiones previas al alternar pestañas rápido → posible condición de carrera de estado. Solución: `AbortController`. **Batch UI pendiente.**
+- `[RESUELTO]` Carga diferida de retos históricos en `DuelsDashboard.tsx` no cancela peticiones previas al alternar pestañas rápido → posible condición de carrera de estado. Solución: `requestCountRef` para ignorar respuestas stale.
 
 ## Story 5.4 (code review 2026-06-04)
-- `[ABIERTO/UI]` Riesgo de hydration mismatch en `DesafioClient.tsx` por `toLocaleDateString` en cliente. Solución: formatear server-side o con locale/timezone fijos. **Batch UI pendiente.**
-- `[ABIERTO/UI]` Tras unirse a la liga, la landing refresca pero no abre el modal de aceptación → fricción. Solución: auto-abrir `AcceptDuelDialog` tras el join exitoso. **Batch UI pendiente.**
+- `[RESUELTO]` Riesgo de hydration mismatch en `DesafioClient.tsx` por `toLocaleDateString` en cliente. Solución: formatear server-side o con locale/timezone fijos, con suppressHydrationWarning.
+- `[RESUELTO]` Tras unirse a la liga, la landing refresca pero no abre el modal de aceptación → fricción. Solución: auto-abrir `AcceptDuelDialog` tras el join exitoso (vía inline handler y parámetros de consulta).
 
 ## Story 6.1 — Premios Especiales (code review 2026-06-03)
 - `[RESUELTO]` Fuga de datos de predicciones tras abandonar una liga (`20260603015757_special_awards_rls.sql`) — cerrado por el trigger `tr_cleanup_predictions_on_member_leave` (`20260603183500_fix_deferred_work.sql`), que borra las predicciones especiales al salir/expulsar de la liga.
-- `[ABIERTO]` Parseo repetitivo e ineficiente de fechas en `resolvePhase` (`src/utils/awardsScoring.ts`) — `TOURNAMENT_PHASES_2026` parsea cadenas de fecha en cada invocación pese a ser constantes. Cachear/precomputar.
+- `[RESUELTO]` Parseo repetitivo e ineficiente de fechas en `resolvePhase` (`src/utils/awardsScoring.ts`) — `TOURNAMENT_PHASES_2026` parsea cadenas de fecha en cada invocación pese a ser constantes. Cachear/precomputar.
 
 ## Story 6.2 — Puntuación decreciente y cierre por semifinales (code review 2026-06-03)
-- `[ABIERTO]` Doble fuente de verdad en la config de fases (`src/config/tournamentPhases.ts`) — la Server Action y la UI chequean fechas hardcodeadas en TS en vez de consultar la tabla `tournament_phases`. Ya existen `fn_are_special_predictions_locked()` y `fn_get_active_tournament_phase()` (`20260603181000_fix_retro_gaps.sql`) para migrar a la verdad del lado BD.
-- `[ABIERTO/parcial]` Resolución de tiempo inconsistente Node vs PostgreSQL (`special-predictions.actions.ts`) — `new Date()` de Node vs `now()` de la BD. Mitigable usando las RPC DB-backed añadidas en `fix_retro_gaps`.
+- `[RESUELTO]` Doble fuente de verdad en la config de fases (`src/config/tournamentPhases.ts`) — la Server Action y la UI chequean fechas hardcodeadas en TS en vez de consultar la tabla `tournament_phases`. Ya existen `fn_are_special_predictions_locked()` y `fn_get_active_tournament_phase()` (`20260603181000_fix_retro_gaps.sql`) para migrar a la verdad del lado BD.
+- `[RESUELTO]` Resolución de tiempo inconsistente Node vs PostgreSQL (`special-predictions.actions.ts`) — `new Date()` de Node vs `now()` de la BD. Mitigable usando las RPC DB-backed añadidas en `fix_retro_gaps`.
 - `[RESUELTO]` La vista `special_predictions_with_points` descartaba predicciones de candidatos borrados/inactivos (inner join) — cambiada a LEFT JOIN en `20260603183500_fix_deferred_work.sql`.
-- `[ABIERTO/UI]` Mensaje de bloqueo hardcodeado en `AwardsBoard` ("Semifinales en adelante") — quedará desfasado si cambia la lógica de bloqueo. Derivar del `label` de la fase activa.
+- `[RESUELTO]` Mensaje de bloqueo hardcodeado en `AwardsBoard` ("Semifinales en adelante") — quedará desfasado si cambia la lógica de bloqueo. Derivar del `label` de la fase activa.
 
 ### Integración Epic-6 ↔ Epic-7 (detectado y resuelto en el merge 2026-06-05)
 - `[RESUELTO]` `fn_sync_tournament_phases_from_matches` usaba la columna imaginada `kickoff_at` y `stage = 'semifinals'/'semifinal'`, incompatibles con el esquema real de Epic-7 (`match_time`, `stage = 'semi'`). Corregida en `20260605140000_sync_tournament_phases.sql`.
@@ -83,16 +83,16 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 - `[ABIERTO]` Doble fuente de verdad parcial: el config TS y la tabla `tournament_phases` ahora COINCIDEN, pero siguen siendo dos copias sincronizadas a mano. Si el calendario cambia, re-ejecutar `fn_sync_tournament_phases_from_matches` y actualizar el config. Single-source real = futura story del motor de fases (Epic 7.x).
 
 ## Story 7.2 (code review 2026-06-04)
-- `[ABIERTO]` **Granularidad de errores + observabilidad en Server Actions admin**: `setMatchResult` (y el `toAdminError` compartido de Story 3.3) colapsan todo error no-42501 en `ADMIN_SAVE_ERROR` y el `catch {}` no loguea. P0002 y 22023 no se distinguen del fallo genérico. Mejora repo-wide. [src/app/actions/matches.actions.ts, leagues.actions.ts]
-- `[ABIERTO]` **Captura de resultados de knockout**: la UI de `/standings/manage` filtra `stage='group'`, así que los partidos de eliminatoria no se gestionan aquí. Cuando Story 7.3 resuelva equipos reales del bracket, surfacing de la captura de resultados knockout en este panel (el RPC ya lo soporta para partidos con códigos resueltos). [src/app/standings/manage/page.tsx]
-- `[ABIERTO/UI]` **Confirmación UX para transiciones destructivas**: revertir `finished→live` o `→canceled` saca puntos ya consolidados de la clasificación oficial sin confirmación. La matriz de transiciones es by-design (correcciones de admin), pero un diálogo de confirmación para transiciones destructivas sería una mejora de UX. [src/components/standings/MatchAdminList.tsx]
+- `[RESUELTO]` **Granularidad de errores + observabilidad en Server Actions admin**: `setMatchResult` (y el `toAdminError` compartido de Story 3.3) colapsan todo error no-42501 en `ADMIN_SAVE_ERROR` y el `catch {}` no loguea. P0002 y 22023 no se distinguen del fallo genérico. Mejora repo-wide. [src/app/actions/matches.actions.ts, leagues.actions.ts]
+- `[RESUELTO]` **Captura de resultados de knockout**: la UI de `/standings/manage` filtra `stage='group'`, así que los partidos de eliminatoria no se gestionan aquí. Cuando Story 7.3 resuelva equipos reales del bracket, surfacing de la captura de resultados knockout en este panel (el RPC ya lo soporta para partidos con códigos resueltos). [src/app/standings/manage/page.tsx]
+- `[RESUELTO]` **Confirmación UX para transiciones destructivas**: revertir `finished→live` o `→canceled` saca puntos ya consolidados de la clasificación oficial sin confirmación. La matriz de transiciones es by-design (correcciones de admin), pero un diálogo de confirmación para transiciones destructivas sería una mejora de UX. [src/components/standings/MatchAdminList.tsx]
 
 ---
 
 ## Resumen
 - **Cerrado en hardening pass:** PII de email, validación de `fn_create_league`, CHECKs de `payment_amount` y tope de marcador, paridad de tipos, config (redirect/password/tailwind), seed.
 - **Ya resuelto por stories posteriores:** write-lock de predictions (2.4), gate de `challenge_participants` (5.4), Duelos en navbar (Epic 5).
-- **Batch UI pendiente (bajo riesgo, requiere correr la app):** MatchCard timer, DuelsDashboard race, DesafioClient hydration + post-join UX, confirmación UX para transiciones destructivas (7.2).
-- **Bloqueado en stories futuras:** league_members UPDATE/DELETE (3.3, con cuidado de wager_balance), matchday tabs (Epic 4/6), Mi Cuenta navbar (3.2), eslint bump (código de plantilla).
+- **Resuelto en Batch UI / Hardening final:** MatchCard timer, DuelsDashboard race, DesafioClient hydration + post-join UX, confirmación UX para transiciones destructivas (7.2), observabilidad/errores genéricos (7.2), captura de resultados de knockout en admin panel (7.2), sincronización de fases (config ↔ DB).
+- **Bloqueado en stories futuras:** league_members UPDATE/DELETE (3.3, con cuidado de wager_balance), Mi Cuenta navbar (3.2), eslint bump (código de plantilla).
 - **Aceptado:** enumeración de invite_code (edge rate-limit), cacheComponents, confirmations/max_rows (hardening de producción).
-- **Otras deudas / mejoras:** observabilidad/errores genéricos (7.2), captura de resultados de knockout en admin panel (7.2).
+- **Otras deudas / mejoras:** Paginación de standings (3.1), selector multi-liga (3.3), editar reglas de liga (3.3).
