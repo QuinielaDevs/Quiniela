@@ -43,3 +43,8 @@
 
 - La carga diferida de retos históricos (finalizados/cancelados) en `src/components/duels/DuelsDashboard.tsx` no cancela peticiones previas inactivas en caso de que el usuario alterne rápidamente entre pestañas, lo que podría derivar en condiciones de carrera al actualizar el estado.
 
+## Deferred from: code review of 5-4-compartir-de-forma-viral-por-whatsapp-y-landing-page-banter-preview.md (2026-06-04)
+
+- **[Review][Defer] Riesgo de desajuste de hidratación (hydration mismatch) en Next.js** (`src/app/desafio/[id]/DesafioClient.tsx:255`): Formatear la fecha directamente en el renderizado del cliente con `toLocaleDateString` puede provocar errores de hidratación si el servidor utiliza una configuración de idioma o zona horaria diferente.
+- **[Review][Defer] Flujo de experiencia de usuario desconectado tras unirse a la liga** (`src/app/desafio/[id]/DesafioClient.tsx:263-274`): Tras unirse a una liga privada, la landing se refresca pero no abre automáticamente el modal de aceptación, obligando al usuario a volver a clicar "Unirse al Pozo", lo que genera fricción.
+

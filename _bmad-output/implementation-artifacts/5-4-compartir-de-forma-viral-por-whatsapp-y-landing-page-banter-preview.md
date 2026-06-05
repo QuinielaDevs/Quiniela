@@ -3,7 +3,7 @@ baseline_commit: ed39e8b6308b393b79d21b3f9678a8575ca6bc6c
 ---
 # Story 5.4: Compartir de Forma Viral por WhatsApp y Landing Page (Banter Preview)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -152,3 +152,23 @@ El RPC expone `invite_code` para el flujo "Unirse a la Liga para Participar" (po
  - [DesafioClient.tsx](file:///c:/Users/Public/Development/AI-Driven/pija-quiniela/src/app/desafio/[id]/DesafioClient.tsx)
  - [challenge-landing.test.ts](file:///c:/Users/Public/Development/AI-Driven/pija-quiniela/tests/integration/challenge-landing.test.ts)
  - [MatchCard.test.tsx](file:///c:/Users/Public/Development/AI-Driven/pija-quiniela/src/components/predictions/MatchCard.test.tsx)
+
+### Review Findings
+
+1. **`decision-needed`** findings (unchecked):
+   - [ ] [Review][Decision] Discrepancia en la lógica de confidencialidad para retos cancelados antes del kickoff — La política RLS `participants_select_gated` permite consultar predicciones si el estado es `canceled`. Sin embargo, la función RPC `fn_get_challenge_landing` no las expone si el partido no ha comenzado (ya que `v_unlocked` es `false`). ¿Se deben mantener ocultas las predicciones de retos cancelados hasta que pase el kickoff (`match_time - 1 min`) para proteger la confidencialidad, o está bien revelarlas una vez canceladas?
+
+2. **`patch`** findings (unchecked):
+   - [ ] [Review][Patch] Bug de valor falsy en predicciones de 0 goles [src/app/desafio/[id]/DesafioClient.tsx:447]
+   - [ ] [Review][Patch] Duplicación del creador y ocultación de rivales en pozos abiertos [supabase/migrations/20260605120000_challenge_landing_rpc.sql:1125-1137]
+   - [ ] [Review][Patch] Archivo de imagen OpenGraph inexistente en el sistema de archivos [src/app/desafio/[id]/page.tsx:706]
+   - [ ] [Review][Patch] Falta de banderas de equipos en la UI [src/app/desafio/[id]/DesafioClient.tsx:380-405]
+   - [ ] [Review][Patch] Desviación menor en la etiqueta del botón de compartir en el Dashboard [src/components/duels/DuelsDashboard.tsx:858]
+   - [ ] [Review][Patch] Error de resolución de URL absoluta en OpenGraph [src/app/desafio/[id]/page.tsx:699-712]
+   - [ ] [Review][Patch] Falta de control de errores (try/catch) en acciones del servidor [src/app/desafio/[id]/DesafioClient.tsx:263-298]
+   - [ ] [Review][Patch] Posible doble envío de acciones por doble clic rápido [src/app/desafio/[id]/DesafioClient.tsx:585-622]
+   - [ ] [Review][Patch] Posible caída si la fecha del partido es nula o inválida [src/app/desafio/[id]/DesafioClient.tsx:255]
+
+3. **`defer`** findings (checked off, marked deferred):
+   - [x] [Review][Defer] Riesgo de desajuste de hidratación (hydration mismatch) en Next.js [src/app/desafio/[id]/DesafioClient.tsx:255] — deferred, pre-existing
+   - [x] [Review][Defer] Flujo de experiencia de usuario desconectado tras unirse a la liga [src/app/desafio/[id]/DesafioClient.tsx:263-274] — deferred, pre-existing
