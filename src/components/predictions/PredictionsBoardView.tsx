@@ -134,14 +134,14 @@ export function PredictionsBoardView({
                 </span>
                 Grupo {section.group}
               </h3>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                 {section.matches.map(renderCard)}
               </div>
             </section>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {knockoutMatches.map(renderCard)}
         </div>
       )}

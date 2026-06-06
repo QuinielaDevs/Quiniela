@@ -496,9 +496,13 @@ export function MatchCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <div className="flex flex-col items-start gap-2">
-          <span className="flex items-center gap-1.5 text-sm font-semibold">
+      {/* Móvil (<md): rejilla con identidad pegada a los bordes y "vs" al centro.
+          Desktop (md+): el marcador se agrupa centrado (cada equipo apilado:
+          bandera/nombre/código arriba, stepper abajo) flanqueando el "vs", con
+          más aire. Así aprovecha el ancho sin truncar nombres ni dejar huecos. */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 md:flex md:items-end md:justify-center md:gap-10 lg:gap-14">
+        <div className="flex flex-col items-start gap-2 md:items-center md:text-center">
+          <span className="flex items-center gap-1.5 text-sm font-semibold md:text-base">
             {flagForTeamCode(match.home_team_code) && (
               <span aria-hidden="true">
                 {flagForTeamCode(match.home_team_code)}
@@ -520,10 +524,10 @@ export function MatchCard({
           />
         </div>
 
-        <div className="pt-8 font-display text-xl font-bold text-accent">vs</div>
+        <div className="pt-8 font-display text-xl font-bold text-accent md:pb-2.5 md:pt-0 md:text-2xl">vs</div>
 
-        <div className="flex flex-col items-end gap-2">
-          <span className="flex items-center gap-1.5 text-right text-sm font-semibold">
+        <div className="flex flex-col items-end gap-2 md:items-center md:text-center">
+          <span className="flex items-center gap-1.5 text-right text-sm font-semibold md:text-base">
             {awayLabel}
             {flagForTeamCode(match.away_team_code) && (
               <span aria-hidden="true">

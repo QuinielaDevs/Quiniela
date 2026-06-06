@@ -202,7 +202,7 @@ function EmptyState({
 
 function BoardSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
       {[0, 1, 2].map((i) => (
         <div
           key={i}
