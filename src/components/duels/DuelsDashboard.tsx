@@ -458,7 +458,7 @@ export function DuelsDashboard({
                     <UserPlus className="size-4" />
                     Retos Recibidos
                   </h3>
-                  <div className="flex flex-col gap-3">
+                  <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
                     {pendingReceived.map(renderChallengeCard)}
                   </div>
                 </div>
@@ -471,7 +471,7 @@ export function DuelsDashboard({
                     <Coins className="size-4" />
                     Pozos Abiertos del Grupo
                   </h3>
-                  <div className="flex flex-col gap-3">
+                  <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
                     {openPools.map(renderChallengeCard)}
                   </div>
                 </div>
@@ -484,7 +484,7 @@ export function DuelsDashboard({
                     <Trophy className="size-4" />
                     Duelos En Juego
                   </h3>
-                  <div className="flex flex-col gap-3">
+                  <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
                     {inGame.map(renderChallengeCard)}
                   </div>
                 </div>
@@ -497,7 +497,7 @@ export function DuelsDashboard({
                     <History className="size-4" />
                     Retos Enviados (Pendientes)
                   </h3>
-                  <div className="flex flex-col gap-3">
+                  <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
                     {pendingSent.map(renderChallengeCard)}
                   </div>
                 </div>
@@ -522,7 +522,7 @@ export function DuelsDashboard({
               </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">{historyChallenges.map(renderChallengeCard)}</div>
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{historyChallenges.map(renderChallengeCard)}</div>
           )}
         </div>
       )}

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
+import { TopNav } from "@/components/layout/TopNav";
 import {
   ProfileSummaryCard,
   type AccountGameProfileView,
@@ -164,15 +165,19 @@ export async function AccountBoard() {
   return (
     <>
       <PageHeader />
-      <ProfileSummaryCard
-        displayName={displayName}
-        avatarUrl={avatarUrl}
-        leagueName={leagueName}
-        latestProfile={latestGameProfile}
-        emptyProfileMessage={emptyProfileMessage}
-        badges={badgeRows}
-      />
-      <BadgeHistory badges={badgeRows} />
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[360px_1fr] lg:items-start lg:gap-6">
+        <div className="lg:sticky lg:top-20">
+          <ProfileSummaryCard
+            displayName={displayName}
+            avatarUrl={avatarUrl}
+            leagueName={leagueName}
+            latestProfile={latestGameProfile}
+            emptyProfileMessage={emptyProfileMessage}
+            badges={badgeRows}
+          />
+        </div>
+        <BadgeHistory badges={badgeRows} />
+      </div>
     </>
   );
 }
@@ -180,10 +185,10 @@ export async function AccountBoard() {
 function PageHeader() {
   return (
     <header className="space-y-1">
-      <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent">
+      <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent lg:hidden">
         PIJA Quiniela
       </p>
-      <h1 className="font-display text-2xl font-bold">Mi Cuenta</h1>
+      <h1 className="font-display text-2xl font-bold lg:text-4xl">Mi Cuenta</h1>
     </header>
   );
 }
@@ -236,14 +241,17 @@ function BoardSkeleton() {
 
 export default function AccountPage() {
   return (
-    <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-        <Suspense fallback={<BoardSkeleton />}>
-          <AccountBoard />
-        </Suspense>
-      </div>
+    <>
+      <TopNav />
+      <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pb-10">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-6xl lg:gap-6">
+          <Suspense fallback={<BoardSkeleton />}>
+            <AccountBoard />
+          </Suspense>
+        </div>
 
-      <BottomNavbar />
-    </main>
+        <BottomNavbar />
+      </main>
+    </>
   );
 }

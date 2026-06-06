@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/server";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
+import { TopNav } from "@/components/layout/TopNav";
 import {
   MemberAdminList,
   type AdminMemberView,
@@ -184,26 +185,29 @@ function BoardSkeleton() {
 
 export default function ManageLeaguePage() {
   return (
-    <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-        <header className="flex items-start justify-between gap-2">
-          <div className="space-y-1">
-            <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent">
-              PIJA Quiniela
-            </p>
-            <h1 className="font-display text-2xl font-bold">Gestión de liga</h1>
-          </div>
-          <span className="mt-1 rounded-sm border border-primary bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
-            Admin
-          </span>
-        </header>
+    <>
+      <TopNav />
+      <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pb-10">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
+          <header className="flex items-start justify-between gap-2">
+            <div className="space-y-1">
+              <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent lg:hidden">
+                PIJA Quiniela
+              </p>
+              <h1 className="font-display text-2xl font-bold lg:text-4xl">Gestión de liga</h1>
+            </div>
+            <span className="mt-1 rounded-sm border border-primary bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+              Admin
+            </span>
+          </header>
 
-        <Suspense fallback={<BoardSkeleton />}>
-          <ManageBoard />
-        </Suspense>
-      </div>
+          <Suspense fallback={<BoardSkeleton />}>
+            <ManageBoard />
+          </Suspense>
+        </div>
 
-      <BottomNavbar />
-    </main>
+        <BottomNavbar />
+      </main>
+    </>
   );
 }

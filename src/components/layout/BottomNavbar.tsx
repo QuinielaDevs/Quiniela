@@ -2,42 +2,25 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Trophy, Swords, User } from "lucide-react";
-import type { ComponentType } from "react";
 
+import { NAV_ITEMS, isNavItemActive } from "@/components/layout/nav-items";
 import { cn } from "@/utils/utils";
 
 // Barra de navegación inferior móvil (EXPERIENCE: Pronósticos | Posiciones |
-// Duelos | Mi Cuenta).
-type NavItem = {
-  href: string;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-  enabled: boolean;
-};
-
-const ITEMS: NavItem[] = [
-  { href: "/predictions", label: "Pronósticos", icon: ClipboardList, enabled: true },
-  { href: "/standings", label: "Posiciones", icon: Trophy, enabled: true },
-  { href: "/duels", label: "Duelos", icon: Swords, enabled: true },
-  { href: "/account", label: "Mi Cuenta", icon: User, enabled: true },
-];
-
+// Duelos | Mi Cuenta). Se oculta en desktop (lg+), donde la navegación pasa a la
+// barra superior horizontal (TopNav).
 export function BottomNavbar() {
   const pathname = usePathname();
 
   return (
     <nav
       aria-label="Navegación principal"
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card lg:hidden"
     >
       <ul className="mx-auto flex w-full max-w-md items-stretch">
-        {ITEMS.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive =
-            item.enabled &&
-            (pathname === item.href ||
-              (item.href === "/standings" && pathname === "/live"));
+          const isActive = item.enabled && isNavItemActive(pathname, item.href);
           const content = (
             <span
               className={cn(

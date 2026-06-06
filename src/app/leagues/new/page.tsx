@@ -28,10 +28,10 @@ async function NewLeagueContent() {
  */
 export default function NewLeaguePage() {
   return (
-    <main className="flex min-h-screen justify-center px-4 py-6">
-      <div className="w-full max-w-md">
+    <main className="flex min-h-screen justify-center px-4 py-6 lg:py-12">
+      <div className="w-full max-w-md lg:max-w-xl">
         <header className="mb-6">
-          <h1 className="font-display text-2xl font-extrabold tracking-tight text-accent">
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-accent lg:text-3xl">
             Crear nueva liga
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">

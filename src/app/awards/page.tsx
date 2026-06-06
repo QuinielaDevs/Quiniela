@@ -12,6 +12,7 @@ import type {
   SpecialPrediction,
 } from "@/types";
 import { AwardsBoard } from "@/components/awards/AwardsBoard";
+import { TopNav } from "@/components/layout/TopNav";
 
 const outfit = Outfit({ subsets: ["latin"], display: "swap" });
 
@@ -35,26 +36,29 @@ export default function AwardsPage(props: AwardsPageProps) {
 
 function AwardsFallback() {
   return (
-    <main
-      className={cn(
-        "min-h-screen bg-[#0D1B2A] px-4 py-8 text-white",
-        outfit.className,
-      )}
-    >
-      <div className="mx-auto w-full max-w-md">
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold">Premios Especiales</h1>
-          <p className="mt-1 text-sm text-white/60">
-            Tus apuestas de largo plazo del Mundial. Un tap y queda guardado.
-          </p>
-        </header>
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 rounded-lg bg-[#1B263B]" />
-          <div className="h-40 rounded-lg bg-[#1B263B]" />
-          <div className="h-40 rounded-lg bg-[#1B263B]" />
+    <>
+      <TopNav />
+      <main
+        className={cn(
+          "min-h-screen bg-[#0D1B2A] px-4 py-8 text-white lg:px-8",
+          outfit.className,
+        )}
+      >
+        <div className="mx-auto w-full max-w-md lg:max-w-5xl">
+          <header className="mb-6">
+            <h1 className="text-2xl font-bold lg:text-4xl">Premios Especiales</h1>
+            <p className="mt-1 text-sm text-white/60">
+              Tus apuestas de largo plazo del Mundial. Un tap y queda guardado.
+            </p>
+          </header>
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 rounded-lg bg-[#1B263B]" />
+            <div className="h-40 rounded-lg bg-[#1B263B]" />
+            <div className="h-40 rounded-lg bg-[#1B263B]" />
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
 
@@ -96,33 +100,36 @@ async function AwardsContent({ searchParams }: AwardsPageProps) {
   const { league: requestedLeague } = await searchParams;
 
   return (
-    <main
-      className={cn(
-        "min-h-screen bg-[#0D1B2A] px-4 py-8 text-white",
-        outfit.className,
-      )}
-    >
-      <div className="mx-auto w-full max-w-md">
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold">Premios Especiales</h1>
-          <p className="mt-1 text-sm text-white/60">
-            Tus apuestas de largo plazo del Mundial. Un tap y queda guardado.
-          </p>
-        </header>
-
-        {leagues.length === 0 ? (
-          <p className="rounded-lg border border-white/10 bg-[#1B263B] px-4 py-6 text-center text-sm text-white/70">
-            Únete a una liga para pronosticar los premios de la Copa.
-          </p>
-        ) : (
-          <AwardsForLeague
-            leagues={leagues}
-            requestedLeague={requestedLeague}
-            userId={user.id}
-          />
+    <>
+      <TopNav />
+      <main
+        className={cn(
+          "min-h-screen bg-[#0D1B2A] px-4 py-8 text-white lg:px-8",
+          outfit.className,
         )}
-      </div>
-    </main>
+      >
+        <div className="mx-auto w-full max-w-md lg:max-w-5xl">
+          <header className="mb-6">
+            <h1 className="text-2xl font-bold lg:text-4xl">Premios Especiales</h1>
+            <p className="mt-1 text-sm text-white/60">
+              Tus apuestas de largo plazo del Mundial. Un tap y queda guardado.
+            </p>
+          </header>
+
+          {leagues.length === 0 ? (
+            <p className="rounded-lg border border-white/10 bg-[#1B263B] px-4 py-6 text-center text-sm text-white/70">
+              Únete a una liga para pronosticar los premios de la Copa.
+            </p>
+          ) : (
+            <AwardsForLeague
+              leagues={leagues}
+              requestedLeague={requestedLeague}
+              userId={user.id}
+            />
+          )}
+        </div>
+      </main>
+    </>
   );
 }
 

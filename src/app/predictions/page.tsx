@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/server";
 import { PredictionsBoardView } from "@/components/predictions/PredictionsBoardView";
 import { JoinByCodeForm } from "@/components/join/JoinByCodeForm";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
+import { TopNav } from "@/components/layout/TopNav";
 
 import { groupCandidatesByCategory } from "@/utils/awards";
 import type { AwardCandidate, SpecialPrediction } from "@/types";
@@ -216,27 +217,30 @@ export default function PredictionsPage({
   searchParams,
 }: PredictionsPageProps) {
   return (
-    <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pt-10 lg:pb-28">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
-        <header className="space-y-1">
-          <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent">
-            PIJA Quiniela
-          </p>
-          <h1 className="font-display text-2xl font-bold lg:text-4xl">
-            Pronósticos
-          </h1>
-        </header>
+    <>
+      <TopNav />
+      <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pt-8 lg:pb-10">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-6xl lg:gap-6">
+          <header className="space-y-1">
+            <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent lg:hidden">
+              PIJA Quiniela
+            </p>
+            <h1 className="font-display text-2xl font-bold lg:text-4xl">
+              Pronósticos
+            </h1>
+          </header>
 
-        <Suspense fallback={null}>
-          <JoinedBanner searchParams={searchParams} />
-        </Suspense>
+          <Suspense fallback={null}>
+            <JoinedBanner searchParams={searchParams} />
+          </Suspense>
 
-        <Suspense fallback={<BoardSkeleton />}>
-          <PredictionsBoard />
-        </Suspense>
-      </div>
+          <Suspense fallback={<BoardSkeleton />}>
+            <PredictionsBoard />
+          </Suspense>
+        </div>
 
-      <BottomNavbar />
-    </main>
+        <BottomNavbar />
+      </main>
+    </>
   );
 }

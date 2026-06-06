@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LiveStandingsBoard } from "@/components/live/LiveStandingsBoard";
 import type { LiveMatch } from "@/components/live/goalImpact";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
+import { TopNav } from "@/components/layout/TopNav";
 import { createClient } from "@/utils/supabase/server";
 import type { PaymentStatus } from "@/types";
 import type { StandingMember, StandingPrediction } from "@/utils/standings";
@@ -144,29 +145,32 @@ function BoardSkeleton() {
 
 export default function LivePage() {
   return (
-    <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-        <header className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent">
-              PIJA Quiniela
-            </p>
-            <h1 className="font-display text-2xl font-bold">Tabla en Vivo</h1>
-          </div>
-          <Link
-            href="/standings"
-            className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Volver
-          </Link>
-        </header>
+    <>
+      <TopNav />
+      <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pb-10">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
+          <header className="flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent lg:hidden">
+                PIJA Quiniela
+              </p>
+              <h1 className="font-display text-2xl font-bold lg:text-4xl">Tabla en Vivo</h1>
+            </div>
+            <Link
+              href="/standings"
+              className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Volver
+            </Link>
+          </header>
 
-        <Suspense fallback={<BoardSkeleton />}>
-          <LiveBoard />
-        </Suspense>
-      </div>
+          <Suspense fallback={<BoardSkeleton />}>
+            <LiveBoard />
+          </Suspense>
+        </div>
 
-      <BottomNavbar />
-    </main>
+        <BottomNavbar />
+      </main>
+    </>
   );
 }

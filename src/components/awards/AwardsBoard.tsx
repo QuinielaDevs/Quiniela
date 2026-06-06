@@ -177,23 +177,25 @@ export function AwardsBoard({
         </p>
       </div>
 
-      {AWARD_CATEGORIES.map(({ category, title, hint }) => (
-        <Card key={category} className="border-white/10 bg-[#1B263B]">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-white">{title}</CardTitle>
-            <CardDescription className="text-white/60">{hint}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CandidatePicker
-              candidates={candidatesByCategory[category]}
-              selectedId={selections[category]}
-              pendingId={isPending ? pendingId : null}
-              disabled={isPending || isLocked}
-              onSelect={(candidateId) => handleSelect(category, candidateId)}
-            />
-          </CardContent>
-        </Card>
-      ))}
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-3 lg:items-start lg:gap-5">
+        {AWARD_CATEGORIES.map(({ category, title, hint }) => (
+          <Card key={category} className="border-white/10 bg-[#1B263B]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg text-white">{title}</CardTitle>
+              <CardDescription className="text-white/60">{hint}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CandidatePicker
+                candidates={candidatesByCategory[category]}
+                selectedId={selections[category]}
+                pendingId={isPending ? pendingId : null}
+                disabled={isPending || isLocked}
+                onSelect={(candidateId) => handleSelect(category, candidateId)}
+              />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
