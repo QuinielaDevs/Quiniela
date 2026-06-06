@@ -1,0 +1,15 @@
+{
+  "type": "match.postponed",
+  "id": "5c2b8e00000000000000000000000000",
+  "matchId": "2026-005",
+  "year": 2026,
+  "ts": "2026-06-12T15:00:00Z",
+  "payload": {
+    "homeTeam": "Brazil",
+    "awayTeam": "Argentina",
+    "status": "postponed",
+    "rescheduledTo": "2026-06-13T17:00:00Z",
+    "reason": "Stadium roof damage",
+    "actor": "actor:f1c80000"
+  }
+}

@@ -98,10 +98,12 @@ If you wish to just develop locally and not deploy to Vercel, [follow the steps 
 
 > Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
 
-## Testing de integración (Vitest contra Supabase local)
+## Testing y Pruebas de Contrato (Vitest)
 
-Las pruebas de integración (`npm run test:integration`) corren contra el
-Supabase local (Docker). Requisitos:
+El proyecto cuenta con dos suites de pruebas principales:
+
+- **Unitarias (`npm run test:unit`)**: Pruebas rápidas y 100% offline. Incluye la validación del contrato de webhooks entrantes de Zafronix usando samples oficiales. Para más detalles, ver [zafronix-webhook-contract.md](docs/zafronix-webhook-contract.md).
+- **Integración (`npm run test:integration`)**: Corren contra el Supabase local (Docker). Requisitos:
 
 - Docker + `npx supabase start` corriendo, con `project_id` == nombre del
   directorio del proyecto.

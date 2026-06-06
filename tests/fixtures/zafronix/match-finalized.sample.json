@@ -1,0 +1,18 @@
+{
+  "type": "match.finalized",
+  "id": "8a3f1c50000000000000000000000000",
+  "matchId": "2026-001",
+  "year": 2026,
+  "ts": "2026-06-11T19:30:00Z",
+  "payload": {
+    "homeTeam": "Mexico",
+    "awayTeam": "USA",
+    "homeScore": 2,
+    "awayScore": 1,
+    "result": "2-1",
+    "extraTime": false,
+    "penalties": null,
+    "stage": "group_a",
+    "actor": "actor:f1c80000"
+  }
+}
