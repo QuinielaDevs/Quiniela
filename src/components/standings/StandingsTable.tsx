@@ -17,7 +17,6 @@ type StandingsTableProps = {
   members: StandingMember[];
   matches: StandingMatch[];
   predictions: StandingPrediction[];
-  matchdays: number[];
 };
 
 type Tab = { key: string; label: string };
@@ -26,7 +25,6 @@ export function StandingsTable({
   members,
   matches,
   predictions,
-  matchdays,
 }: StandingsTableProps) {
   const [activeKey, setActiveKey] = useState("general");
 

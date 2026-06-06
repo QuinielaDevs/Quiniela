@@ -8,7 +8,6 @@ import { StandingsTable } from "@/components/standings/StandingsTable";
 import { PaymentBanner } from "@/components/standings/PaymentBanner";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import {
-  finishedMatchdays,
   type StandingMatch,
   type StandingMember,
   type StandingPrediction,
@@ -110,8 +109,6 @@ export async function StandingsBoard() {
     joinedAt: m.joined_at,
   }));
 
-  const matchdays = finishedMatchdays(finishedMatches);
-
   const currentMember = rows.find((m) => m.user_id === userId);
   const showPaymentBanner =
     !!league?.requires_payment && currentMember?.payment_status === "pending";
@@ -154,7 +151,6 @@ export async function StandingsBoard() {
         members={members}
         matches={finishedMatches}
         predictions={predictions}
-        matchdays={matchdays}
       />
     </>
   );

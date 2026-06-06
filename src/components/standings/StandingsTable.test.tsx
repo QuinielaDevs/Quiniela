@@ -55,7 +55,6 @@ function renderTable() {
       members={MEMBERS}
       matches={MATCHES}
       predictions={PREDICTIONS}
-      matchdays={[1, 2]}
     />,
   );
 }
@@ -97,7 +96,7 @@ describe("StandingsTable", () => {
 
   it("muestra empty state si la liga no tiene miembros", () => {
     render(
-      <StandingsTable members={[]} matches={[]} predictions={[]} matchdays={[]} />,
+      <StandingsTable members={[]} matches={[]} predictions={[]} />,
     );
     expect(screen.getByText("Aún no hay participantes")).toBeInTheDocument();
   });
