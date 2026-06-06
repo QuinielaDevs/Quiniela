@@ -1,0 +1,36 @@
+# Story 8.2: Sincronización Periódica de Respaldo con ETags (Cron Job)
+# Ejecuta cada 30 minutos un script de sincronización condicional que usa
+# cabeceras If-None-Match / ETags para evitar consumir la cuota gratuita
+# de la API de Zafronix (250 requests/día) cuando no hay cambios.
+
+name: Sync Matches (Backup Cron)
+
+on:
+  schedule:
+    # Cada 30 minutos durante el periodo de partidos
+    - cron: "*/30 * * * *"
+  workflow_dispatch: # Permitir ejecución manual desde la UI de GitHub
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run sync-matches script
+        run: npx tsx scripts/sync-matches.ts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          WC_API_KEY: ${{ secrets.WC_API_KEY }}
