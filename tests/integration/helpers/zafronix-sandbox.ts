@@ -135,6 +135,9 @@ async function fetchZafronix(
         },
       });
       clearTimeout(timeoutId);
+      if (res.status >= 500) {
+        throw new Error(`Error de servidor Zafronix (HTTP ${res.status})`);
+      }
       return res;
     } catch (err) {
       clearTimeout(timeoutId);
@@ -145,7 +148,7 @@ async function fetchZafronix(
     }
   }
   throw new Error(
-    `Fallo de red contra Zafronix sandbox (${path}) tras ${retries + 1} intento(s): ` +
+    `Fallo contra Zafronix sandbox (${path}) tras ${retries + 1} intento(s): ` +
       `${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
   );
 }
@@ -201,6 +204,9 @@ export async function resetSandbox(): Promise<void> {
 export async function getSandboxStatus(): Promise<SandboxStatus> {
   const res = await fetchZafronix("/sandbox/status", { method: "GET" });
   const json = await parseJsonOrThrow(res, "GET /sandbox/status");
+  if (json === null) {
+    throw new Error("GET /sandbox/status devolvió una respuesta vacía inesperadamente.");
+  }
   return sandboxStatusSchema.parse(json);
 }
 
@@ -212,6 +218,9 @@ export async function getSandboxStatus(): Promise<SandboxStatus> {
 export async function listSandboxMatches(): Promise<SandboxMatch[]> {
   const res = await fetchZafronix(`/matches?year=${SANDBOX_YEAR}`, { method: "GET" });
   const json = await parseJsonOrThrow(res, "GET /matches?year=9999");
+  if (json === null) {
+    throw new Error("GET /matches?year=9999 devolvió una respuesta vacía inesperadamente.");
+  }
   return sandboxMatchesResponseSchema.parse(json).data;
 }
 

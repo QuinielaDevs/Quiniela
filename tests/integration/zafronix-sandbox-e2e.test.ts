@@ -163,7 +163,7 @@ describe.skipIf(!SANDBOX_ENABLED)(
         .select("id, external_ref, home_score, away_score, status");
       if (error) throw error;
       const rows = (data ?? [])
-        .filter((m) => m.external_ref !== excludeRef)
+        .filter((m) => m.external_ref !== excludeRef && (!m.external_ref || !m.external_ref.startsWith("9999-")))
         .map((m) => ({
           id: m.id,
           home_score: m.home_score,
@@ -175,14 +175,26 @@ describe.skipIf(!SANDBOX_ENABLED)(
     }
 
     async function deleteLocalFixture(ref: string): Promise<void> {
-      const { data: existing } = await admin
+      if (!ref.startsWith("9999-")) {
+        throw new Error(`deleteLocalFixture abortado: ref '${ref}' no pertenece al namespace 9999`);
+      }
+      const { data: existing, error: selectError } = await admin
         .from("matches")
         .select("id")
         .eq("external_ref", ref);
+      if (selectError) throw selectError;
       if (existing && existing.length > 0) {
         const ids = existing.map((m) => m.id);
-        await admin.from("predictions").delete().in("match_id", ids);
-        await admin.from("matches").delete().in("id", ids);
+        const { error: deletePredictionsError } = await admin
+          .from("predictions")
+          .delete()
+          .in("match_id", ids);
+        if (deletePredictionsError) throw deletePredictionsError;
+        const { error: deleteMatchesError } = await admin
+          .from("matches")
+          .delete()
+          .in("id", ids);
+        if (deleteMatchesError) throw deleteMatchesError;
       }
     }
 
@@ -311,8 +323,8 @@ describe.skipIf(!SANDBOX_ENABLED)(
               // external_ref del nuevo registro.
               { event: "UPDATE", schema: "public", table: "matches" },
               (payload) => {
-                const row = payload.new as Record<string, unknown>;
-                if (row.external_ref === externalRef) onRealtimeEvent(row);
+                const row = payload.new as Record<string, unknown> | null;
+                if (row && row.external_ref === externalRef) onRealtimeEvent(row);
               },
             )
             .subscribe((status) => {
@@ -344,6 +356,10 @@ describe.skipIf(!SANDBOX_ENABLED)(
           awayScore: AWAY_SCORE,
         });
         const bridgeRes = await bridgeWebhook(event);
+        if (bridgeRes.status !== 200) {
+          const errText = await bridgeRes.text();
+          console.error(`bridgeWebhook falló con estado ${bridgeRes.status}:`, errText);
+        }
         expect(bridgeRes.status).toBe(200);
 
         // ── (AC #3c) public.matches actualizada ──
@@ -364,9 +380,25 @@ describe.skipIf(!SANDBOX_ENABLED)(
         expect(payload.away_score).toBe(AWAY_SCORE);
         expect(payload.status).toBe("finished");
       } finally {
-        if (channel && realtimeClient) await realtimeClient.removeChannel(channel);
-        if (realtimeClient) await realtimeClient.realtime.disconnect();
-        await admin.auth.admin.deleteUser(testUserId).catch(() => {});
+        if (channel && realtimeClient) {
+          try {
+            await realtimeClient.removeChannel(channel);
+          } catch (err) {
+            console.error("Error al remover canal Realtime en finally:", err);
+          }
+        }
+        if (realtimeClient) {
+          try {
+            await realtimeClient.realtime.disconnect();
+          } catch (err) {
+            console.error("Error al desconectar cliente Realtime en finally:", err);
+          }
+        }
+        try {
+          await admin.auth.admin.deleteUser(testUserId);
+        } catch (err) {
+          console.error("Error al eliminar usuario de test en finally:", err);
+        }
       }
     });
 

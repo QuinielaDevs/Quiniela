@@ -66,13 +66,6 @@ jobs:
             echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
-            # Secreto de firma HMAC para los tests del webhook de Zafronix.
-            # NO es un secreto real: el CI nunca recibe webhooks reales de
-            # Zafronix; los tests RE-FIRMAN localmente con este mismo valor
-            # (ver tests/integration/helpers/hmac.ts → TEST_WEBHOOK_SECRET).
-            # El handler responde 500 si la variable falta, por eso se exporta
-            # aquí para que el webhook handler y la firma del test coincidan.
-            echo "ZAFRONIX_WEBHOOK_SECRET=whsec_test_secret_for_integration_tests_only"
           } >> "$GITHUB_ENV"
           # NOTA: ZAFRONIX_SANDBOX_KEY (zwc_skt_…) NO se inyecta en CI a
           # propósito. Sin ella, la suite del ciclo live contra el sandbox real

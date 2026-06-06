@@ -11,11 +11,11 @@
  *   - Procesamiento de match.postponed (AC #5)
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { createHmac } from "node:crypto";
 import { createServiceRoleClient } from "./setup";
 import {
   TEST_WEBHOOK_SECRET as WEBHOOK_SECRET,
   signWebhookHeaders as signPayload,
+  signWebhookBody,
 } from "./helpers/hmac";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
@@ -70,7 +70,7 @@ beforeAll(async () => {
   supabase = createServiceRoleClient();
 
   // Limpiar predicciones y luego partidos de pruebas anteriores (evita violación de FK)
-  const { data: existingMatches } = await supabase
+  const { data: existingMatches, error: selectError } = await supabase
     .from("matches")
     .select("id")
     .in("external_ref", [
@@ -78,11 +78,17 @@ beforeAll(async () => {
       KNOCKOUT_EXTERNAL_REF,
       POSTPONE_EXTERNAL_REF,
     ]);
+  if (selectError) throw selectError;
+
   if (existingMatches && existingMatches.length > 0) {
     const ids = existingMatches.map((m) => m.id);
-    await supabase.from("predictions").delete().in("match_id", ids);
+    const { error: deletePredictionsError } = await supabase
+      .from("predictions")
+      .delete()
+      .in("match_id", ids);
+    if (deletePredictionsError) throw deletePredictionsError;
   }
-  await supabase
+  const { error: deleteMatchesError } = await supabase
     .from("matches")
     .delete()
     .in("external_ref", [
@@ -90,6 +96,7 @@ beforeAll(async () => {
       KNOCKOUT_EXTERNAL_REF,
       POSTPONE_EXTERNAL_REF,
     ]);
+  if (deleteMatchesError) throw deleteMatchesError;
 
   // Crear partidos de prueba
   const { data: groupMatch, error: e1 } = await supabase
@@ -146,11 +153,15 @@ beforeAll(async () => {
 afterAll(async () => {
   // Limpiar predicciones y partidos de prueba
   if (supabase) {
-    await supabase
-      .from("predictions")
-      .delete()
-      .in("match_id", [groupMatchId, knockoutMatchId, postponeMatchId].filter(Boolean));
-    await supabase
+    const ids = [groupMatchId, knockoutMatchId, postponeMatchId].filter(Boolean);
+    if (ids.length > 0) {
+      const { error: deletePredictionsError } = await supabase
+        .from("predictions")
+        .delete()
+        .in("match_id", ids);
+      if (deletePredictionsError) throw deletePredictionsError;
+    }
+    const { error: deleteMatchesError } = await supabase
       .from("matches")
       .delete()
       .in("external_ref", [
@@ -158,6 +169,7 @@ afterAll(async () => {
         KNOCKOUT_EXTERNAL_REF,
         POSTPONE_EXTERNAL_REF,
       ]);
+    if (deleteMatchesError) throw deleteMatchesError;
   }
 });
 
@@ -185,11 +197,7 @@ describe("POST /api/webhooks/zafronix", () => {
 
     it("rechaza solicitudes sin cabecera X-Zafronix-Timestamp", async () => {
       const body = JSON.stringify({ type: "match.finalized", matchId: "test" });
-      const sig =
-        "sha256=" +
-        createHmac("sha256", WEBHOOK_SECRET)
-          .update(`${Date.now()}.${body}`)
-          .digest("hex");
+      const sig = signWebhookBody(body, WEBHOOK_SECRET);
       const res = await POST(new NextRequest(WEBHOOK_URL, {
         method: "POST",
         headers: new Headers({
@@ -305,10 +313,11 @@ describe("POST /api/webhooks/zafronix", () => {
   describe("match.finalized — Actualización de marcadores (AC #3)", () => {
     beforeEach(async () => {
       // Resetear el partido de grupo a estado live
-      await supabase
+      const { error } = await supabase
         .from("matches")
         .update({ status: "live", home_score: null, away_score: null })
         .eq("id", groupMatchId);
+      if (error) throw error;
     });
 
     it("actualiza home_score, away_score y status a finished", async () => {
@@ -373,7 +382,7 @@ describe("POST /api/webhooks/zafronix", () => {
   describe("match.finalized/patched — Knockout team resolution (AC #4)", () => {
     beforeEach(async () => {
       // Resetear el partido eliminatorio
-      await supabase
+      const { error } = await supabase
         .from("matches")
         .update({
           status: "live",
@@ -383,6 +392,7 @@ describe("POST /api/webhooks/zafronix", () => {
           away_team: "TBD",
         })
         .eq("id", knockoutMatchId);
+      if (error) throw error;
     });
 
     it("actualiza home_team y away_team en partido eliminatorio con bracket_slot", async () => {
@@ -423,7 +433,7 @@ describe("POST /api/webhooks/zafronix", () => {
 
     it("match.patched actualiza marcador corregido en knockout", async () => {
       // Primero finalizar el partido
-      await supabase
+      const { error } = await supabase
         .from("matches")
         .update({
           status: "finished",
@@ -433,6 +443,7 @@ describe("POST /api/webhooks/zafronix", () => {
           away_team: "Japan",
         })
         .eq("id", knockoutMatchId);
+      if (error) throw error;
 
       const payload = {
         type: "match.patched",
@@ -512,25 +523,28 @@ describe("POST /api/webhooks/zafronix", () => {
       testLeagueId = league!.id;
 
       // Hacer miembro al usuario
-      await supabase.from("league_members").insert({
+      const { error: memberErr } = await supabase.from("league_members").insert({
         league_id: testLeagueId,
         user_id: testUserId,
         role: "admin",
       });
+      if (memberErr) throw memberErr;
     });
 
     beforeEach(async () => {
       // Resetear el partido de postpone
-      await supabase
+      const { error: updateError } = await supabase
         .from("matches")
         .update({ status: "scheduled", home_score: null, away_score: null })
         .eq("id", postponeMatchId);
+      if (updateError) throw updateError;
 
       // Limpiar predicciones existentes
-      await supabase
+      const { error: deleteError } = await supabase
         .from("predictions")
         .delete()
         .eq("match_id", postponeMatchId);
+      if (deleteError) throw deleteError;
 
       // Crear una predicción de prueba
       const { data: pred, error: predErr } = await supabase
@@ -552,12 +566,16 @@ describe("POST /api/webhooks/zafronix", () => {
     afterAll(async () => {
       // Limpiar fixtures de prueba
       if (supabase && testLeagueId) {
-        await supabase.from("predictions").delete().eq("league_id", testLeagueId);
-        await supabase.from("league_members").delete().eq("league_id", testLeagueId);
-        await supabase.from("leagues").delete().eq("id", testLeagueId);
+        const { error: deletePredictionsError } = await supabase.from("predictions").delete().eq("league_id", testLeagueId);
+        if (deletePredictionsError) throw deletePredictionsError;
+        const { error: deleteMembersError } = await supabase.from("league_members").delete().eq("league_id", testLeagueId);
+        if (deleteMembersError) throw deleteMembersError;
+        const { error: deleteLeaguesError } = await supabase.from("leagues").delete().eq("id", testLeagueId);
+        if (deleteLeaguesError) throw deleteLeaguesError;
       }
       if (supabase && testUserId) {
-        await supabase.auth.admin.deleteUser(testUserId);
+        const { error: deleteUserError } = await supabase.auth.admin.deleteUser(testUserId);
+        if (deleteUserError) throw deleteUserError;
       }
     });
 

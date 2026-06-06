@@ -4,7 +4,7 @@ baseline_commit: cc9ace72af793b08359b2dfb9c5f253627f305d6
 
 # Story 8.4: Entorno de Pruebas Integradas con el Sandbox de Zafronix (Año 9999)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -77,6 +77,21 @@ Los docs **no confirman entrega de webhooks a `localhost`** y la registración d
   - [x] `npm run typecheck` sin errores; `npx eslint` limpio en archivos nuevos (exit 0).
   - [x] `npm run test:integration` **sin** la clave: 182 passed, 2 skipped (casos live omitidos, resto verde). **Con** la clave (`ZAFRONIX_SANDBOX_KEY` provista por el usuario): **184 passed, 0 skipped** — ciclo live verificado end-to-end contra el sandbox real.
   - [x] `npm run test:unit`: 267 passed. (`test:ci` = unit+integration+e2e; e2e Playwright sin cambios respecto a `main`.)
+
+### Review Findings
+
+- [ ] [Review][Patch] Secreto hardcodeado en el workflow de GitHub Actions [.github/workflows/ci.yml:74]
+- [ ] [Review][Patch] Falta de inicialización de ZAFRONIX_WEBHOOK_SECRET en tests locales [tests/integration/helpers/hmac.ts:34]
+- [ ] [Review][Patch] Instrucciones de README incompatibles con variables de Supabase [README.md:43]
+- [ ] [Review][Patch] Falta de guardrail de namespace en el borrado de fixtures locales [tests/integration/zafronix-sandbox-e2e.test.ts:852]
+- [ ] [Review][Patch] Aserción de aislamiento frágil ante ejecución concurrente [tests/integration/zafronix-sandbox-e2e.test.ts:835]
+- [ ] [Review][Patch] Reintentos de peticiones HTTP omitidos en errores transitorios [tests/integration/helpers/zafronix-sandbox.ts:470]
+- [ ] [Review][Patch] Crash de validación Zod ante respuestas HTTP vacías (204) [tests/integration/helpers/zafronix-sandbox.ts:515]
+- [ ] [Review][Patch] Riesgo de fuga de recursos por fallo interrumpido en cleanup [tests/integration/zafronix-sandbox-e2e.test.ts:1041]
+- [ ] [Review][Patch] Duplicidad en la lógica de firmas HMAC [tests/integration/zafronix-webhook.test.ts:190]
+- [ ] [Review][Patch] Omisión del manejo de errores en consultas SQL de fixtures [tests/integration/zafronix-sandbox-e2e.test.ts:852]
+- [ ] [Review][Patch] Diagnóstico limitado de errores al fallar el webhook puente [tests/integration/zafronix-sandbox-e2e.test.ts:1022]
+- [ ] [Review][Patch] Falta de validación de nulidad sobre payload.new en Realtime [tests/integration/zafronix-sandbox-e2e.test.ts:988]
 
 ## Dev Notes
 

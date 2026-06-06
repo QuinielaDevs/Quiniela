@@ -7,3 +7,19 @@ import { config } from "dotenv";
 
 config({ path: ".env.test.local" });
 config({ path: ".env.test" });
+
+// Map local Supabase CLI env keys to Vitest expected keys
+if (process.env.api_external_url && !process.env.SUPABASE_URL) {
+  process.env.SUPABASE_URL = process.env.api_external_url;
+}
+if (process.env.anon_key && !process.env.SUPABASE_ANON_KEY) {
+  process.env.SUPABASE_ANON_KEY = process.env.anon_key;
+}
+if (process.env.service_role_key && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.service_role_key;
+}
+
+// Auto-configure webhook secret fallback for integration tests
+process.env.ZAFRONIX_WEBHOOK_SECRET =
+  process.env.ZAFRONIX_WEBHOOK_SECRET ??
+  "whsec_test_secret_for_integration_tests_only";
