@@ -103,3 +103,7 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 - `[ABIERTO]` **El recálculo de puntos ante correcciones de marcadores (match.patched)** — Cuando se recibe una corrección de marcador, el disparador `fn_resolve_challenges_on_match_status_change` no recalcula las predicciones que ya tienen `evaluated_at IS NOT NULL`. Se difiere por implicar cambios complejos de lógica e idempotencia en triggers preexistentes de base de datos.
 - `[ABIERTO]` **Vulnerabilidad ante entrega de eventos de webhook fuera de orden** — Si llega un evento antiguo retrasado después de uno nuevo, podría sobrescribir la base de datos con información obsoleta. Se difiere por requerir el almacenamiento de marcas de tiempo del proveedor en la tabla `matches` para control de concurrencia.
 
+## Deferred from: code review of 8-3-script-administrativo-de-sincronizacion-y-restauracion-completa.md (2026-06-06)
+- `[ABIERTO]` **Unnormalized Stage Value Insertions** — The script inserts `apiMatch.stage` directly into `public.matches.stage` without mapping or normalizing. This could trigger check or enum constraints in the database if the API values differ from local conventions.
+
+

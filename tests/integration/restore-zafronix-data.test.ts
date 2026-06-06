@@ -432,6 +432,183 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
         .eq("description", "match_accrual_correction");
       expect(txs).toHaveLength(1); // sigue habiendo sólo una corrección
     });
+
+    it("revierte un partido finalizado a scheduled, reseteando evaluated_at a NULL y devolviendo los puntos", async () => {
+      const apiMatches = [
+        {
+          id: UPDATE_REF,
+          homeTeam: "España",
+          awayTeam: "Portugal",
+          homeScore: null,
+          awayScore: null,
+          status: "scheduled",
+        },
+      ];
+
+      const result = await restoreZafronixData(
+        admin,
+        TEST_API_KEY,
+        createMock200(apiMatches),
+      );
+
+      expect(result.updated).toBe(1);
+      expect(result.corrections).toBe(1);
+
+      // 1. El partido es scheduled y con marcador null
+      const { data: match } = await admin
+        .from("matches")
+        .select("home_score, away_score, status")
+        .eq("id", updateMatchId)
+        .single();
+      expect(match!.home_score).toBeNull();
+      expect(match!.status).toBe("scheduled");
+
+      // 2. La predicción se reseteó a NULL en points_earned y evaluated_at
+      const { data: pred } = await admin
+        .from("predictions")
+        .select("points_earned, evaluated_at")
+        .eq("id", predictionId)
+        .single();
+      expect(pred!.points_earned).toBeNull();
+      expect(pred!.evaluated_at).toBeNull();
+
+      // 3. El saldo bajó de nuevo a 0.00 (reversión total)
+      const { data: member } = await admin
+        .from("league_members")
+        .select("wager_balance")
+        .eq("league_id", leagueId)
+        .eq("user_id", userA.id)
+        .single();
+      expect(Number(member!.wager_balance)).toBe(0.0);
+    });
+
+    it("reconvierte y recalcula desafíos completados si cambia el marcador", async () => {
+      // 1. Crear un partido de prueba para el desafío
+      const CHALLENGE_MATCH_REF = "test-restore-chal-match";
+      const { data: match } = await admin
+        .from("matches")
+        .insert({
+          external_ref: CHALLENGE_MATCH_REF,
+          home_team: "Argentina",
+          away_team: "Brasil",
+          match_time: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          status: "finished",
+          home_score: 1,
+          away_score: 0,
+          matchday: 1,
+          stage: "group",
+        })
+        .select("id")
+        .single();
+      const chalMatchId = match!.id;
+
+      // 2. Crear segundo usuario
+      const userB = await createUser();
+      await admin
+        .from("league_members")
+        .insert({ league_id: leagueId, user_id: userB.id, role: "member", wager_balance: 100.0 });
+      await admin
+        .from("league_members")
+        .update({ wager_balance: 100.0 })
+        .eq("league_id", leagueId)
+        .eq("user_id", userA.id);
+
+      // 3. Crear desafío completado: apuesta 20 puntos.
+      // Creador: userA (pronóstico 1-0). Rival: userB (pronóstico 2-0).
+      // Marcador inicial: 1-0. Ganador: userA.
+      const { data: challenge } = await admin
+        .from("challenges")
+        .insert({
+          league_id: leagueId,
+          match_id: chalMatchId,
+          creator_id: userA.id,
+          challenged_id: userB.id,
+          points_bet: 20,
+          type: "direct",
+          status: "completed",
+          winner_ids: [userA.id],
+        })
+        .select("id")
+        .single();
+      const challengeId = challenge!.id;
+
+      await admin
+        .from("challenge_participants")
+        .insert([
+          { challenge_id: challengeId, user_id: userA.id, prediction_home: 1, prediction_away: 0 },
+          { challenge_id: challengeId, user_id: userB.id, prediction_home: 2, prediction_away: 0 }
+        ]);
+
+      // Registrar transacciones de escrow inicial y del payout
+      await admin.from("point_transactions").insert([
+        { user_id: userA.id, league_id: leagueId, amount: -20.0, description: "escrow_hold", reference_id: challengeId },
+        { user_id: userB.id, league_id: leagueId, amount: -20.0, description: "escrow_hold", reference_id: challengeId },
+        // Payout: userA gana todo el pozo (40.0)
+        { user_id: userA.id, league_id: leagueId, amount: 40.0, description: "challenge_payout", reference_id: challengeId }
+      ]);
+
+      // Saldos iniciales ajustados:
+      // userA: 100 (original) - 20 (apuesta) + 40 (payout) = 120.0
+      // userB: 100 (original) - 20 (apuesta) = 80.0
+      await admin.from("league_members").update({ wager_balance: 120.0 }).eq("league_id", leagueId).eq("user_id", userA.id);
+      await admin.from("league_members").update({ wager_balance: 80.0 }).eq("league_id", leagueId).eq("user_id", userB.id);
+
+      // 4. Ejecutar restauración con marcador cambiado: 2-0.
+      // Con marcador 2-0, el ganador del desafío debe ser userB.
+      const apiMatches = [
+        {
+          id: CHALLENGE_MATCH_REF,
+          homeTeam: "Argentina",
+          awayTeam: "Brasil",
+          homeScore: 2,
+          awayScore: 0,
+          status: "finished",
+        },
+      ];
+
+      const result = await restoreZafronixData(
+        admin,
+        TEST_API_KEY,
+        createMock200(apiMatches),
+      );
+
+      // El partido se actualiza
+      expect(result.updated).toBe(1);
+
+      // Verificar que el desafío ahora muestra como ganador a userB
+      const { data: updatedChallenge } = await admin
+        .from("challenges")
+        .select("status, winner_ids")
+        .eq("id", challengeId)
+        .single();
+      expect(updatedChallenge!.status).toBe("completed");
+      expect(updatedChallenge!.winner_ids).toEqual([userB.id]);
+
+      // Verificar transacciones:
+      // userA debe tener una reversión de -40.0. Saldo final de userA: 120 - 40 = 80.0.
+      // userB debe tener un pago de challenge_payout de 40.0. Saldo final de userB: 80 + 40 = 120.0.
+      const { data: memberA } = await admin
+        .from("league_members")
+        .select("wager_balance")
+        .eq("league_id", leagueId)
+        .eq("user_id", userA.id)
+        .single();
+      expect(Number(memberA!.wager_balance)).toBe(80.0);
+
+      const { data: memberB } = await admin
+        .from("league_members")
+        .select("wager_balance")
+        .eq("league_id", leagueId)
+        .eq("user_id", userB.id)
+        .single();
+      expect(Number(memberB!.wager_balance)).toBe(120.0);
+
+      // Limpieza específica del partido y desafío
+      await admin.from("point_transactions").delete().eq("reference_id", challengeId);
+      await admin.from("challenge_participants").delete().eq("challenge_id", challengeId);
+      await admin.from("challenges").delete().eq("id", challengeId);
+      await admin.from("matches").delete().eq("id", chalMatchId);
+    });
   });
 
   // ── Manejo de errores ──────────────────────────────────────────────

@@ -106,6 +106,7 @@ interface LocalMatch {
   away_score: number | null;
   status: string;
   bracket_slot: number | null;
+  match_time: string | null;
 }
 
 // ── Helpers de Normalización y Mapeo ─────────────────────────────────
@@ -169,6 +170,23 @@ async function fetchWithRetry(
     }
   }
   throw new Error("Petición de red no alcanzada");
+}
+
+/**
+ * Ejecuta una tarea asíncrona sobre una lista de elementos agrupados en lotes (concurrencia controlada).
+ */
+async function runInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const chunk = items.slice(i, i + batchSize);
+    const chunkResults = await Promise.all(chunk.map(fn));
+    results.push(...chunkResults);
+  }
+  return results;
 }
 
 /**
@@ -272,30 +290,37 @@ async function correctEvaluatedPredictions(
 
   const results = await Promise.all(
     preds.map(async (p) => {
-      // Motor de puntuación ÚNICO (src/utils/scoring.ts): puntos base * multiplicador.
-      const base = calculateBasePoints(
-        { home: p.home_score_pred, away: p.away_score_pred },
-        actual,
-        mappedStatus,
-      );
-      const newPoints = calculatePredictionPoints(base, Number(p.multiplier));
-
-      const { data: delta, error: rpcError } = await supabase.rpc(
-        "fn_apply_accrual_correction",
-        {
-          p_prediction_id: p.id,
-          p_new_points: newPoints,
-          p_match_id: local.id,
-        },
-      );
-
-      if (rpcError) {
-        console.error(
-          `Error al corregir predicción ${p.id}: ${rpcError.message}`,
+      try {
+        // Motor de puntuación ÚNICO (src/utils/scoring.ts): puntos base * multiplicador.
+        const base = calculateBasePoints(
+          { home: p.home_score_pred, away: p.away_score_pred },
+          actual,
+          mappedStatus,
         );
+        const newPoints = calculatePredictionPoints(base, Number(p.multiplier));
+
+        const { data: delta, error: rpcError } = await supabase.rpc(
+          "fn_apply_accrual_correction",
+          {
+            p_prediction_id: p.id,
+            p_new_points: newPoints,
+            p_match_id: local.id,
+            p_match_status: mappedStatus,
+          },
+        );
+
+        if (rpcError) {
+          console.error(
+            `Error al corregir predicción ${p.id}: ${rpcError.message}`,
+          );
+          return { corrected: false, errored: true };
+        }
+        return { corrected: Number(delta) !== 0, errored: false };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`Excepción al corregir predicción ${p.id}: ${msg}`);
         return { corrected: false, errored: true };
       }
-      return { corrected: Number(delta) !== 0, errored: false };
     }),
   );
 
@@ -350,13 +375,22 @@ export async function restoreZafronixData(
       `Error de validación del body de la API: ${JSON.stringify(parseResult.error.issues)}`,
     );
   }
-  const apiMatches = parseResult.data.data;
+  // Deduplicar partidos de la API por ID para evitar conflictos/inserciones duplicadas concurrentes
+  const seenIds = new Set<string>();
+  const apiMatches = parseResult.data.data.filter((match) => {
+    if (seenIds.has(match.id)) {
+      console.warn(`⚠️ Registro de partido duplicado en la respuesta de la API de Zafronix: ${match.id}. Se omitirá el duplicado.`);
+      return false;
+    }
+    seenIds.add(match.id);
+    return true;
+  });
 
   // 3. Consultar todos los partidos locales actuales (AC #4).
   const { data: localMatches, error: fetchError } = await supabase
     .from("matches")
     .select(
-      "id, external_ref, home_team, away_team, home_score, away_score, status, bracket_slot",
+      "id, external_ref, home_team, away_team, home_score, away_score, status, bracket_slot, match_time",
     );
 
   if (fetchError) {
@@ -413,6 +447,7 @@ export async function restoreZafronixData(
       local.home_score !== apiMatch.homeScore ||
       local.away_score !== apiMatch.awayScore;
     const statusChanged = local.status !== mappedStatus;
+    const timeChanged = apiMatch.matchTime ? (local.match_time !== apiMatch.matchTime) : false;
 
     const canUpdateTeams =
       local.bracket_slot !== null &&
@@ -423,7 +458,7 @@ export async function restoreZafronixData(
       (local.home_team !== apiMatch.homeTeam ||
         local.away_team !== apiMatch.awayTeam);
 
-    if (scoreChanged || statusChanged || teamsChanged) {
+    if (scoreChanged || statusChanged || teamsChanged || timeChanged) {
       updateTasks.push({ local, apiMatch });
     }
   }
@@ -435,10 +470,10 @@ export async function restoreZafronixData(
     errors: skippedInserts,
   };
 
-  // 6. Insertar partidos ausentes en paralelo (evita N+1 secuencial bloqueante).
+  // 6. Insertar partidos ausentes en lotes (concurrencia controlada para evitar saturación de la DB).
   if (insertRows.length > 0) {
-    const insertResults = await Promise.all(
-      insertRows.map((row) => supabase.from("matches").insert(row)),
+    const insertResults = await runInBatches(insertRows, 5, async (row) =>
+      await supabase.from("matches").insert(row),
     );
     for (const r of insertResults) {
       if (r.error) {
@@ -450,64 +485,75 @@ export async function restoreZafronixData(
     }
   }
 
-  // 7. Procesar actualizaciones en paralelo. Por cada partido cambiado:
+  // 7. Procesar actualizaciones en lotes (concurrencia controlada). Por cada partido cambiado:
   //    (a) corregir predicciones ya evaluadas (RPC atómica), luego
-  //    (b) actualizar el partido (dispara el trigger para las NO evaluadas).
-  const updateResults = await Promise.all(
-    updateTasks.map(async ({ local, apiMatch }) => {
-      const mappedStatus = mapApiStatus(apiMatch.status);
-      const scoreChanged =
-        local.home_score !== apiMatch.homeScore ||
-        local.away_score !== apiMatch.awayScore;
-      const statusChanged = local.status !== mappedStatus;
+  //    (b) actualizar el partido (dispara el trigger para las NO evaluadas y desafíos completados).
+  const updateResults = await runInBatches(updateTasks, 5, async ({ local, apiMatch }) => {
+    const mappedStatus = mapApiStatus(apiMatch.status);
+    const scoreChanged =
+      local.home_score !== apiMatch.homeScore ||
+      local.away_score !== apiMatch.awayScore;
+    const statusChanged = local.status !== mappedStatus;
 
-      let corrections = 0;
-      let errors = 0;
+    let corrections = 0;
+    let errors = 0;
 
-      // (a) Solo recalculamos cuando el cambio afecta a la puntuación.
-      if (scoreChanged || statusChanged) {
-        const res = await correctEvaluatedPredictions(
-          supabase,
-          local,
-          apiMatch,
-          mappedStatus,
-        );
-        corrections += res.corrections;
-        errors += res.errors;
-      }
+    // (a) Solo recalculamos cuando el cambio afecta a la puntuación.
+    if (scoreChanged || statusChanged) {
+      const res = await correctEvaluatedPredictions(
+        supabase,
+        local,
+        apiMatch,
+        mappedStatus,
+      );
+      corrections += res.corrections;
+      errors += res.errors;
 
-      // (b) Actualizar el partido con los nuevos datos.
-      const canUpdateTeams =
-        local.bracket_slot !== null &&
-        !isPlaceholderTeam(apiMatch.homeTeam) &&
-        !isPlaceholderTeam(apiMatch.awayTeam);
-
-      const updateData: Record<string, unknown> = {
-        home_score: apiMatch.homeScore,
-        away_score: apiMatch.awayScore,
-        status: mappedStatus,
-        updated_at: new Date().toISOString(),
-      };
-      if (canUpdateTeams) {
-        updateData.home_team = apiMatch.homeTeam;
-        updateData.away_team = apiMatch.awayTeam;
-      }
-
-      const { error: updateError } = await supabase
-        .from("matches")
-        .update(updateData)
-        .eq("id", local.id);
-
-      if (updateError) {
+      // Si hubo errores al corregir las predicciones, NO actualizamos el partido
+      // para mantener consistencia y evitar un estado de datos parcial.
+      if (errors > 0) {
         console.error(
-          `Error al actualizar partido ${local.id}: ${updateError.message}`,
+          `Se cancela actualización del partido ${local.id} debido a errores en la corrección de predicciones.`,
         );
-        errors++;
         return { updated: false, corrections, errors };
       }
-      return { updated: true, corrections, errors };
-    }),
-  );
+    }
+
+    // (b) Actualizar el partido con los nuevos datos.
+    const canUpdateTeams =
+      local.bracket_slot !== null &&
+      !isPlaceholderTeam(apiMatch.homeTeam) &&
+      !isPlaceholderTeam(apiMatch.awayTeam);
+
+    const updateData: Record<string, unknown> = {
+      external_ref: apiMatch.id, // Sostener / rellenar la referencia externa
+      home_score: apiMatch.homeScore,
+      away_score: apiMatch.awayScore,
+      status: mappedStatus,
+      updated_at: new Date().toISOString(),
+    };
+    if (apiMatch.matchTime) {
+      updateData.match_time = apiMatch.matchTime;
+    }
+    if (canUpdateTeams) {
+      updateData.home_team = apiMatch.homeTeam;
+      updateData.away_team = apiMatch.awayTeam;
+    }
+
+    const { error: updateError } = await supabase
+      .from("matches")
+      .update(updateData)
+      .eq("id", local.id);
+
+    if (updateError) {
+      console.error(
+        `Error al actualizar partido ${local.id}: ${updateError.message}`,
+      );
+      errors++;
+      return { updated: false, corrections, errors };
+    }
+    return { updated: true, corrections, errors };
+  });
 
   for (const r of updateResults) {
     if (r.updated) summary.updated++;
@@ -560,8 +606,7 @@ async function main(): Promise<void> {
 const isDirectRun =
   typeof process !== "undefined" &&
   process.argv[1] &&
-  (process.argv[1].endsWith("restore-zafronix-data.ts") ||
-    process.argv[1].endsWith("restore-zafronix-data.js"));
+  /restore-zafronix-data(?:\.[tj]s)?$/.test(process.argv[1]);
 
 if (isDirectRun) {
   main();

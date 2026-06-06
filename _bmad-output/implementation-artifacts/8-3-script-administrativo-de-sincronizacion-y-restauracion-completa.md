@@ -4,7 +4,7 @@ baseline_commit: 024163aa824c440a730499a0a8acbbaaa65249d2
 
 # Story 8.3: Script Administrativo de Sincronización y Restauración Completa
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -62,6 +62,21 @@ para que el calendario y resultados del Mundial se puedan resembrar, validar o c
     - [x] Verificar que los partidos cambien su marcador y status en `public.matches`.
     - [x] Verificar que las predicciones existentes se hayan recalculado de forma precisa y que los saldos (`wager_balance`) de los usuarios se actualicen sumando/restando el delta exacto de la corrección.
     - [x] Verificar que se registren transacciones correspondientes de corrección en `public.point_transactions`.
+
+### Review Findings
+
+- [x] [Review][Decision] Completed Challenges Omitted from Score Corrections — When a match's score is corrected, the script only recalculates predictions and user balances for predictions. It does not touch challenges or challenge_participants which might have already been completed based on the old score. The database trigger only resolves active challenges (status = 'active'), so any completed challenges will remain incorrect.
+- [x] [Review][Patch] Missing existence check for league member in RPC [supabase/migrations/20260606130000_accrual_correction_rpc.sql:67]
+- [x] [Review][Patch] Reset evaluated_at to NULL in RPC when match status reverts from finished [supabase/migrations/20260606130000_accrual_correction_rpc.sql:48]
+- [x] [Review][Patch] Lack of Transactional Boundary Between Prediction Corrections and Match Updates [scripts/restore-zafronix-data.ts:457]
+- [x] [Review][Patch] Potential duplicate match records in API response [scripts/restore-zafronix-data.ts:390]
+- [x] [Review][Patch] Missing external_ref persistence on match updates [scripts/restore-zafronix-data.ts:485]
+- [x] [Review][Patch] Unbounded concurrency in Promise.all database requests [scripts/restore-zafronix-data.ts:440]
+- [x] [Review][Patch] Fragile Entry Point Script Detection [scripts/restore-zafronix-data.ts:559]
+- [x] [Review][Patch] Lack of exception handling in concurrent prediction corrections [scripts/restore-zafronix-data.ts:273]
+- [x] [Review][Patch] Omission of Kickoff Time Updates [scripts/restore-zafronix-data.ts:426]
+- [x] [Review][Patch] Corrupted UTF-8 Character Encoding [scripts/restore-zafronix-data.ts:1]
+- [x] [Review][Defer] Unnormalized Stage Value Insertions [scripts/restore-zafronix-data.ts:229] — deferred, pre-existing
 
 ## Dev Notes
 
