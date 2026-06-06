@@ -30,17 +30,18 @@ La API de Zafronix notifica los cambios de forma pasiva a través de webhooks. E
 2. **Validación de Seguridad (HMAC-SHA256):**
    * Cada petición HTTP POST de Zafronix incluye la firma HMAC-SHA256 en la cabecera `X-Zafronix-Signature-256` y la marca de tiempo en `X-Zafronix-Timestamp`.
    * El webhook calcula la firma localmente sobre la cadena `${timestamp}.${rawBody}` utilizando la clave secreta `ZAFRONIX_WEBHOOK_SECRET` y valida que la diferencia temporal no supere los 5 minutos para prevenir ataques de repetición ("replay attacks").
-3. **Persistencia y Reactividad:**
-   * El payload procesado actualiza la fila de `public.matches` correspondiente usando `external_ref` como clave (ej. `2026-073`).
+3. **Persistencia, Resolución Dinámica y Reactividad:**
+   * Debido a que el seed local posee metadatos enriquecidos no disponibles en la API externa (banderas, sedes en español, etc.), se evita sobreescribir los datos locales. El webhook resuelve los partidos en memoria mediante traducción dinámica: fase de grupos compara los pares de nombres de equipos normalizados y eliminatorias compara el número de partido (`matchNum >= 73`) con el campo `bracket_slot` local. El campo `external_ref` se mantiene como fallback de compatibilidad.
+   * Si el partido solicitado no puede ser localizado por ninguno de los métodos anteriores, el webhook responde con un código de estado `404 Not Found` en lugar de `500`.
    * La tabla en vivo (Epic 4) reacciona por Supabase Realtime a este cambio de base de datos.
    * Los webhooks no realizan solicitudes a la API, por lo que **no consumen la cuota de llamadas diarias**.
 
 ### 2.2 Sincronización Periódica de Respaldo (Conditional GETs con ETags)
 Como mecanismo de contingencia si falla la red o la entrega del webhook:
-1. Un cron job periódico (ej. cada 30 minutos durante las ventanas de partidos activos) realiza una petición condicional a `GET /matches?year=2026`.
+1. Un cron job periódico programado en GitHub Actions ejecutado cada 30 minutos **únicamente durante los meses de junio y julio** (período del torneo) realiza una petición condicional a `GET /matches?year=2026`.
 2. Se envía la cabecera HTTP `If-None-Match` incluyendo el último `ETag` (hash SHA-256 de la respuesta) almacenado en la caché o base de datos.
 3. Si los marcadores y el calendario no han cambiado, el servidor de Zafronix responde con un código **`304 Not Modified`** y cuerpo vacío.
-4. **Las respuestas 304 no decrementan la cuota de llamadas diarias**, lo que permite verificar la sincronía infinitas veces de forma gratuita. Si hay cambios, se devuelve `200 OK` con el payload de los partidos para actualizar la base de datos y guardar el nuevo ETag.
+4. **Las respuestas 304 no decrementan la cuota de llamadas diarias**, lo que permite verificar la sincronía infinitas veces de forma gratuita. Si hay cambios, se devuelve `200 OK` con el payload de los partidos para actualizar la base de datos de forma paralela mediante `Promise.all` y guardar el nuevo ETag (el guardado en `system_config` queda condicionado al éxito total de la transacción).
 
 ### 2.3 Mecanismo de Emergencia (Admin RPC Override)
 Se conserva el panel rápido y el procedimiento almacenado (RPC) `public.fn_admin_update_match_result` (desarrollado en la Epic 7). En caso de corte de red general de la API o errores de la fuente externa, el administrador del sistema puede forzar y anular marcadores manualmente por base de datos como última instancia.

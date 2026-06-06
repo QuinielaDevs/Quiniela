@@ -121,13 +121,13 @@ Hot reloading nativo, configuraciones de ESLint estándar y soporte directo para
 - **Motor de Base de Datos:** PostgreSQL en Supabase Free Tier.
 - **Esquema de Autenticación:** Google OAuth a través de `@supabase/ssr` (Auth basado en cookies en Next.js).
 - **Modelo de Autorización y Seguridad:** Políticas Row Level Security (RLS) en Postgres y Triggers transaccionales.
-- **Patrón de Sincronización Principal:** Endpoint HTTP POST de webhook receptor en `/api/webhooks/zafronix` con validación de firmas HMAC-SHA256.
-- **Patrón de Sincronización de Respaldo:** Cron job periódico para consultas condicionales a la API de Zafronix (`GET /matches?year=2026`) utilizando cabeceras `If-None-Match` y ETags.
+- **Patrón de Sincronización Principal:** Endpoint HTTP POST de webhook receptor en `/api/webhooks/zafronix` con validación de firmas HMAC-SHA256 y mapeo dinámico en memoria.
+- **Patrón de Sincronización de Respaldo:** Cron job periódico (restringido a junio y julio) para consultas condicionales a la API de Zafronix (`GET /matches?year=2026`) utilizando cabeceras `If-None-Match` y ETags.
 
 **Decisiones Importantes (Moldean la Arquitectura):**
 - **Estrategia de Caché y Tiempo Real:** Recalculación en el lado del cliente (JS) al recibir eventos de WebSocket de Supabase Realtime, protegiendo las conexiones y CPU del servidor.
-- **Identificación de Partidos:** Uso de UUIDs autogenerados como clave primaria en `public.matches` y mapeo a la API externa a través de la columna `external_ref TEXT UNIQUE` (evita dependencias de IDs enteros externos).
-- **Orquestador de Tareas Cron:** GitHub Actions programados para la sincronización de resultados condicionales (ETags) y keep-alive diario de base de datos.
+- **Identificación de Partidos (Mapeo Híbrido en Memoria):** Uso de UUIDs autogenerados como clave primaria en `public.matches`. Para resolver la diferencia en los esquemas de IDs (datos locales con metadatos ricos pre-sembrados vs IDs `2026-NNN` de la API de Zafronix), se utiliza una resolución híbrida en memoria: traducción por pares de equipos normalizados en fase de grupos y por número de partido (`matchNum >= 73` mapeado a `bracket_slot`) para eliminatorias, con fallback a coincidencia directa por `external_ref` para compatibilidad de pruebas.
+- **Orquestador de Tareas Cron:** GitHub Actions programados para la sincronización de resultados condicionales (ETags) ejecutados cada 30 minutos únicamente en junio y julio (período del torneo) y keep-alive diario de base de datos.
 - **Bypass de Cuota de API:** Utilización de respuestas `304 Not Modified` (ETags) para evitar el decremento del límite de cuota gratuita de Zafronix (250 llamadas diarias).
 
 **Decisiones Diferidas (Post-MVP):**
@@ -139,7 +139,7 @@ Hot reloading nativo, configuraciones de ESLint estándar y soporte directo para
 ### Data Architecture
 
 - **PostgreSQL en Supabase (Plan Gratuito):** Motor relacional ACID ideal para gestionar perfiles, ligas, predicciones y transacciones de puntos.
-- **Esquema de Relación de Partidos (UUID + external_ref):** La clave primaria de `public.matches` se define como `UUID` (`DEFAULT gen_random_uuid()`). Se introduce la columna `external_ref TEXT UNIQUE` para almacenar el ID string de la API de Zafronix (ej. `"2026-001"`). Las claves foráneas en `predictions` y `challenges` se actualizan a `UUID` para alinearse con esta clave primaria.
+- **Esquema de Relación de Partidos (Resolución Híbrida Dinámica):** La clave primaria de `public.matches` se define como `UUID`. Para conservar el seed local con metadatos indispensables ausentes en la API de Zafronix (banderas, sedes y traducciones al español), se realiza un mapeo dinámico en memoria: fase de grupos se resuelve por par de equipos normalizados (`home_team` | `away_team`), y eliminatorias se resuelven por número de partido (`matchNum >= 73` mapeado al campo `bracket_slot`). La columna `external_ref` se mantiene como fallback de compatibilidad.
 - **Recalculación en el Cliente (Client-side Recalculation):** Cuando Supabase emite un cambio de marcador en vivo vía WebSocket (gatillado por la base de datos tras actualizarse por webhook de Zafronix), la UI del cliente recalcula localmente el puntaje proyectado y ordena la clasificación de la liga privada en JavaScript. Rationale: Evita colapsar la base de datos gratuita de Supabase con agrupamientos, uniones y ordenaciones SQL concurrentes bajo el límite de 200 sockets activos.
 - **Supabase CLI para Migraciones:** La base de datos se maneja como código en local (`supabase/migrations`) y se automatiza su despliegue mediante Git.
 
@@ -158,8 +158,8 @@ Hot reloading nativo, configuraciones de ESLint estándar y soporte directo para
 ### API & Communication Patterns
 
 - **Next.js Server Actions (TypeScript RPC):** Mutaciones directas desde el formulario táctil y flujos de juego al servidor, eliminando controladores REST redundantes.
-- **Webhooks Pasivos en Tiempo Real (Zafronix API):** Integración pasiva para captura de marcadores. Se expone un endpoint HTTP POST en `/api/webhooks/zafronix` que escucha los eventos `match.finalized`, `match.patched` y `match.postponed` de la API de Zafronix para actualizar la base de datos.
-- **Sincronización Periódica de Respaldo (Conditional GETs con ETags):** Cron job periódico programado en GitHub Actions que ejecuta peticiones condicionales HTTP `GET https://api.zafronix.com/fifa/worldcup/v1/matches?year=2026` pasando la cabecera `If-None-Match` con el último `ETag` (hash de 16 caracteres de la última respuesta exitosa 200) guardado en la base de datos o almacenamiento de caché. En caso de no haber modificaciones de datos, la API de Zafronix responderá `304 Not Modified`, lo que garantiza que no se consuma la cuota de llamadas gratuitas de la API (250/día).
+- **Webhooks Pasivos en Tiempo Real (Zafronix API):** Integración pasiva para captura de marcadores en `/api/webhooks/zafronix` que escucha los eventos `match.finalized`, `match.patched` y `match.postponed` de Zafronix. Resuelve el partido dinámicamente usando traducción de nombres y slots en memoria, y responde con `404 Not Found` en lugar de `500` si el partido no se puede localizar localmente.
+- **Sincronización Periódica de Respaldo (Conditional GETs con ETags):** Cron job periódico programado en GitHub Actions (ejecutado cada 30 minutos restringido a los meses de junio y julio) que realiza consultas HTTP condicionales `GET` pasando `If-None-Match`. Las actualizaciones se realizan de forma masiva/paralela mediante `Promise.all` y el almacenamiento del nuevo ETag se condiciona a que todas las escrituras en la base de datos tengan éxito.
 - **Mecanismo de Emergencia (Admin RPC Override):** Se mantiene el panel administrativo RPC (`public.fn_admin_update_match_result`) desarrollado en la Epic 7 para que el administrador pueda anular marcadores manualmente por base de datos si ocurre una caída del servicio de la API o del webhook.
 
 ---
