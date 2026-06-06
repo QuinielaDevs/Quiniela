@@ -107,6 +107,7 @@ interface LocalMatch {
   status: string;
   bracket_slot: number | null;
   match_time: string | null;
+  stage: string | null;
 }
 
 // ── Helpers de Normalización y Mapeo ─────────────────────────────────
@@ -138,6 +139,57 @@ export function mapApiStatus(apiStatus: string): MatchStatus {
         `⚠️ Estado desconocido de la API: "${apiStatus}". Mapeando por defecto a "scheduled".`,
       );
       return "scheduled";
+  }
+}
+
+/**
+ * Normaliza los nombres de las fases (stage) al vocabulario interno de la base de datos:
+ * 'group', 'round-32', 'round-16', 'quarter', 'semi', 'third-place', 'final'.
+ */
+export function normalizeStage(stage: string | null | undefined): string | null {
+  if (!stage) return null;
+  const s = stage.trim().toLowerCase();
+  switch (s) {
+    case "group":
+    case "group_stage":
+    case "group-stage":
+    case "groups":
+      return "group";
+    case "round-32":
+    case "round_of_32":
+    case "round-of-32":
+    case "last-32":
+      return "round-32";
+    case "round-16":
+    case "round_of_16":
+    case "round-of-16":
+    case "last-16":
+      return "round-16";
+    case "quarter-finals":
+    case "quarter-final":
+    case "quarterfinals":
+    case "quarterfinal":
+    case "quarter":
+    case "quarters":
+      return "quarter";
+    case "semi-finals":
+    case "semi-final":
+    case "semifinals":
+    case "semifinal":
+    case "semi":
+    case "semis":
+      return "semi";
+    case "third-place":
+    case "third_place":
+    case "thirdplace":
+    case "playoff-for-third-place":
+    case "3rd-place":
+      return "third-place";
+    case "final":
+    case "finals":
+      return "final";
+    default:
+      return stage;
   }
 }
 
@@ -244,7 +296,7 @@ function buildInsertRow(apiMatch: ZafronixMatch): Record<string, unknown> | null
     match_time: apiMatch.matchTime,
     status: mappedStatus,
     matchday: apiMatch.matchday ?? null,
-    stage: apiMatch.stage ?? null,
+    stage: normalizeStage(apiMatch.stage),
     group_label: apiMatch.groupLabel ?? null,
     bracket_slot: apiMatch.bracketSlot ?? null,
     home_source: apiMatch.homeSource ?? null,
@@ -390,7 +442,7 @@ export async function restoreZafronixData(
   const { data: localMatches, error: fetchError } = await supabase
     .from("matches")
     .select(
-      "id, external_ref, home_team, away_team, home_score, away_score, status, bracket_slot, match_time",
+      "id, external_ref, home_team, away_team, home_score, away_score, status, bracket_slot, match_time, stage",
     );
 
   if (fetchError) {
@@ -448,6 +500,8 @@ export async function restoreZafronixData(
       local.away_score !== apiMatch.awayScore;
     const statusChanged = local.status !== mappedStatus;
     const timeChanged = apiMatch.matchTime ? (local.match_time !== apiMatch.matchTime) : false;
+    const normalizedApiStage = normalizeStage(apiMatch.stage);
+    const stageChanged = apiMatch.stage ? (local.stage !== normalizedApiStage) : false;
 
     const canUpdateTeams =
       local.bracket_slot !== null &&
@@ -458,7 +512,7 @@ export async function restoreZafronixData(
       (local.home_team !== apiMatch.homeTeam ||
         local.away_team !== apiMatch.awayTeam);
 
-    if (scoreChanged || statusChanged || teamsChanged || timeChanged) {
+    if (scoreChanged || statusChanged || teamsChanged || timeChanged || stageChanged) {
       updateTasks.push({ local, apiMatch });
     }
   }
@@ -534,6 +588,9 @@ export async function restoreZafronixData(
     };
     if (apiMatch.matchTime) {
       updateData.match_time = apiMatch.matchTime;
+    }
+    if (apiMatch.stage) {
+      updateData.stage = normalizeStage(apiMatch.stage);
     }
     if (canUpdateTeams) {
       updateData.home_team = apiMatch.homeTeam;

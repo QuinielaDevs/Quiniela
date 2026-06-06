@@ -115,7 +115,7 @@ export function requireSandboxKey(): string {
 async function fetchZafronix(
   path: string,
   init: RequestInit,
-  { retries = 1, retryDelayMs = 1500 }: { retries?: number; retryDelayMs?: number } = {},
+  { retries = 3, retryDelayMs = 2000 }: { retries?: number; retryDelayMs?: number } = {},
 ): Promise<Response> {
   const key = requireSandboxKey();
   const url = `${ZAFRONIX_BASE_URL}${path}`;
@@ -135,6 +135,17 @@ async function fetchZafronix(
         },
       });
       clearTimeout(timeoutId);
+      
+      if (res.status === 429) {
+        const retryAfterStr = res.headers.get("retry-after");
+        const retryAfterMs = retryAfterStr ? parseInt(retryAfterStr, 10) * 1000 : retryDelayMs;
+        if (retryAfterMs > 10000) {
+          throw new Error(`Rate limited (429). Retry after is too long for test suite: ${retryAfterMs}ms`);
+        }
+        console.warn(`[Zafronix Sandbox] Got 429 Rate Limit. Retrying in ${retryAfterMs}ms...`);
+        throw new Error(`Rate limited (429). Retry after ${retryAfterMs}ms`);
+      }
+
       if (res.status >= 500) {
         throw new Error(`Error de servidor Zafronix (HTTP ${res.status})`);
       }
@@ -143,7 +154,10 @@ async function fetchZafronix(
       clearTimeout(timeoutId);
       lastErr = err;
       if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, retryDelayMs));
+        const delay = err instanceof Error && err.message.includes("Rate limited")
+          ? parseInt(err.message.split("after ")[1], 10) || retryDelayMs
+          : retryDelayMs;
+        await new Promise((r) => setTimeout(r, delay));
       }
     }
   }

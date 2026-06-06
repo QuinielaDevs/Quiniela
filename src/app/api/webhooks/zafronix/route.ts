@@ -97,9 +97,13 @@ async function findLocalMatch(
   // 1. Intentar coincidencia directa por external_ref (tests)
   const { data: directMatch, error: directError } = await supabase
     .from("matches")
-    .select("id, bracket_slot, home_team, away_team")
+    .select("id, bracket_slot, home_team, away_team, status, external_last_sync_at")
     .eq("external_ref", matchId)
     .maybeSingle();
+
+  if (directError) {
+    return { data: null, error: directError };
+  }
 
   if (directMatch) {
     return { data: directMatch, error: null };
@@ -115,11 +119,12 @@ async function findLocalMatch(
 
   if (matchNum >= 73) {
     // Eliminatorias: buscar por bracket_slot
-    return await supabase
+    const { data, error } = await supabase
       .from("matches")
-      .select("id, bracket_slot, home_team, away_team")
+      .select("id, bracket_slot, home_team, away_team, status, external_last_sync_at")
       .eq("bracket_slot", matchNum)
       .maybeSingle();
+    return { data, error };
   } else {
     // Fase de grupos: buscar por nombres de equipos normalizados
     if (!homeTeam || !awayTeam) {
@@ -128,12 +133,13 @@ async function findLocalMatch(
     const normHome = normalizeTeamName(homeTeam);
     const normAway = normalizeTeamName(awayTeam);
 
-    return await supabase
+    const { data, error } = await supabase
       .from("matches")
-      .select("id, bracket_slot, home_team, away_team")
+      .select("id, bracket_slot, home_team, away_team, status, external_last_sync_at")
       .eq("home_team", normHome)
       .eq("away_team", normAway)
       .maybeSingle();
+    return { data, error };
   }
 }
 
@@ -164,13 +170,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 3. Validar ventana de replay (AC #2)
+  // 3. Validar ventana de replay (AC #2) con validación dual (segundos/milisegundos) sin límites arbitrarios
   let timestampMs = Number(timestamp);
-  if (!isNaN(timestampMs) && timestampMs < 10000000000) {
-    // Si viene en segundos (ej. 17xxxxx), convertir a milisegundos
-    timestampMs *= 1000;
+  let replayValid = false;
+  if (!isNaN(timestampMs)) {
+    if (isWithinReplayWindow(timestampMs)) {
+      replayValid = true;
+    } else {
+      const asMs = timestampMs * 1000;
+      if (isWithinReplayWindow(asMs)) {
+        timestampMs = asMs;
+        replayValid = true;
+      }
+    }
   }
-  if (isNaN(timestampMs) || !isWithinReplayWindow(timestampMs)) {
+
+  if (!replayValid) {
+    console.warn(
+      `[Zafronix Webhook] Replay window check failed. Header timestamp: ${timestamp} (parsed as ${timestampMs} ms), current server time: ${Date.now()}`
+    );
     return NextResponse.json(
       {
         error: "replay_rejected",
@@ -180,11 +198,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 4. Leer raw body como texto para verificación HMAC (AC #1)
-  const rawBody = await req.text();
+  // 4. Leer raw body como texto para verificación HMAC (AC #1) con manejo de reseteo de conexión
+  let rawBody: string;
+  try {
+    rawBody = await req.text();
+  } catch (err) {
+    console.error("[Zafronix Webhook] Error reading request body stream:", err);
+    return NextResponse.json(
+      { error: "invalid_request", message: "Failed to read request body stream" },
+      { status: 400 },
+    );
+  }
 
-  // 5. Verificar firma HMAC-SHA256 con comparación en tiempo constante
+  // 5. Verificar firma HMAC-SHA256 con comparación en tiempo constante y logs diagnósticos
   if (!verifySignature(rawBody, timestamp, signature, webhookSecret)) {
+    console.warn(
+      `[Zafronix Webhook] HMAC signature verification failed. Header timestamp: ${timestamp}, signature: ${signature}`
+    );
     return NextResponse.json(
       {
         error: "signature_mismatch",
@@ -308,12 +338,28 @@ async function handleMatchFinalized(
     );
   }
 
+  // Control de orden (concurrencia)
+  const incomingTs = new Date(event.ts).getTime();
+  if (match.external_last_sync_at) {
+    const existingTs = new Date(match.external_last_sync_at).getTime();
+    if (incomingTs < existingTs) {
+      console.warn(
+        `[Zafronix Webhook] Ignoring out-of-order match.finalized event. Incoming ts: ${event.ts}, existing ts: ${match.external_last_sync_at}`
+      );
+      return NextResponse.json(
+        { ok: true, ignored: true, reason: "out_of_order" },
+        { status: 200 },
+      );
+    }
+  }
+
   // Preparar la actualización
   const updateData: Record<string, any> = {
     home_score: homeScore,
     away_score: awayScore,
     status: "finished",
     updated_at: new Date().toISOString(),
+    external_last_sync_at: event.ts,
   };
 
   // AC #4: Si es eliminatoria (bracket_slot no nulo), actualizar equipos si no son placeholders
@@ -385,10 +431,26 @@ async function handleMatchPatched(
     );
   }
 
+  // Control de orden (concurrencia)
+  const incomingTs = new Date(event.ts).getTime();
+  if (match.external_last_sync_at) {
+    const existingTs = new Date(match.external_last_sync_at).getTime();
+    if (incomingTs < existingTs) {
+      console.warn(
+        `[Zafronix Webhook] Ignoring out-of-order match.patched event. Incoming ts: ${event.ts}, existing ts: ${match.external_last_sync_at}`
+      );
+      return NextResponse.json(
+        { ok: true, ignored: true, reason: "out_of_order" },
+        { status: 200 },
+      );
+    }
+  }
+
   // Construir actualización a partir del diff
   const updateData: Record<string, any> = {
     updated_at: new Date().toISOString(),
     status: match.status, // Preservar el estado actual del partido en lugar de forzar finished
+    external_last_sync_at: event.ts,
   };
 
   if (changes.homeScore) {
@@ -481,6 +543,21 @@ async function handleMatchPostponed(
     );
   }
 
+  // Control de orden (concurrencia)
+  const incomingTs = new Date(event.ts).getTime();
+  if (match.external_last_sync_at) {
+    const existingTs = new Date(match.external_last_sync_at).getTime();
+    if (incomingTs < existingTs) {
+      console.warn(
+        `[Zafronix Webhook] Ignoring out-of-order match.postponed event. Incoming ts: ${event.ts}, existing ts: ${match.external_last_sync_at}`
+      );
+      return NextResponse.json(
+        { ok: true, ignored: true, reason: "out_of_order" },
+        { status: 200 },
+      );
+    }
+  }
+
   // Llamar al RPC transaccional que actualiza el partido y anula predicciones
   const { error: rpcError } = await supabase.rpc(
     "fn_postpone_match_and_predictions",
@@ -494,6 +571,20 @@ async function handleMatchPostponed(
     console.error("Error executing postpone RPC:", rpcError);
     return NextResponse.json(
       { error: "internal_error", message: "Failed to update match and predictions" },
+      { status: 500 },
+    );
+  }
+
+  // Actualizar la marca de tiempo de sincronización
+  const { error: updateError } = await supabase
+    .from("matches")
+    .update({ external_last_sync_at: event.ts })
+    .eq("id", match.id);
+
+  if (updateError) {
+    console.error("Error updating external_last_sync_at after postpone:", updateError);
+    return NextResponse.json(
+      { error: "internal_error", message: "Failed to update sync timestamp" },
       { status: 500 },
     );
   }

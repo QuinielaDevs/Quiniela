@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-01T19:12:28-04:00"
-last_updated: "2026-06-06T20:05:00-04:00"
+last_updated: "2026-06-06T16:14:44-04:00"
 project: "pija-quiniela"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -90,4 +90,4 @@ development_status:
   8-3-script-administrativo-de-sincronizacion-y-restauracion-completa: done
   8-4-entorno-de-pruebas-integradas-con-el-sandbox-de-zafronix-ano-9999: done
   8-5-test-de-contrato-del-webhook-de-zafronix: done
-  epic-8-retrospective: optional
+  epic-8-retrospective: done

@@ -26,10 +26,10 @@ export const ZAFRONIX_HEADERS = {
  */
 export const baseEventSchema = z.object({
   type: z.string(),
-  id: z.string(),
+  id: z.string().min(1),
   matchId: z.string(),
   year: z.number().int(),
-  ts: z.string(),
+  ts: z.string().datetime(),
   payload: z.record(z.string(), z.unknown()),
 });
 
@@ -60,7 +60,7 @@ export const matchPatchedPayload = z.object({
 export const matchPostponedPayload = z.object({
   homeTeam: z.string().optional(),
   awayTeam: z.string().optional(),
-  status: z.string(),
+  status: z.enum(["postponed", "cancelled", "canceled", "abandoned"]),
   rescheduledTo: z.string().optional(),
   reason: z.string().optional(),
   actor: z.string().optional(),

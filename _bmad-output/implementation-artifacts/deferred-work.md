@@ -93,26 +93,21 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 - **Cerrado en hardening pass:** PII de email, validación de `fn_create_league`, CHECKs de `payment_amount` y tope de marcador, paridad de tipos, config (redirect/password/tailwind), seed.
 - **Ya resuelto por stories posteriores:** write-lock de predictions (2.4), gate de `challenge_participants` (5.4), Duelos en navbar (Epic 5).
 - **Resuelto en Batch UI / Hardening final:** MatchCard timer, DuelsDashboard race, DesafioClient hydration + post-join UX, confirmación UX para transiciones destructivas (7.2), observabilidad/errores genéricos (7.2), captura de resultados de knockout en admin panel (7.2), sincronización de fases (config ↔ DB).
-- **Bloqueado en stories futuras:** league_members UPDATE/DELETE (3.3, con cuidado de wager_balance), Mi Cuenta navbar (3.2), eslint bump (código de plantilla).
-- **Aceptado:** enumeración de invite_code (edge rate-limit), cacheComponents, confirmations/max_rows (hardening de producción).
 - **Otras deudas / mejoras:** Paginación de standings (3.1), selector multi-liga (3.3), editar reglas de liga (3.3).
 
 ---
 
 ## Deferred from: code review of 8-1-endpoint-de-webhook-para-sincronizacion-de-partidos-en-tiempo-real-zafronix-api.md (2026-06-06)
-- `[ABIERTO]` **El recálculo de puntos ante correcciones de marcadores (match.patched)** — Cuando se recibe una corrección de marcador, el disparador `fn_resolve_challenges_on_match_status_change` no recalcula las predicciones que ya tienen `evaluated_at IS NOT NULL`. Se difiere por implicar cambios complejos de lógica e idempotencia en triggers preexistentes de base de datos.
-- `[ABIERTO]` **Vulnerabilidad ante entrega de eventos de webhook fuera de orden** — Si llega un evento antiguo retrasado después de uno nuevo, podría sobrescribir la base de datos con información obsoleta. Se difiere por requerir el almacenamiento de marcas de tiempo del proveedor en la tabla `matches` para control de concurrencia.
+- `[RESUELTO]` **El recálculo de puntos ante correcciones de marcadores (match.patched)** — Trigger `fn_resolve_challenges_on_match_status_change` redefinido para recalcular e invalidar predicciones evaluadas en caso de correcciones, manteniendo idempotencia y recalculando también predicciones normales de ligas activas.
+- `[RESUELTO]` **Vulnerabilidad ante entrega de eventos de webhook fuera de orden** — Añadida la columna `external_last_sync_at` en la tabla `matches`. El webhook valida que el timestamp recibido del evento sea estrictamente mayor que el almacenado localmente para evitar sobrescribir con eventos obsoletos.
 
 ## Deferred from: code review of 8-3-script-administrativo-de-sincronizacion-y-restauracion-completa.md (2026-06-06)
-- `[ABIERTO]` **Unnormalized Stage Value Insertions** — The script inserts `apiMatch.stage` directly into `public.matches.stage` without mapping or normalizing. This could trigger check or enum constraints in the database if the API values differ from local conventions.
+- `[RESUELTO]` **Unnormalized Stage Value Insertions** — Implementada la función `normalizeStage` en `restore-zafronix-data.ts` para mapear los valores de fase de la API (ej: `1/8`, `1/4`) a las constantes internas correspondientes (`last_16`, `quarter`), evitando fallos en las restricciones de CHECK de base de datos.
 
 ## Deferred from: code review of 8-5-test-de-contrato-del-webhook-de-zafronix.md (2026-06-06)
-- `[ABIERTO]` **Dangerous seconds-to-milliseconds heuristic in route handler for year 9999 sandbox timestamps** — The heuristic in `route.ts` that converts seconds to milliseconds when `timestampMs < 10000000000` will fail for Sandbox requests using year 9999 timestamps (e.g. `253402300800` seconds). The large timestamp will bypass conversion, remain in seconds, and trigger false-positive replay attack rejections.
-- `[ABIERTO]` **Database query error during external_ref matching is silently ignored** — In `findLocalMatch`, if a query on `matches` table returns an error during the `external_ref` lookup, the error is returned in `error` but the function does not halt or log it correctly, instead continuing down the fallback paths.
-- `[ABIERTO]` **Failure during NextRequest text stream read returns 500 instead of 400** — NextRequest `req.text()` might throw an error if the connection resets, which would propagate and return a 500 Internal Server Error instead of a 400 Bad Request.
-- `[ABIERTO]` **Lack of logging for HMAC signature verification failures** — The route handler silently responds with a 401 status code when signature verification fails, without logging diagnostic information (e.g., mismatch warnings, received vs expected timestamp).
-- `[ABIERTO]` **Weak validation of event ID format, timestamp string format, and status in schemas** — The `baseEventSchema` accepts any string for `id` and `ts`, and `matchPostponedPayload` accepts any string for `status`.
-- `[ABIERTO]` **Live sandbox rate limiting failure in zafronix-sandbox-e2e.test.ts** — Integration test suite runs are vulnerable to rate limits (e.g. `429 Too Many Requests`) from the external Sandbox API, causing potential transient failures.
-
-
-
+- `[RESUELTO]` **Dangerous seconds-to-milliseconds heuristic in route handler for year 9999 sandbox timestamps** — Modificada la heurística en `route.ts` para soportar de manera segura timestamps del año 9999 tanto en segundos como en milisegundos mediante una validación dual de la ventana de replay.
+- `[RESUELTO]` **Database query error during external_ref matching is silently ignored** — Corregida la función `findLocalMatch` en `route.ts` para que propague y maneje adecuadamente los errores devueltos por consultas a Supabase en lugar de omitirlos silenciosamente.
+- `[RESUELTO]` **Failure during NextRequest text stream read returns 500 instead of 400** — La lectura del stream `req.text()` está envuelta en un bloque try/catch en `route.ts` que retorna un código de estado 400 Bad Request si la lectura del cuerpo falla por conexiones rotas o malformaciones.
+- `[RESUELTO]` **Lack of logging for HMAC signature verification failures** — Se agregaron logs detallados de diagnóstico (warnings) en `route.ts` cuando falla la verificación de firmas HMAC, mostrando el timestamp recibido y las razones del descarte.
+- `[RESUELTO]` **Weak validation of event ID format, timestamp string format, and status in schemas** — Robustecida la validación de Zod schemas en `contract.ts` forzando `.min(1)` para los identificadores de evento, `.datetime()` para el timestamp `ts` de eventos y un strict enum para el estatus de partidos suspendidos/cancelados.
+- `[RESUELTO]` **Live sandbox rate limiting failure in zafronix-sandbox-e2e.test.ts** — Implementado reintento de backoff exponencial en `tests/integration/helpers/zafronix-sandbox.ts` que interpreta la cabecera `Retry-After`, con una política fail-fast si el retardo supera los 10 segundos para no bloquear la ejecución local de Vitest.
