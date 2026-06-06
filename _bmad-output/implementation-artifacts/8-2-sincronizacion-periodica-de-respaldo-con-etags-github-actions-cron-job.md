@@ -65,6 +65,22 @@ para que los marcadores de respaldo del Mundial se sincronicen de manera automat
     - [x] Verificar que el ETag en `public.system_config` clave `'zafronix_matches_etag'` se actualizó al nuevo valor.
   - [x] Validar que se envían las cabeceras `X-API-Key` y `If-None-Match` de forma correcta.
 
+### Review Findings
+
+- [ ] [Review][Decision] Desviación del criterio de "upsert" — El script ignora partidos no encontrados en la base de datos local en lugar de crearlos mediante un upsert completo como especifica el AC #8.
+- [ ] [Review][Decision] Configuración continua del cron job — El cron job de GitHub Actions está configurado para ejecutarse ininterrumpidamente todo el año, cuando el AC #1 indica que debe ser solo durante el periodo de partidos.
+- [ ] [Review][Decision] Modificaciones fuera del alcance de la Story 8.2 en standings — Se removió matchdays de StandingsTable y de StandingsBoard, lo cual no pertenece a la tarea de sincronización periódica.
+- [ ] [Review][Patch] Guardado incondicional de ETag al fallar la actualización [scripts/sync-matches.ts:257]
+- [ ] [Review][Patch] Manejo silencioso de errores en getStoredETag [scripts/sync-matches.ts:92]
+- [ ] [Review][Patch] Esquema Zod rígido para nombres de equipos y falta de validación de equipos reales [scripts/sync-matches.ts:34]
+- [ ] [Review][Patch] Consultas N+1 secuenciales en el bucle de actualización de partidos [scripts/sync-matches.ts:241]
+- [ ] [Review][Patch] Ausencia de try-catch al parsear response.json() [scripts/sync-matches.ts:169]
+- [ ] [Review][Patch] Las pruebas de integración borran el ETag real del entorno de desarrollo [tests/integration/sync-matches.test.ts:655]
+- [ ] [Review][Patch] Inconsistencia en la invocación del script en el workflow [/.github/workflows/sync-matches.yml:32]
+- [ ] [Review][Patch] El mapeo de estados desconocidos de la API por defecto vuelve a "scheduled" [scripts/sync-matches.ts:53]
+- [ ] [Review][Patch] Falta de timeouts y políticas de reintento en peticiones externas [scripts/sync-matches.ts:147]
+- [ ] [Review][Patch] Ausencia de validación de apiKey en syncMatches [scripts/sync-matches.ts:130]
+
 ## Dev Notes
 
 - **Conexión a la Base de Datos**: Al ser un script autónomo de cron job, debe inicializarse el cliente de Supabase usando el rol de servicio `service_role` para poder modificar las tablas `matches` y `system_config` evadiendo las restricciones de RLS.

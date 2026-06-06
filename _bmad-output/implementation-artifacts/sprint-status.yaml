@@ -84,7 +84,7 @@ development_status:
   # Epic 8: Sincronización Automática con Zafronix World Cup API
   epic-8: in-progress
   8-1-endpoint-de-webhook-para-sincronizacion-de-partidos-en-tiempo-real-zafronix-api: done
-  8-2-sincronizacion-periodica-de-respaldo-con-etags-github-actions-cron-job: review
+  8-2-sincronizacion-periodica-de-respaldo-con-etags-github-actions-cron-job: done
   8-3-script-administrativo-de-sincronizacion-y-restauracion-completa: backlog
   8-4-entorno-de-pruebas-integradas-con-el-sandbox-de-zafronix-ano-9999: backlog
   epic-8-retrospective: optional

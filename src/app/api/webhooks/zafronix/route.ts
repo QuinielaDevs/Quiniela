@@ -112,6 +112,112 @@ function mapPostponedStatus(
   }
 }
 
+/**
+ * Normaliza nombres de equipos para solucionar discrepancias entre la API y el seed local.
+ */
+function normalizeTeamName(name: string): string {
+  const norm = name.trim().toLowerCase();
+  switch (norm) {
+    case "usa":
+    case "united states":
+      return "United States";
+    case "south korea":
+    case "korea republic":
+      return "Korea Republic";
+    case "czech republic":
+    case "czechia":
+      return "Czechia";
+    case "turkey":
+    case "türkiye":
+      return "Türkiye";
+    case "ivory coast":
+    case "cote d'ivoire":
+    case "cote d''ivoire":
+      return "Cote d'Ivoire";
+    case "iran":
+    case "ir iran":
+      return "IR Iran";
+    case "cape verde":
+    case "cabo verde":
+      return "Cabo Verde";
+    case "dr congo":
+    case "congo dr":
+      return "Congo DR";
+    case "bosnia and herzegovina":
+    case "bosnia & herzegovina":
+      return "Bosnia & Herzegovina";
+    default:
+      return name;
+  }
+}
+
+/**
+ * Determina si el nombre de equipo provisto es un marcador de posición (placeholder) del bracket.
+ */
+function isPlaceholderTeam(name: string): boolean {
+  const norm = name.trim().toUpperCase();
+  if (norm === "TBD" || norm === "POR DEFINIR" || norm === "" || norm === "POR DEFINIR EQUIPO") {
+    return true;
+  }
+  if (/^[123][A-L]$/.test(norm)) return true;
+  if (/^[WL]\d{2,3}$/.test(norm)) return true;
+  if (/^3[A-L]{3,6}$/.test(norm)) return true;
+  return false;
+}
+
+/**
+ * Encuentra un partido local correspondiente al ID y equipos de Zafronix.
+ * Soporta resolución por external_ref, bracket_slot (eliminatorias) o nombres normalizados (fase de grupos).
+ */
+async function findLocalMatch(
+  supabase: SupabaseClient,
+  matchId: string,
+  homeTeam?: string | null,
+  awayTeam?: string | null,
+): Promise<{ data: any; error: any }> {
+  // 1. Intentar coincidencia directa por external_ref (tests)
+  const { data: directMatch, error: directError } = await supabase
+    .from("matches")
+    .select("id, bracket_slot, home_team, away_team")
+    .eq("external_ref", matchId)
+    .maybeSingle();
+
+  if (directMatch) {
+    return { data: directMatch, error: null };
+  }
+
+  // 2. Si no coincide, traducir ID de Zafronix (2026-NNN)
+  const parts = matchId.split("-");
+  const matchNum = parts.length > 1 && parts[1] ? parseInt(parts[1], 10) : NaN;
+
+  if (isNaN(matchNum)) {
+    return { data: null, error: null };
+  }
+
+  if (matchNum >= 73) {
+    // Eliminatorias: buscar por bracket_slot
+    return await supabase
+      .from("matches")
+      .select("id, bracket_slot, home_team, away_team")
+      .eq("bracket_slot", matchNum)
+      .maybeSingle();
+  } else {
+    // Fase de grupos: buscar por nombres de equipos normalizados
+    if (!homeTeam || !awayTeam) {
+      return { data: null, error: null };
+    }
+    const normHome = normalizeTeamName(homeTeam);
+    const normAway = normalizeTeamName(awayTeam);
+
+    return await supabase
+      .from("matches")
+      .select("id, bracket_slot, home_team, away_team")
+      .eq("home_team", normHome)
+      .eq("away_team", normAway)
+      .maybeSingle();
+  }
+}
+
 // ── Route Handler ───────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -260,21 +366,16 @@ async function handleMatchFinalized(
 
   const { homeTeam, awayTeam, homeScore, awayScore } = payloadResult.data;
 
-  // Buscar el partido por external_ref
-  const { data: match, error: findError } = await supabase
-    .from("matches")
-    .select("id, bracket_slot")
-    .eq("external_ref", event.matchId)
-    .single();
+  // Buscar el partido usando el helper de mapeo
+  const { data: match, error: findError } = await findLocalMatch(
+    supabase,
+    event.matchId,
+    homeTeam,
+    awayTeam,
+  );
 
   if (findError) {
-    if (findError.code === "PGRST116") {
-      return NextResponse.json(
-        { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
-        { status: 404 },
-      );
-    }
-    console.error("Database error looking up match:", findError);
+    console.error("Error looking up match:", findError);
     return NextResponse.json(
       { error: "internal_error", message: "Failed to look up match" },
       { status: 500 },
@@ -283,13 +384,12 @@ async function handleMatchFinalized(
 
   if (!match) {
     return NextResponse.json(
-      { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
+      { error: "not_found", message: `Match with external_ref / mapping '${event.matchId}' not found` },
       { status: 404 },
     );
   }
 
   // Preparar la actualización
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateData: Record<string, any> = {
     home_score: homeScore,
     away_score: awayScore,
@@ -297,10 +397,12 @@ async function handleMatchFinalized(
     updated_at: new Date().toISOString(),
   };
 
-  // AC #4: Si es eliminatoria (bracket_slot no nulo), actualizar equipos
+  // AC #4: Si es eliminatoria (bracket_slot no nulo), actualizar equipos si no son placeholders
   if (match.bracket_slot !== null && match.bracket_slot !== undefined) {
-    updateData.home_team = homeTeam;
-    updateData.away_team = awayTeam;
+    if (!isPlaceholderTeam(homeTeam) && !isPlaceholderTeam(awayTeam)) {
+      updateData.home_team = homeTeam;
+      updateData.away_team = awayTeam;
+    }
   }
 
   const { error: updateError } = await supabase
@@ -341,21 +443,16 @@ async function handleMatchPatched(
 
   const { homeTeam, awayTeam, changes } = payloadResult.data;
 
-  // Buscar el partido por external_ref
-  const { data: match, error: findError } = await supabase
-    .from("matches")
-    .select("id, bracket_slot, status")
-    .eq("external_ref", event.matchId)
-    .single();
+  // Buscar el partido usando el helper de mapeo
+  const { data: match, error: findError } = await findLocalMatch(
+    supabase,
+    event.matchId,
+    homeTeam,
+    awayTeam,
+  );
 
   if (findError) {
-    if (findError.code === "PGRST116") {
-      return NextResponse.json(
-        { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
-        { status: 404 },
-      );
-    }
-    console.error("Database error looking up match:", findError);
+    console.error("Error looking up match:", findError);
     return NextResponse.json(
       { error: "internal_error", message: "Failed to look up match" },
       { status: 500 },
@@ -364,13 +461,12 @@ async function handleMatchPatched(
 
   if (!match) {
     return NextResponse.json(
-      { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
+      { error: "not_found", message: `Match with external_ref / mapping '${event.matchId}' not found` },
       { status: 404 },
     );
   }
 
   // Construir actualización a partir del diff
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateData: Record<string, any> = {
     updated_at: new Date().toISOString(),
     status: match.status, // Preservar el estado actual del partido en lugar de forzar finished
@@ -397,10 +493,10 @@ async function handleMatchPatched(
     updateData.away_score = val;
   }
 
-  // AC #4: Si es eliminatoria, actualizar equipos si se proveen
+  // AC #4: Si es eliminatoria, actualizar equipos si se proveen y no son placeholders
   if (match.bracket_slot !== null && match.bracket_slot !== undefined) {
-    if (homeTeam) updateData.home_team = homeTeam;
-    if (awayTeam) updateData.away_team = awayTeam;
+    if (homeTeam && !isPlaceholderTeam(homeTeam)) updateData.home_team = homeTeam;
+    if (awayTeam && !isPlaceholderTeam(awayTeam)) updateData.away_team = awayTeam;
   }
 
   const { error: updateError } = await supabase
@@ -440,24 +536,19 @@ async function handleMatchPostponed(
     );
   }
 
-  const { status: zafronixStatus } = payloadResult.data;
+  const { status: zafronixStatus, homeTeam, awayTeam } = payloadResult.data;
   const dbStatus = mapPostponedStatus(zafronixStatus);
 
-  // Buscar el partido por external_ref
-  const { data: match, error: findError } = await supabase
-    .from("matches")
-    .select("id")
-    .eq("external_ref", event.matchId)
-    .single();
+  // Buscar el partido usando el helper de mapeo
+  const { data: match, error: findError } = await findLocalMatch(
+    supabase,
+    event.matchId,
+    homeTeam,
+    awayTeam,
+  );
 
   if (findError) {
-    if (findError.code === "PGRST116") {
-      return NextResponse.json(
-        { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
-        { status: 404 },
-      );
-    }
-    console.error("Database error looking up match:", findError);
+    console.error("Error looking up match:", findError);
     return NextResponse.json(
       { error: "internal_error", message: "Failed to look up match" },
       { status: 500 },
@@ -466,7 +557,7 @@ async function handleMatchPostponed(
 
   if (!match) {
     return NextResponse.json(
-      { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
+      { error: "not_found", message: `Match with external_ref / mapping '${event.matchId}' not found` },
       { status: 404 },
     );
   }

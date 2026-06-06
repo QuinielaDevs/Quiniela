@@ -29,10 +29,9 @@ const ETAG_CONFIG_KEY = "zafronix_matches_etag";
 
 /**
  * Schema para un partido individual de la respuesta de la API de Zafronix.
- * El endpoint GET /matches?year=2026 retorna un array de estos objetos.
  */
 const zafronixMatchSchema = z.object({
-  id: z.string(), // external_ref en nuestra DB
+  id: z.string(),
   homeTeam: z.string(),
   awayTeam: z.string(),
   homeScore: z.number().int().nonnegative().nullable(),
@@ -42,9 +41,70 @@ const zafronixMatchSchema = z.object({
   bracketSlot: z.number().int().nullable().optional(),
 });
 
-const zafronixResponseSchema = z.array(zafronixMatchSchema);
+/**
+ * La API retorna un objeto envoltorio con metadatos y la propiedad "data" conteniendo el array de partidos.
+ */
+const zafronixResponseSchema = z.object({
+  year: z.number().int().optional(),
+  count: z.number().int().optional(),
+  data: z.array(zafronixMatchSchema),
+});
 
-// ── Helpers ─────────────────────────────────────────────────────────
+// ── Helpers de Normalización y Mapeo ─────────────────────────────────
+
+/**
+ * Normaliza nombres de equipos para solucionar discrepancias entre la API y el seed local.
+ */
+export function normalizeTeamName(name: string): string {
+  const norm = name.trim().toLowerCase();
+  switch (norm) {
+    case "usa":
+    case "united states":
+      return "United States";
+    case "south korea":
+    case "korea republic":
+      return "Korea Republic";
+    case "czech republic":
+    case "czechia":
+      return "Czechia";
+    case "turkey":
+    case "türkiye":
+      return "Türkiye";
+    case "ivory coast":
+    case "cote d'ivoire":
+    case "cote d''ivoire":
+      return "Cote d'Ivoire";
+    case "iran":
+    case "ir iran":
+      return "IR Iran";
+    case "cape verde":
+    case "cabo verde":
+      return "Cabo Verde";
+    case "dr congo":
+    case "congo dr":
+      return "Congo DR";
+    case "bosnia and herzegovina":
+    case "bosnia & herzegovina":
+      return "Bosnia & Herzegovina";
+    default:
+      return name;
+  }
+}
+
+/**
+ * Determina si el nombre de equipo provisto es un marcador de posición (placeholder) del bracket.
+ */
+export function isPlaceholderTeam(name: string): boolean {
+  const norm = name.trim().toUpperCase();
+  if (norm === "TBD" || norm === "POR DEFINIR" || norm === "" || norm === "POR DEFINIR EQUIPO") {
+    return true;
+  }
+  // Coincide con patrones típicos como 1A, 2B, W73, L102, 3ABCDF, 3ABC, etc.
+  if (/^[123][A-L]$/.test(norm)) return true;
+  if (/^[WL]\d{2,3}$/.test(norm)) return true;
+  if (/^3[A-L]{3,6}$/.test(norm)) return true;
+  return false;
+}
 
 /**
  * Mapea el status de la API de Zafronix a los status válidos de nuestra DB.
@@ -70,8 +130,42 @@ function mapApiStatus(
       return "canceled";
     case "scheduled":
     default:
+      console.warn(`⚠️ Estado desconocido de la API: "${apiStatus}". Mapeando por defecto a "scheduled".`);
       return "scheduled";
   }
+}
+
+/**
+ * Realiza una petición externa con reintentos y tiempo límite de respuesta (timeout).
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  fetchFn: typeof globalThis.fetch = globalThis.fetch,
+  retries = 3,
+  delayMs = 1000,
+): Promise<Response> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+
+    try {
+      const response = await fetchFn(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (attempt === retries) {
+        throw new Error(`Fallo tras ${retries} intentos de red. Último error: ${err.message}`);
+      }
+      console.warn(`Intento de red ${attempt} fallido: ${err.message}. Reintentando en ${delayMs}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error("Petición de red no alcanzada");
 }
 
 // ── Funciones principales exportadas para testing ───────────────────
@@ -90,8 +184,7 @@ export async function getStoredETag(
     .maybeSingle();
 
   if (error) {
-    console.error("Error al leer ETag de system_config:", error.message);
-    return null;
+    throw new Error(`Error al leer ETag de system_config: ${error.message}`);
   }
 
   return data?.value ?? null;
@@ -120,18 +213,17 @@ export async function saveETag(
 
 /**
  * Ejecuta la lógica de sincronización principal.
- * Exportada como función para facilitar el testing sin depender de process.exit.
- *
- * @returns Un objeto con el resultado de la sincronización:
- *   - { status: "not_modified" } si la API respondió 304
- *   - { status: "updated", updated: number } si hubo cambios
- *   - Lanza un error en caso de fallo
  */
 export async function syncMatches(
   supabase: SupabaseClient,
   apiKey: string,
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<{ status: "not_modified" } | { status: "updated"; updated: number }> {
+  // Validación de API Key
+  if (!apiKey || apiKey.trim() === "") {
+    throw new Error("El X-API-Key de Zafronix no puede estar vacío.");
+  }
+
   // 1. Consultar el ETag anterior de la base de datos
   const storedETag = await getStoredETag(supabase);
 
@@ -143,8 +235,12 @@ export async function syncMatches(
     headers["If-None-Match"] = storedETag;
   }
 
-  // 3. Realizar la solicitud a la API de Zafronix
-  const response = await fetchFn(ZAFRONIX_API_URL, { headers });
+  // 3. Realizar la solicitud a la API de Zafronix con timeout y reintentos
+  const response = await fetchWithRetry(
+    ZAFRONIX_API_URL,
+    { headers },
+    fetchFn,
+  );
 
   // 4. Procesar según status de respuesta
   if (response.status === 304) {
@@ -165,17 +261,22 @@ export async function syncMatches(
   const newETag =
     response.headers.get("etag") || response.headers.get("ETag");
 
-  // 6. Parsear y validar el body JSON
-  const rawBody = await response.json();
-  const parseResult = zafronixResponseSchema.safeParse(rawBody);
+  // 6. Parsear y validar el body JSON (con control de excepciones de parsing)
+  let rawBody: unknown;
+  try {
+    rawBody = await response.json();
+  } catch (err: any) {
+    throw new Error(`Error al parsear el JSON de la respuesta de la API: ${err.message}`);
+  }
 
+  const parseResult = zafronixResponseSchema.safeParse(rawBody);
   if (!parseResult.success) {
     throw new Error(
       `Error de validación del body de la API: ${JSON.stringify(parseResult.error.issues)}`,
     );
   }
 
-  const apiMatches = parseResult.data;
+  const apiMatches = parseResult.data.data;
 
   // 7. Consultar todos los partidos locales para comparar
   const { data: localMatches, error: fetchError } = await supabase
@@ -190,18 +291,46 @@ export async function syncMatches(
     );
   }
 
-  // 8. Crear mapa de partidos locales por external_ref para búsqueda rápida
+  // 8. Crear mapas en memoria para búsquedas eficientes y mapeo de IDs
   const localByRef = new Map(
     (localMatches ?? [])
       .filter((m) => m.external_ref)
       .map((m) => [m.external_ref, m]),
   );
 
-  // 9. Comparar y actualizar solo los partidos que cambiaron
-  let updatedCount = 0;
+  const localKnockoutBySlot = new Map(
+    (localMatches ?? [])
+      .filter((m) => m.bracket_slot !== null && m.bracket_slot !== undefined)
+      .map((m) => [m.bracket_slot, m]),
+  );
+
+  const localGroupByTeams = new Map(
+    (localMatches ?? [])
+      .filter((m) => m.bracket_slot === null || m.bracket_slot === undefined)
+      .map((m) => [`${normalizeTeamName(m.home_team)}|${normalizeTeamName(m.away_team)}`, m]),
+  );
+
+  // 9. Comparar y preparar actualizaciones solo de los partidos que cambiaron
+  const updateDataList: Array<{ id: string; [key: string]: any }> = [];
 
   for (const apiMatch of apiMatches) {
-    const local = localByRef.get(apiMatch.id);
+    // 9.1 Mapear dinámicamente el partido de la API al local
+    let local = localByRef.get(apiMatch.id);
+
+    if (!local) {
+      const parts = apiMatch.id.split("-");
+      const matchNum = parts.length > 1 && parts[1] ? parseInt(parts[1], 10) : NaN;
+
+      if (!isNaN(matchNum)) {
+        if (matchNum >= 73) {
+          local = localKnockoutBySlot.get(matchNum);
+        } else if (apiMatch.homeTeam && apiMatch.awayTeam) {
+          const key = `${normalizeTeamName(apiMatch.homeTeam)}|${normalizeTeamName(apiMatch.awayTeam)}`;
+          local = localGroupByTeams.get(key);
+        }
+      }
+    }
+
     if (!local) {
       // Partido no encontrado en la base de datos local — ignorar
       continue;
@@ -214,8 +343,15 @@ export async function syncMatches(
       local.home_score !== apiMatch.homeScore ||
       local.away_score !== apiMatch.awayScore;
     const statusChanged = local.status !== mappedStatus;
-    const teamsChanged =
+    
+    // Solo actualizar nombres de equipos en eliminatoria si recibimos equipos reales (no placeholders)
+    const canUpdateTeams =
       local.bracket_slot !== null &&
+      !isPlaceholderTeam(apiMatch.homeTeam) &&
+      !isPlaceholderTeam(apiMatch.awayTeam);
+
+    const teamsChanged =
+      canUpdateTeams &&
       (local.home_team !== apiMatch.homeTeam ||
         local.away_team !== apiMatch.awayTeam);
 
@@ -224,46 +360,52 @@ export async function syncMatches(
     }
 
     // Construir objeto de actualización
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updateData: Record<string, any> = {
+    const updateData: { id: string; [key: string]: any } = {
+      id: local.id,
       home_score: apiMatch.homeScore,
       away_score: apiMatch.awayScore,
       status: mappedStatus,
       updated_at: new Date().toISOString(),
     };
 
-    // Solo actualizar equipos para partidos de eliminatoria (bracket_slot != null)
-    if (local.bracket_slot !== null) {
+    if (canUpdateTeams) {
       updateData.home_team = apiMatch.homeTeam;
       updateData.away_team = apiMatch.awayTeam;
     }
 
-    const { error: updateError } = await supabase
-      .from("matches")
-      .update(updateData)
-      .eq("id", local.id);
-
-    if (updateError) {
-      console.error(
-        `Error al actualizar partido ${apiMatch.id}: ${updateError.message}`,
-      );
-      continue;
-    }
-
-    updatedCount++;
+    updateDataList.push(updateData);
   }
 
-  // 10. Guardar el nuevo ETag si fue proporcionado
-  if (newETag) {
+  // 9.2 Ejecutar las consultas en paralelo con Promise.all para evitar consultas N+1 secuenciales
+  let allUpdatesSucceeded = true;
+  if (updateDataList.length > 0) {
+    const promises = updateDataList.map((data) => {
+      const { id, ...fields } = data;
+      return supabase.from("matches").update(fields).eq("id", id);
+    });
+
+    const results = await Promise.all(promises);
+    for (const r of results) {
+      if (r.error) {
+        console.error("Error al actualizar partido:", r.error.message);
+        allUpdatesSucceeded = false;
+      }
+    }
+  }
+
+  // 10. Guardar el nuevo ETag si fue proporcionado y las actualizaciones tuvieron éxito
+  if (newETag && allUpdatesSucceeded) {
     await saveETag(supabase, newETag);
+  } else if (!allUpdatesSucceeded) {
+    console.warn("⚠️ Algunas actualizaciones de partidos fallaron. No se guardará el nuevo ETag para reintentar.");
   }
 
   console.log(
-    `✅ Sincronización completada. Partidos actualizados: ${updatedCount}. ` +
-      `ETag actualizado: ${newETag ?? "(no proporcionado)"}`,
+    `✅ Sincronización completada. Partidos actualizados: ${updateDataList.length}. ` +
+      `ETag actualizado: ${newETag && allUpdatesSucceeded ? newETag : "(no actualizado)"}`,
   );
 
-  return { status: "updated", updated: updatedCount };
+  return { status: "updated", updated: updateDataList.length };
 }
 
 // ── Entry Point (ejecución directa) ────────────────────────────────

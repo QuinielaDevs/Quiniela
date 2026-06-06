@@ -43,6 +43,7 @@ const SYNC_UNCHANGED_REF = "test-sync-2026-grp-A2";
 // ── Fixtures ────────────────────────────────────────────────────────
 
 let supabase: SupabaseClient;
+let originalETag: string | null = null;
 
 let groupMatchId: string;
 let knockoutMatchId: string;
@@ -50,6 +51,18 @@ let unchangedMatchId: string;
 
 beforeAll(async () => {
   supabase = createServiceRoleClient();
+
+  // Guardar ETag original para no afectar base de datos de desarrollo
+  try {
+    const { data } = await supabase
+      .from("system_config")
+      .select("value")
+      .eq("key", ETAG_CONFIG_KEY)
+      .maybeSingle();
+    originalETag = data?.value ?? null;
+  } catch (err) {
+    console.warn("No se pudo respaldar el ETag original:", err);
+  }
 
   // Limpiar partidos y ETag de pruebas anteriores
   const testRefs = [SYNC_GROUP_REF, SYNC_KNOCKOUT_REF, SYNC_UNCHANGED_REF];
@@ -134,7 +147,17 @@ afterAll(async () => {
       await supabase.from("predictions").delete().in("match_id", ids);
     }
     await supabase.from("matches").delete().in("external_ref", testRefs);
-    await supabase.from("system_config").delete().eq("key", ETAG_CONFIG_KEY);
+
+    // Restaurar ETag original
+    if (originalETag !== null) {
+      await supabase.from("system_config").upsert({
+        key: ETAG_CONFIG_KEY,
+        value: originalETag,
+        description: "ETag de la última respuesta 200 de Zafronix matches API",
+      });
+    } else {
+      await supabase.from("system_config").delete().eq("key", ETAG_CONFIG_KEY);
+    }
   }
 });
 
@@ -153,14 +176,14 @@ function createMock304(): typeof globalThis.fetch {
 }
 
 /**
- * Crea un mock de fetch que responde con 200 OK y un array de partidos.
+ * Crea un mock de fetch que responde con 200 OK y un objeto envoltorio con el array de partidos.
  */
 function createMock200(
   matches: object[],
   etag: string = TEST_ETAG_NEW,
 ): typeof globalThis.fetch {
   return vi.fn().mockResolvedValue(
-    new Response(JSON.stringify(matches), {
+    new Response(JSON.stringify({ year: 2026, count: matches.length, data: matches }), {
       status: 200,
       statusText: "OK",
       headers: new Headers({
