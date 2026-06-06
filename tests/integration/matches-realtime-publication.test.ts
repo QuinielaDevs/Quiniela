@@ -4,7 +4,7 @@ import { basename } from "node:path";
 import { describe, expect, it } from "vitest";
 
 function queryLocalPostgres(sql: string): string {
-  const projectName = basename(process.cwd());
+  const projectName = basename(process.cwd()).toLowerCase();
   return execFileSync(
     "docker",
     [

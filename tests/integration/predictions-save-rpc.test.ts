@@ -9,7 +9,7 @@ import {
 import type { Prediction } from "@/types";
 
 function runSql(sql: string): void {
-  const containerName = `supabase_db_${basename(process.cwd())}`;
+  const containerName = `supabase_db_${basename(process.cwd()).toLowerCase()}`;
   execFileSync(
     "docker",
     [

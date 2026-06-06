@@ -5,7 +5,7 @@ import { basename } from "node:path";
 import { describe, expect, it } from "vitest";
 
 function containerName(): string {
-  return `supabase_db_${basename(process.cwd())}`;
+  return `supabase_db_${basename(process.cwd()).toLowerCase()}`;
 }
 
 function queryLocalPostgres(sql: string): string {
