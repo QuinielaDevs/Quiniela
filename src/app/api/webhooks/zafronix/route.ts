@@ -140,7 +140,11 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Validar ventana de replay (AC #2)
-  const timestampMs = Number(timestamp);
+  let timestampMs = Number(timestamp);
+  if (!isNaN(timestampMs) && timestampMs < 10000000000) {
+    // Si viene en segundos (ej. 17xxxxx), convertir a milisegundos
+    timestampMs *= 1000;
+  }
   if (isNaN(timestampMs) || !isWithinReplayWindow(timestampMs)) {
     return NextResponse.json(
       {
@@ -263,7 +267,21 @@ async function handleMatchFinalized(
     .eq("external_ref", event.matchId)
     .single();
 
-  if (findError || !match) {
+  if (findError) {
+    if (findError.code === "PGRST116") {
+      return NextResponse.json(
+        { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
+        { status: 404 },
+      );
+    }
+    console.error("Database error looking up match:", findError);
+    return NextResponse.json(
+      { error: "internal_error", message: "Failed to look up match" },
+      { status: 500 },
+    );
+  }
+
+  if (!match) {
     return NextResponse.json(
       { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
       { status: 404 },
@@ -326,11 +344,25 @@ async function handleMatchPatched(
   // Buscar el partido por external_ref
   const { data: match, error: findError } = await supabase
     .from("matches")
-    .select("id, bracket_slot")
+    .select("id, bracket_slot, status")
     .eq("external_ref", event.matchId)
     .single();
 
-  if (findError || !match) {
+  if (findError) {
+    if (findError.code === "PGRST116") {
+      return NextResponse.json(
+        { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
+        { status: 404 },
+      );
+    }
+    console.error("Database error looking up match:", findError);
+    return NextResponse.json(
+      { error: "internal_error", message: "Failed to look up match" },
+      { status: 500 },
+    );
+  }
+
+  if (!match) {
     return NextResponse.json(
       { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
       { status: 404 },
@@ -341,14 +373,28 @@ async function handleMatchPatched(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateData: Record<string, any> = {
     updated_at: new Date().toISOString(),
-    status: "finished", // Un patch implica que el partido sigue finished
+    status: match.status, // Preservar el estado actual del partido en lugar de forzar finished
   };
 
   if (changes.homeScore) {
-    updateData.home_score = changes.homeScore.to as number;
+    const val = changes.homeScore.to;
+    if (typeof val !== "number" || !Number.isInteger(val) || val < 0) {
+      return NextResponse.json(
+        { error: "validation_failed", message: "Invalid homeScore correction value" },
+        { status: 400 },
+      );
+    }
+    updateData.home_score = val;
   }
   if (changes.awayScore) {
-    updateData.away_score = changes.awayScore.to as number;
+    const val = changes.awayScore.to;
+    if (typeof val !== "number" || !Number.isInteger(val) || val < 0) {
+      return NextResponse.json(
+        { error: "validation_failed", message: "Invalid awayScore correction value" },
+        { status: 400 },
+      );
+    }
+    updateData.away_score = val;
   }
 
   // AC #4: Si es eliminatoria, actualizar equipos si se proveen
@@ -404,48 +450,42 @@ async function handleMatchPostponed(
     .eq("external_ref", event.matchId)
     .single();
 
-  if (findError || !match) {
+  if (findError) {
+    if (findError.code === "PGRST116") {
+      return NextResponse.json(
+        { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
+        { status: 404 },
+      );
+    }
+    console.error("Database error looking up match:", findError);
+    return NextResponse.json(
+      { error: "internal_error", message: "Failed to look up match" },
+      { status: 500 },
+    );
+  }
+
+  if (!match) {
     return NextResponse.json(
       { error: "not_found", message: `Match with external_ref '${event.matchId}' not found` },
       { status: 404 },
     );
   }
 
-  // Actualizar el status del partido.
-  // Esto gatilla el trigger tr_resolve_challenges_on_match_status_change
-  // que cancela duelos y reembolsa escrow automáticamente.
-  const { error: updateError } = await supabase
-    .from("matches")
-    .update({
-      status: dbStatus,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", match.id);
+  // Llamar al RPC transaccional que actualiza el partido y anula predicciones
+  const { error: rpcError } = await supabase.rpc(
+    "fn_postpone_match_and_predictions",
+    {
+      p_match_id: match.id,
+      p_status: dbStatus,
+    }
+  );
 
-  if (updateError) {
-    console.error("Error updating match status:", updateError);
+  if (rpcError) {
+    console.error("Error executing postpone RPC:", rpcError);
     return NextResponse.json(
-      { error: "internal_error", message: "Failed to update match status" },
+      { error: "internal_error", message: "Failed to update match and predictions" },
       { status: 500 },
     );
-  }
-
-  // Anular predicciones: points_earned = 0.00, evaluated_at = now()
-  // Esto se hace para todas las predicciones del partido
-  // que aún no hayan sido evaluadas.
-  const { error: predError } = await supabase
-    .from("predictions")
-    .update({
-      points_earned: 0.0,
-      evaluated_at: new Date().toISOString(),
-    })
-    .eq("match_id", match.id)
-    .is("evaluated_at", null);
-
-  if (predError) {
-    console.error("Error nullifying predictions:", predError);
-    // No retornamos error al webhook — el match ya se actualizó correctamente.
-    // Loggeamos para investigación pero damos 200 para que Zafronix no reintente.
   }
 
   return NextResponse.json(

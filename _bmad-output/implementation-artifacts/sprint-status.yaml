@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-06-01T19:12:28-04:00"
-last_updated: "2026-06-05T17:43:00-04:00"
+last_updated: "2026-06-06T10:35:00-04:00"
 project: "pija-quiniela"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -83,7 +83,7 @@ development_status:
 
   # Epic 8: Sincronización Automática con Zafronix World Cup API
   epic-8: in-progress
-  8-1-endpoint-de-webhook-para-sincronizacion-de-partidos-en-tiempo-real-zafronix-api: review
+  8-1-endpoint-de-webhook-para-sincronizacion-de-partidos-en-tiempo-real-zafronix-api: done
   8-2-sincronizacion-periodica-de-respaldo-con-etags-github-actions-cron-job: backlog
   8-3-script-administrativo-de-sincronizacion-y-restauracion-completa: backlog
   8-4-entorno-de-pruebas-integradas-con-el-sandbox-de-zafronix-ano-9999: backlog

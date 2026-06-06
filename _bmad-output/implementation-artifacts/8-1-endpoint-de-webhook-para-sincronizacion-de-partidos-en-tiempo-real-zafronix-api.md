@@ -4,7 +4,7 @@ baseline_commit: 64eba1ed19b8a3f3a5b7a253ecd8e3ecbaa833a7
 
 # Story 8.1: Endpoint de Webhook para Sincronización de Partidos en Tiempo Real (Zafronix API)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -62,6 +62,21 @@ para que el sistema reciba y procese notificaciones en tiempo real sobre la fina
   - [x] Diseñar tests para el descarte por ventana de tiempo (replay attack).
   - [x] Simular payloads de `match.finalized` y `match.patched` para validar actualizaciones correctas de marcadores y nombres de equipos en `public.matches`.
   - [x] Simular payloads de `match.postponed` para verificar la anulación automática de predicciones (`points_earned = 0.00` y `evaluated_at IS NOT NULL`) y que el trigger de base de datos reembolse el escrow y cancele los duelos.
+
+### Review Findings
+
+- [x] [Review][Patch] Refactor integration tests to call POST handler directly [tests/integration/zafronix-webhook.test.ts:697-742]
+- [x] [Review][Patch] Missing timestamp unit validation for replay attack prevention [src/app/api/webhooks/zafronix/route.ts:143-152]
+- [x] [Review][Patch] Non-transactional match status update and predictions nullification [src/app/api/webhooks/zafronix/route.ts:385-455]
+- [x] [Review][Patch] Incorrect HTTP 404 returned on database query failure [src/app/api/webhooks/zafronix/route.ts:260-271]
+- [x] [Review][Patch] Unsafe type casting of score corrections in patch events [src/app/api/webhooks/zafronix/route.ts:347-352]
+- [x] [Review][Patch] Match status forced to 'finished' on patch events [src/app/api/webhooks/zafronix/route.ts:344]
+- [x] [Review][Patch] Only un-evaluated predictions nullified on postponed matches [src/app/api/webhooks/zafronix/route.ts:443]
+- [x] [Review][Patch] Test cleanup in beforeAll vulnerable to foreign key constraint violation [tests/integration/zafronix-webhook.test.ts:761-768]
+- [x] [Review][Patch] Fragile hardcoded sleep in integration tests [tests/integration/zafronix-webhook.test.ts:1162-1163]
+- [x] [Review][Patch] Redundant ternary operator for BASE_URL in test suite [tests/integration/zafronix-webhook.test.ts:697-699]
+- [x] [Review][Defer] Match Score Corrections Do Not Recalculate Points [supabase/migrations/20260604195000_resolve_challenges.sql:200-202] — deferred, pre-existing (trigger limitation)
+- [x] [Review][Defer] Out-of-Order Webhook Event Delivery Vulnerability [src/app/api/webhooks/zafronix/route.ts] — deferred, pre-existing (requires DB schema expansion)
 
 ## Dev Notes
 

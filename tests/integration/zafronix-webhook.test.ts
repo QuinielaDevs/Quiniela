@@ -14,6 +14,8 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createHmac } from "node:crypto";
 import { createServiceRoleClient } from "./setup";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { NextRequest } from "next/server";
+import { POST } from "../../src/app/api/webhooks/zafronix/route";
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -21,12 +23,7 @@ const WEBHOOK_SECRET =
   process.env.ZAFRONIX_WEBHOOK_SECRET ??
   "whsec_test_secret_for_integration_tests_only";
 
-/** Base URL del servidor Next.js local. */
-const BASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
-  ? "http://localhost:3000"
-  : "http://localhost:3000";
-
-const WEBHOOK_URL = `${BASE_URL}/api/webhooks/zafronix`;
+const WEBHOOK_URL = "http://localhost:3000/api/webhooks/zafronix";
 
 /**
  * Genera cabeceras de webhook válidas para un payload dado.
@@ -62,11 +59,12 @@ async function postWebhook(
 ): Promise<Response> {
   const body = JSON.stringify(payload);
   const headers = signPayload(body, secret, timestampMs);
-  return fetch(WEBHOOK_URL, {
+  const req = new NextRequest(WEBHOOK_URL, {
     method: "POST",
-    headers: { ...headers, ...overrides },
+    headers: new Headers({ ...headers, ...overrides }),
     body,
   });
+  return POST(req);
 }
 
 // ── Fixtures ────────────────────────────────────────────────────────
@@ -85,7 +83,19 @@ const POSTPONE_EXTERNAL_REF = "test-wh-2026-005";
 beforeAll(async () => {
   supabase = createServiceRoleClient();
 
-  // Limpiar cualquier dato de pruebas anteriores
+  // Limpiar predicciones y luego partidos de pruebas anteriores (evita violación de FK)
+  const { data: existingMatches } = await supabase
+    .from("matches")
+    .select("id")
+    .in("external_ref", [
+      GROUP_EXTERNAL_REF,
+      KNOCKOUT_EXTERNAL_REF,
+      POSTPONE_EXTERNAL_REF,
+    ]);
+  if (existingMatches && existingMatches.length > 0) {
+    const ids = existingMatches.map((m) => m.id);
+    await supabase.from("predictions").delete().in("match_id", ids);
+  }
   await supabase
     .from("matches")
     .delete()
@@ -174,14 +184,14 @@ describe("POST /api/webhooks/zafronix", () => {
     it("rechaza solicitudes sin cabecera X-Zafronix-Signature-256", async () => {
       const body = JSON.stringify({ type: "match.finalized", matchId: "test" });
       const ts = String(Date.now());
-      const res = await fetch(WEBHOOK_URL, {
+      const res = await POST(new NextRequest(WEBHOOK_URL, {
         method: "POST",
-        headers: {
+        headers: new Headers({
           "Content-Type": "application/json",
           "X-Zafronix-Timestamp": ts,
-        },
+        }),
         body,
-      });
+      }));
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data).toHaveProperty("error");
@@ -194,14 +204,14 @@ describe("POST /api/webhooks/zafronix", () => {
         createHmac("sha256", WEBHOOK_SECRET)
           .update(`${Date.now()}.${body}`)
           .digest("hex");
-      const res = await fetch(WEBHOOK_URL, {
+      const res = await POST(new NextRequest(WEBHOOK_URL, {
         method: "POST",
-        headers: {
+        headers: new Headers({
           "Content-Type": "application/json",
           "X-Zafronix-Signature-256": sig,
-        },
+        }),
         body,
-      });
+      }));
       expect(res.status).toBe(400);
     });
 
@@ -487,8 +497,21 @@ describe("POST /api/webhooks/zafronix", () => {
       if (userErr) throw userErr;
       testUserId = user.user!.id;
 
-      // Esperar a que el trigger de profiles se ejecute
-      await new Promise((r) => setTimeout(r, 500));
+      // Esperar a que el trigger de profiles se ejecute de forma robusta
+      let profileExists = false;
+      for (let i = 0; i < 20; i++) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", user.user!.id)
+          .maybeSingle();
+        if (data) {
+          profileExists = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      if (!profileExists) throw new Error("Profile trigger did not execute in time");
 
       const { data: league, error: leagueErr } = await supabase
         .from("leagues")
@@ -637,11 +660,11 @@ describe("POST /api/webhooks/zafronix", () => {
     it("rechaza payloads con JSON inválido", async () => {
       const body = "this is not json {{{";
       const headers = signPayload(body);
-      const res = await fetch(WEBHOOK_URL, {
+      const res = await POST(new NextRequest(WEBHOOK_URL, {
         method: "POST",
-        headers,
+        headers: new Headers(headers),
         body,
-      });
+      }));
       expect(res.status).toBe(400);
     });
   });
