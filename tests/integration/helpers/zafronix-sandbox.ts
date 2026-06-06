@@ -155,7 +155,7 @@ async function fetchZafronix(
       lastErr = err;
       if (attempt < retries) {
         const delay = err instanceof Error && err.message.includes("Rate limited")
-          ? parseInt(err.message.split("after ")[1], 10) || retryDelayMs
+          ? parseInt(err.message.split("after ")[1] || "", 10) || retryDelayMs
           : retryDelayMs;
         await new Promise((r) => setTimeout(r, delay));
       }
