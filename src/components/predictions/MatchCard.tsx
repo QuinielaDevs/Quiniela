@@ -39,6 +39,7 @@ export type MatchCardMatch = Pick<
   | "away_source"
   | "bracket_slot"
   | "venue"
+  | "group_label"
 >;
 
 type MatchCardProps = {

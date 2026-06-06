@@ -4,7 +4,12 @@ import { useMemo, useState } from "react";
 
 import { MatchCard, type MatchCardMatch } from "@/components/predictions/MatchCard";
 import { ScrollableTabs } from "@/components/ui/ScrollableTabs";
-import { buildPhases, phaseKeyForMatch } from "@/utils/tournament";
+import {
+  buildPhases,
+  groupByGroupLabel,
+  phaseKeyForMatch,
+  sortKnockoutBySlot,
+} from "@/utils/tournament";
 import { AwardsBoard } from "@/components/awards/AwardsBoard";
 import type { AwardCandidate, AwardCategory } from "@/types";
 
@@ -65,6 +70,40 @@ export function PredictionsBoardView({
     [matches, activeKey],
   );
 
+  const isGroupPhase = activeKey.startsWith("jornada-");
+
+  // En grupos: secciones por Grupo A–L. En eliminatorias: orden por bracket_slot.
+  const groupedSections = useMemo(
+    () => (isGroupPhase ? groupByGroupLabel(visibleMatches) : []),
+    [isGroupPhase, visibleMatches],
+  );
+  const knockoutMatches = useMemo(
+    () => (isGroupPhase ? [] : sortKnockoutBySlot(visibleMatches)),
+    [isGroupPhase, visibleMatches],
+  );
+
+  const renderCard = (match: MatchCardMatch) => {
+    const prediction = predictionByMatch.get(match.id);
+    return (
+      <MatchCard
+        key={match.id}
+        leagueId={leagueId}
+        match={match}
+        initialPrediction={
+          prediction
+            ? {
+                id: prediction.id,
+                homeScorePred: prediction.home_score_pred,
+                awayScorePred: prediction.away_score_pred,
+                multiplier: prediction.multiplier ?? undefined,
+                updatedAt: prediction.updated_at ?? undefined,
+              }
+            : null
+        }
+      />
+    );
+  };
+
   return (
     <div className="flex flex-col gap-3">
       {phases.length > 1 && (
@@ -85,29 +124,25 @@ export function PredictionsBoardView({
           activePhaseLabel={activePhaseLabel}
           activePhaseCode={activePhaseCode}
         />
+      ) : isGroupPhase ? (
+        <div className="flex flex-col gap-6">
+          {groupedSections.map((section) => (
+            <section key={section.group} className="flex flex-col gap-3">
+              <h3 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-accent">
+                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-sm bg-accent/15 px-2 text-accent">
+                  {section.group}
+                </span>
+                Grupo {section.group}
+              </h3>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                {section.matches.map(renderCard)}
+              </div>
+            </section>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {visibleMatches.map((match) => {
-            const prediction = predictionByMatch.get(match.id);
-            return (
-              <MatchCard
-                key={match.id}
-                leagueId={leagueId}
-                match={match}
-                initialPrediction={
-                  prediction
-                    ? {
-                        id: prediction.id,
-                        homeScorePred: prediction.home_score_pred,
-                        awayScorePred: prediction.away_score_pred,
-                        multiplier: prediction.multiplier ?? undefined,
-                        updatedAt: prediction.updated_at ?? undefined,
-                      }
-                    : null
-                }
-              />
-            );
-          })}
+          {knockoutMatches.map(renderCard)}
         </div>
       )}
     </div>

@@ -79,6 +79,59 @@ export function buildPhases(
   return phases;
 }
 
+// Agrupa partidos de fase de grupos por su `group_label` (A–L), ordenado
+// alfabéticamente. Los partidos sin group_label caen en una sección final "—"
+// (no debería ocurrir en grupos, es defensivo). Dentro de cada grupo respeta el
+// orden de entrada (la consulta ya los trae por match_time).
+export function groupByGroupLabel<T extends { group_label: string | null }>(
+  matches: T[],
+): { group: string; matches: T[] }[] {
+  const byGroup = new Map<string, T[]>();
+
+  for (const match of matches) {
+    const key = match.group_label ?? "—";
+    const bucket = byGroup.get(key);
+    if (bucket) bucket.push(match);
+    else byGroup.set(key, [match]);
+  }
+
+  return [...byGroup.entries()]
+    .sort(([a], [b]) => {
+      // La sección sin grupo ("—") siempre va al final.
+      if (a === "—") return 1;
+      if (b === "—") return -1;
+      return a.localeCompare(b);
+    })
+    .map(([group, groupMatches]) => ({ group, matches: groupMatches }));
+}
+
+// Ordena partidos de eliminatoria por `bracket_slot` ascendente (orden del
+// cuadro). Fallback a `match_time` cuando falta el slot. No muta la entrada.
+export function sortKnockoutBySlot<
+  T extends { bracket_slot: number | null; match_time: string },
+>(matches: T[]): T[] {
+  return [...matches].sort((a, b) => {
+    const slotA = a.bracket_slot;
+    const slotB = b.bracket_slot;
+    if (slotA != null && slotB != null) return slotA - slotB;
+    if (slotA != null) return -1;
+    if (slotB != null) return 1;
+    return a.match_time.localeCompare(b.match_time);
+  });
+}
+
+// Etiqueta de un cruce de eliminatoria a partir de sus orígenes TBD
+//   (W73, W74) → "Ganador 73 vs Ganador 74"; null si no hay orígenes.
+export function knockoutMatchupLabel(match: {
+  home_source: string | null;
+  away_source: string | null;
+}): string | null {
+  const home = describeMatchSource(match.home_source);
+  const away = describeMatchSource(match.away_source);
+  if (!home && !away) return null;
+  return `${home ?? "Por definir"} vs ${away ?? "Por definir"}`;
+}
+
 // Traduce un código de origen de bracket TBD a texto legible.
 //   1A        → 1.º Grupo A
 //   2B        → 2.º Grupo B

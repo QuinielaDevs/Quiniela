@@ -8,7 +8,10 @@ const redirect = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
 });
 
-vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("next/navigation", () => ({
+  redirect,
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 vi.mock("@/utils/supabase/server", () => ({
   createClient: vi.fn(async () => ({ auth: { getClaims }, from, rpc })),
@@ -121,6 +124,7 @@ describe("/predictions (PredictionsBoard)", () => {
             away_team: "Mexico",
             stage: "group",
             matchday: 1,
+            group_label: "A",
           },
           {
             id: "m2",
@@ -128,6 +132,7 @@ describe("/predictions (PredictionsBoard)", () => {
             away_team: "Alemania",
             stage: "group",
             matchday: 1,
+            group_label: "B",
           },
         ],
       },

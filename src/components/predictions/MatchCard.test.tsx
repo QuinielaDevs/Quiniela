@@ -28,6 +28,7 @@ const MATCH = {
   away_source: null,
   bracket_slot: null,
   venue: "Estadio Monumental",
+  group_label: "A",
 };
 
 // Jornada 2+: el multiplicador escala por antelación (la Jornada 1 es línea base

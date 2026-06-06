@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/server";
 import { PredictionsBoardView } from "@/components/predictions/PredictionsBoardView";
+import { JoinByCodeForm } from "@/components/join/JoinByCodeForm";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 
 import { groupCandidatesByCategory } from "@/utils/awards";
@@ -46,13 +47,7 @@ export async function PredictionsBoard() {
 
   const leagueId = memberships?.[0]?.league_id;
   if (!leagueId) {
-    return (
-      <EmptyState
-        title="Aún no perteneces a una liga"
-        body="Crea tu propia quiniela o únete a una con un enlace de invitación para empezar a pronosticar."
-        cta={{ href: "/leagues/new", label: "Crear una liga" }}
-      />
-    );
+    return <NoLeagueState />;
   }
 
   // Partidos programados de todo el torneo + predicciones propias del usuario.
@@ -70,7 +65,7 @@ export async function PredictionsBoard() {
     supabase
       .from("matches")
       .select(
-        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday, home_source, away_source, bracket_slot, venue",
+        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday, home_source, away_source, bracket_slot, venue, group_label",
       )
       .eq("status", "scheduled")
       .order("match_time", { ascending: true }),
@@ -144,6 +139,38 @@ export async function PredictionsBoard() {
       activePhaseLabel={activePhaseLabel}
       activePhaseCode={activePhaseCode}
     />
+  );
+}
+
+// Estado para usuario logueado sin liga: puede unirse al instante con un código
+// (entrada manual) o crear su propia liga. El formulario es un client component.
+function NoLeagueState() {
+  return (
+    <div className="rounded-md border border-border bg-card p-6 text-card-foreground">
+      <h2 className="font-display text-lg font-bold">
+        Aún no perteneces a una liga
+      </h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        ¿Tienes un código de invitación? Únete al instante. Si no, crea tu propia
+        quiniela.
+      </p>
+
+      <div className="mt-5">
+        <JoinByCodeForm />
+      </div>
+
+      <div className="relative my-5 text-center text-sm">
+        <span className="relative z-10 bg-card px-2 text-muted-foreground">o</span>
+        <div className="absolute inset-0 top-1/2 -z-0 border-t border-border" />
+      </div>
+
+      <Link
+        href="/leagues/new"
+        className="inline-flex h-12 w-full items-center justify-center rounded-sm border border-border bg-background px-6 font-semibold text-foreground transition-colors hover:bg-card"
+      >
+        Crear una liga
+      </Link>
+    </div>
   );
 }
 

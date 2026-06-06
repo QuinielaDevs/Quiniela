@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildPhases,
   describeMatchSource,
+  groupByGroupLabel,
+  knockoutMatchupLabel,
   phaseKeyForMatch,
+  sortKnockoutBySlot,
   stageLabel,
 } from "@/utils/tournament";
 
@@ -79,5 +82,72 @@ describe("describeMatchSource", () => {
 
   it("devuelve null sin origen", () => {
     expect(describeMatchSource(null)).toBeNull();
+  });
+});
+
+describe("groupByGroupLabel", () => {
+  it("agrupa por grupo y ordena A→L conservando el orden interno", () => {
+    const sections = groupByGroupLabel([
+      { id: 1, group_label: "B" },
+      { id: 2, group_label: "A" },
+      { id: 3, group_label: "B" },
+      { id: 4, group_label: "A" },
+    ]);
+
+    expect(sections.map((s) => s.group)).toEqual(["A", "B"]);
+    expect(sections[0]?.matches.map((m) => m.id)).toEqual([2, 4]);
+    expect(sections[1]?.matches.map((m) => m.id)).toEqual([1, 3]);
+  });
+
+  it("agrupa los partidos sin group_label en una sección final '—'", () => {
+    const sections = groupByGroupLabel([
+      { id: 1, group_label: "A" },
+      { id: 2, group_label: null },
+    ]);
+
+    expect(sections.map((s) => s.group)).toEqual(["A", "—"]);
+  });
+
+  it("devuelve lista vacía sin partidos", () => {
+    expect(groupByGroupLabel([])).toEqual([]);
+  });
+});
+
+describe("sortKnockoutBySlot", () => {
+  it("ordena por bracket_slot ascendente sin mutar la entrada", () => {
+    const input = [
+      { bracket_slot: 75, match_time: "2026-07-01T00:00:00Z" },
+      { bracket_slot: 73, match_time: "2026-07-02T00:00:00Z" },
+      { bracket_slot: 74, match_time: "2026-07-03T00:00:00Z" },
+    ];
+    const sorted = sortKnockoutBySlot(input);
+
+    expect(sorted.map((m) => m.bracket_slot)).toEqual([73, 74, 75]);
+    expect(input.map((m) => m.bracket_slot)).toEqual([75, 73, 74]); // no muta
+  });
+
+  it("usa match_time como fallback cuando falta el slot", () => {
+    const sorted = sortKnockoutBySlot([
+      { bracket_slot: null, match_time: "2026-07-03T00:00:00Z" },
+      { bracket_slot: null, match_time: "2026-07-01T00:00:00Z" },
+    ]);
+    expect(sorted.map((m) => m.match_time)).toEqual([
+      "2026-07-01T00:00:00Z",
+      "2026-07-03T00:00:00Z",
+    ]);
+  });
+});
+
+describe("knockoutMatchupLabel", () => {
+  it("compone el cruce a partir de los orígenes", () => {
+    expect(
+      knockoutMatchupLabel({ home_source: "W73", away_source: "W74" }),
+    ).toBe("Ganador 73 vs Ganador 74");
+  });
+
+  it("devuelve null si no hay orígenes", () => {
+    expect(
+      knockoutMatchupLabel({ home_source: null, away_source: null }),
+    ).toBeNull();
   });
 });

@@ -35,9 +35,9 @@ describe("LoginForm", () => {
 
     render(<LoginForm next="/join/ABCDN234" />);
 
-    await userEvent.type(screen.getByLabelText("Email"), "cris@test.local");
-    await userEvent.type(screen.getByLabelText("Password"), "Password123!");
-    await userEvent.click(screen.getByRole("button", { name: "Login" }));
+    await userEvent.type(screen.getByLabelText("Correo electrónico"), "cris@test.local");
+    await userEvent.type(screen.getByLabelText("Contraseña"), "Password123!");
+    await userEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
 
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith("/join/ABCDN234");
@@ -50,9 +50,9 @@ describe("LoginForm", () => {
 
     render(<LoginForm next="https://evil.test/phish" />);
 
-    await userEvent.type(screen.getByLabelText("Email"), "cris@test.local");
-    await userEvent.type(screen.getByLabelText("Password"), "Password123!");
-    await userEvent.click(screen.getByRole("button", { name: "Login" }));
+    await userEvent.type(screen.getByLabelText("Correo electrónico"), "cris@test.local");
+    await userEvent.type(screen.getByLabelText("Contraseña"), "Password123!");
+    await userEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
 
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith("/predictions");
