@@ -583,3 +583,24 @@ So que el ciclo de vida completo de un partido se pueda probar de manera fiel y 
 **And** la suite de pruebas realiza una llamada a `POST /sandbox/reset` antes de comenzar para garantizar un estado consistente de los fixtures ficticios
 **And** se verifica que al simular un resultado deportivo en el sandbox de Zafronix, el webhook local recibe la firma HMAC válida, actualiza la base de datos local y propaga el cambio en tiempo real (Supabase Realtime) permitiendo verificar la tabla de clasificaciones proyectada en el cliente
 **And** no se ejecutan operaciones de escritura sobre partidos reales del año 2026 durante las pruebas
+
+### Story 8.5: Test de Contrato del Webhook de Zafronix (pin del payload + recipe de firma desde docs)
+
+As a desarrollador del proyecto,
+I want fijar (pin) el contrato del webhook entrante de Zafronix con tests deterministas basados en los samples y el esquema de firma publicados en la documentación oficial,
+So que la mitad de ENTRADA (que un webhook real firmado por Zafronix pase nuestro handler) deje de ser un supuesto y quede protegida contra regresiones nuestras, con un runbook claro ante cambios de contrato.
+
+**Contexto:** Follow-up de la Story 8.4. El enfoque híbrido de 8.4 validó la mitad de SALIDA (escritura real al sandbox año 9999) y el pipeline interno (handler → DB → Realtime), pero re-firma el evento localmente, así que la firma y el payload REALES de Zafronix siguen siendo supuestos derivados de la doc. Verificado en https://api.zafronix.com/docs (2026-06-06): el registro de subscribers NO está disponible ("subscriber-side endpoints land in a follow-up release") → capturar una entrega real está BLOQUEADO; PERO los docs publican samples de payload (`match.finalized`/`.patched`/`.postponed`) y el esquema de firma completo. Esta historia cubre solo lo determinista y offline ("B-ahora"); la validación contra una entrega real firmada ("B-después") queda diferida y documentada como placeholder gated hasta que Zafronix habilite el registro.
+
+**Acceptance Criteria:**
+
+**Given** los samples de evento y el esquema de firma publicados en la documentación oficial de Zafronix
+**When** se ejecuta la suite de tests de contrato (offline, sin red, sin clave de sandbox, sin base de datos)
+**Then** cada sample documentado (`match.finalized`, `match.patched`, `match.postponed`) se valida contra los esquemas Zod del handler (`baseEventSchema` + el payload schema específico), fijando la FORMA del payload esperada
+**And** el recipe de firma documentado (HMAC-SHA256 sobre `${timestampMs}.${rawBody}`, cabecera `X-Zafronix-Signature-256: sha256=<hex>`, `X-Zafronix-Timestamp` en ms, ventana de replay 5 min) se verifica contra la función `verifySignature` del handler, incluyendo casos de manipulación (tamper) que deben fallar
+**And** los nombres de cabecera del contrato (`X-Zafronix-Signature-256`, `X-Zafronix-Timestamp`, `X-Zafronix-Event-Type`, `X-Zafronix-Event-Id`, `X-Zafronix-Webhook-Id`, `X-Zafronix-Delivery-Attempt`) quedan aseverados contra los docs
+**And** los samples se almacenan como fixtures versionados y existe un `CONTRACT.md` con la versión de contrato pineada, la fuente (URL + fecha) y un runbook de drift de 3 capas (guard de regresión propio, detección del cambio de Zafronix vía observabilidad en prod, y procedimiento de actualización)
+**And** la validación de una entrega REAL firmada por Zafronix queda documentada como diferida (placeholder gated `*.real.test.ts` con `skipIf` + instrucciones de captura), sin implementarse, por estar bloqueada por la disponibilidad del registro de subscribers
+**And** la suite corre verde en CI offline y no introduce dependencias de red, clave ni base de datos.
+
+**Fuera de alcance (follow-up aparte):** idempotencia/deduplicación de entregas reintentadas por `X-Zafronix-Event-Id` en el handler (relevante por el backoff 0s,5s,25s,2m,10m,52m y auto-disable a 20 fallos) — se documenta como riesgo, no se implementa aquí. Tampoco la deuda de lint pre-existente en `scripts/sync-matches.ts` / `route.ts`.
