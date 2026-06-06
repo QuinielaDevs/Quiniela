@@ -96,3 +96,10 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 - **Bloqueado en stories futuras:** league_members UPDATE/DELETE (3.3, con cuidado de wager_balance), Mi Cuenta navbar (3.2), eslint bump (código de plantilla).
 - **Aceptado:** enumeración de invite_code (edge rate-limit), cacheComponents, confirmations/max_rows (hardening de producción).
 - **Otras deudas / mejoras:** Paginación de standings (3.1), selector multi-liga (3.3), editar reglas de liga (3.3).
+
+---
+
+## Deferred from: code review of 8-1-endpoint-de-webhook-para-sincronizacion-de-partidos-en-tiempo-real-zafronix-api.md (2026-06-06)
+- `[ABIERTO]` **El recálculo de puntos ante correcciones de marcadores (match.patched)** — Cuando se recibe una corrección de marcador, el disparador `fn_resolve_challenges_on_match_status_change` no recalcula las predicciones que ya tienen `evaluated_at IS NOT NULL`. Se difiere por implicar cambios complejos de lógica e idempotencia en triggers preexistentes de base de datos.
+- `[ABIERTO]` **Vulnerabilidad ante entrega de eventos de webhook fuera de orden** — Si llega un evento antiguo retrasado después de uno nuevo, podría sobrescribir la base de datos con información obsoleta. Se difiere por requerir el almacenamiento de marcas de tiempo del proveedor en la tabla `matches` para control de concurrencia.
+
