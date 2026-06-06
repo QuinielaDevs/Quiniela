@@ -67,15 +67,15 @@ export function ScrollableTabs({
   }
 
   return (
-    <div className="relative border-b border-border bg-card">
+    <div className="relative rounded-full border border-border bg-card/60 p-1 shadow-sm backdrop-blur-sm">
       {showLeft && (
         <>
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-card to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-card to-transparent rounded-l-full" />
           <button
             type="button"
             onClick={() => nudge(-1)}
             aria-label={`Desplazar ${ariaLabel} a la izquierda`}
-            className="absolute left-0 top-1/2 z-20 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-secondary text-foreground"
+            className="absolute left-1.5 top-1/2 z-20 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-secondary text-foreground"
           >
             <ChevronLeft className="size-4" aria-hidden="true" />
           </button>
@@ -86,7 +86,7 @@ export function ScrollableTabs({
         ref={scrollerRef}
         role="tablist"
         aria-label={ariaLabel}
-        className="flex gap-1 overflow-x-auto scroll-smooth px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-1 overflow-x-auto scroll-smooth px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-full"
       >
         {tabs.map((tab) => {
           const isActive = tab.key === activeKey;
@@ -116,12 +116,12 @@ export function ScrollableTabs({
 
       {showRight && (
         <>
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-card to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-card to-transparent rounded-r-full" />
           <button
             type="button"
             onClick={() => nudge(1)}
             aria-label={`Desplazar ${ariaLabel} a la derecha`}
-            className="absolute right-0 top-1/2 z-20 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-secondary text-foreground"
+            className="absolute right-1.5 top-1/2 z-20 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-secondary text-foreground"
           >
             <ChevronRight className="size-4" aria-hidden="true" />
           </button>

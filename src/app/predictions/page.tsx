@@ -142,7 +142,7 @@ export default function PredictionsPage({
   searchParams,
 }: PredictionsPageProps) {
   return (
-    <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:py-10">
+    <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pt-10 lg:pb-28">
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
         <header className="space-y-1">
           <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent">

@@ -120,7 +120,7 @@ export function calculatePredictionMultiplier(
   firstMatchTime?: Date | string | number,
 ): number {
   const savedAtMs = toMs(savedAt);
-  const refTimeMs = firstMatchTime ? toMs(firstMatchTime) : toMs(matchTime);
+  const refTimeMs = toMs(matchTime);
   if (!Number.isFinite(savedAtMs) || !Number.isFinite(refTimeMs)) {
     return MIN_MULTIPLIER;
   }

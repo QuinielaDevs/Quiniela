@@ -99,7 +99,7 @@ describe("MatchCard", () => {
     expect(savePrediction).not.toHaveBeenCalled();
 
     await act(async () => {
-      vi.advanceTimersByTime(499);
+      vi.advanceTimersByTime(1499);
     });
     expect(savePrediction).not.toHaveBeenCalled();
 
@@ -126,7 +126,7 @@ describe("MatchCard", () => {
 
     renderMatchCard();
     await act(async () => {
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(2000);
     });
     await flushPromises();
 
@@ -147,7 +147,7 @@ describe("MatchCard", () => {
     });
     fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
     await act(async () => {
-      vi.advanceTimersByTime(499);
+      vi.advanceTimersByTime(1499);
     });
 
     expect(savePrediction).not.toHaveBeenCalled();
@@ -178,7 +178,7 @@ describe("MatchCard", () => {
     fireEvent.click(screen.getByLabelText("Disminuir goles de Argentina"));
 
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
     await flushPromises();
 
@@ -199,7 +199,7 @@ describe("MatchCard", () => {
 
     fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
 
     expect(screen.getByText("Guardando...")).toBeInTheDocument();
@@ -225,7 +225,7 @@ describe("MatchCard", () => {
 
     fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
 
     expect(savePrediction).not.toHaveBeenCalled();
@@ -248,7 +248,7 @@ describe("MatchCard", () => {
 
     fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
     await flushPromises();
 
@@ -272,7 +272,7 @@ describe("MatchCard", () => {
 
     fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
     await flushPromises();
 
@@ -297,7 +297,7 @@ describe("MatchCard", () => {
 
     fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
 
     await flushPromises();
@@ -322,7 +322,7 @@ describe("MatchCard", () => {
 
     fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
     await flushPromises();
 
@@ -369,7 +369,7 @@ describe("MatchCard", () => {
     expect(screen.getByText("1")).toBeInTheDocument();
 
     await act(async () => {
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(2000);
     });
     await flushPromises();
 
@@ -420,7 +420,7 @@ describe("MatchCard", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
 
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
     await flushPromises();
 
@@ -444,7 +444,7 @@ describe("MatchCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
 
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
     await flushPromises();
 
@@ -467,7 +467,7 @@ describe("MatchCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
 
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
     await flushPromises();
 
@@ -511,7 +511,7 @@ describe("MatchCard", () => {
 
     fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1500);
     });
     await flushPromises();
 

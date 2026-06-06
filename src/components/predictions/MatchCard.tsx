@@ -55,7 +55,7 @@ type PendingPrediction = {
   awayScorePred: number;
 };
 
-const DEBOUNCE_MS = 500;
+const DEBOUNCE_MS = 1500;
 const OFFLINE_COPY = "Sin conexion - Pendiente";
 const LOCKED_COPY = "Pronostico cerrado";
 const TBD_COPY = "Pendiente de clasificacion";
@@ -323,6 +323,15 @@ export function MatchCard({
       window.removeEventListener("online", retryPendingSave);
     };
   }, [runSave, saveState]);
+
+  useEffect(() => {
+    if (saveState === "saved") {
+      const timer = setTimeout(() => {
+        setSaveState("idle");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [saveState]);
 
   // Intercepta una edición: si bajaría el multiplicador guardado y no se ha
   // confirmado aún, abre la advertencia ANTES de tocar el estado/debounce.

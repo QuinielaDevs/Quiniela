@@ -34,7 +34,10 @@ export function BottomNavbar() {
       <ul className="mx-auto flex w-full max-w-md items-stretch">
         {ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive = item.enabled && pathname === item.href;
+          const isActive =
+            item.enabled &&
+            (pathname === item.href ||
+              (item.href === "/standings" && pathname === "/live"));
           const content = (
             <span
               className={cn(
