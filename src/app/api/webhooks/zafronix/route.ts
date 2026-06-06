@@ -88,12 +88,21 @@ function isPlaceholderTeam(name: string): boolean {
  * Encuentra un partido local correspondiente al ID y equipos de Zafronix.
  * Soporta resolución por external_ref, bracket_slot (eliminatorias) o nombres normalizados (fase de grupos).
  */
+interface LocalMatch {
+  id: string;
+  bracket_slot: number | null;
+  home_team: string;
+  away_team: string;
+  status: string;
+  external_last_sync_at: string | null;
+}
+
 async function findLocalMatch(
   supabase: SupabaseClient,
   matchId: string,
   homeTeam?: string | null,
   awayTeam?: string | null,
-): Promise<{ data: any; error: any }> {
+): Promise<{ data: LocalMatch | null; error: unknown }> {
   // 1. Intentar coincidencia directa por external_ref (tests)
   const { data: directMatch, error: directError } = await supabase
     .from("matches")
@@ -354,7 +363,7 @@ async function handleMatchFinalized(
   }
 
   // Preparar la actualización
-  const updateData: Record<string, any> = {
+  const updateData: Record<string, unknown> = {
     home_score: homeScore,
     away_score: awayScore,
     status: "finished",
@@ -447,7 +456,7 @@ async function handleMatchPatched(
   }
 
   // Construir actualización a partir del diff
-  const updateData: Record<string, any> = {
+  const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
     status: match.status, // Preservar el estado actual del partido en lugar de forzar finished
     external_last_sync_at: event.ts,

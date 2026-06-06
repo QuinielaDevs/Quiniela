@@ -16,21 +16,22 @@ const fixtureExists = existsSync(fixturePath);
 describe.skipIf(!fixtureExists)("Zafronix webhook - Real delivery verification (Gated)", () => {
   const loadFixture = () => {
     const rawData = readFileSync(fixturePath, "utf-8");
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(rawData);
     } catch (e) {
       throw new Error(`El archivo real-delivery.local.json no es un JSON válido: ${(e as Error).message}`);
     }
 
-    if (!parsed || typeof parsed !== "object" || !parsed.headers || parsed.rawBody === undefined) {
+    const wrapper = parsed as { headers: Record<string, string>; rawBody: string };
+    if (!wrapper || typeof wrapper !== "object" || !wrapper.headers || wrapper.rawBody === undefined) {
       throw new Error(
         "El fixture real-delivery.local.json debe ser un objeto wrapper JSON que contenga las propiedades 'headers' y 'rawBody'. " +
         "Ejemplo:\n{\n  \"headers\": { \"X-Zafronix-Signature-256\": \"...\", \"X-Zafronix-Timestamp\": \"...\" },\n  \"rawBody\": \"{\\\"type\\\":\\\"match.finalized\\\",...}\"\n}"
       );
     }
 
-    return parsed;
+    return wrapper;
   };
 
   it("debe contener todas las cabeceras obligatorias del contrato de Zafronix", () => {
@@ -38,11 +39,11 @@ describe.skipIf(!fixtureExists)("Zafronix webhook - Real delivery verification (
     
     // Normalizar cabeceras a minúsculas para búsqueda insensible a mayúsculas
     const normalizedHeaders = Object.keys(headers).reduce((acc, key) => {
-      acc[key.toLowerCase()] = headers[key];
+      acc[key.toLowerCase()] = headers[key] ?? "";
       return acc;
     }, {} as Record<string, string>);
 
-    for (const [key, headerName] of Object.entries(ZAFRONIX_HEADERS)) {
+    for (const [, headerName] of Object.entries(ZAFRONIX_HEADERS)) {
       const lowerHeaderName = headerName.toLowerCase();
       expect(normalizedHeaders[lowerHeaderName], `Falta la cabecera del contrato: ${headerName}`).toBeDefined();
       expect(normalizedHeaders[lowerHeaderName], `La cabecera ${headerName} no puede estar vacía`).not.toBe("");
@@ -54,7 +55,7 @@ describe.skipIf(!fixtureExists)("Zafronix webhook - Real delivery verification (
     
     // Buscar cabeceras de firma y timestamp de forma insensible a mayúsculas
     const normalizedHeaders = Object.keys(headers).reduce((acc, key) => {
-      acc[key.toLowerCase()] = headers[key];
+      acc[key.toLowerCase()] = headers[key] ?? "";
       return acc;
     }, {} as Record<string, string>);
 
@@ -77,7 +78,7 @@ describe.skipIf(!fixtureExists)("Zafronix webhook - Real delivery verification (
 
   it("debe parsear el payload real y validar con su esquema específico", () => {
     const { rawBody } = loadFixture();
-    let body: any;
+    let body: unknown;
     try {
       body = JSON.parse(rawBody);
     } catch (e) {

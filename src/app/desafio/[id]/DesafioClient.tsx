@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
+import Image from "next/image";
 import { Coins, Calendar, Trophy, ShieldAlert, Share2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -297,7 +298,7 @@ export function DesafioClient({
             <div className="flex justify-between items-center text-sm py-1 border-b border-border/5">
               <div className="flex items-center gap-2">
                 {challenge.creator_avatar_url ? (
-                  <img src={challenge.creator_avatar_url} alt="" className="size-6 rounded-full object-cover border border-border/10 bg-background" />
+                  <Image src={challenge.creator_avatar_url} alt="" width={24} height={24} unoptimized className="size-6 rounded-full object-cover border border-border/10 bg-background" />
                 ) : (
                   <div className="size-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent">C</div>
                 )}

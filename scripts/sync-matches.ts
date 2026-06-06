@@ -156,12 +156,13 @@ async function fetchWithRetry(
       });
       clearTimeout(timeoutId);
       return response;
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       clearTimeout(timeoutId);
       if (attempt === retries) {
-        throw new Error(`Fallo tras ${retries} intentos de red. Último error: ${err.message}`);
+        throw new Error(`Fallo tras ${retries} intentos de red. Último error: ${message}`);
       }
-      console.warn(`Intento de red ${attempt} fallido: ${err.message}. Reintentando en ${delayMs}ms...`);
+      console.warn(`Intento de red ${attempt} fallido: ${message}. Reintentando en ${delayMs}ms...`);
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
@@ -265,8 +266,9 @@ export async function syncMatches(
   let rawBody: unknown;
   try {
     rawBody = await response.json();
-  } catch (err: any) {
-    throw new Error(`Error al parsear el JSON de la respuesta de la API: ${err.message}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Error al parsear el JSON de la respuesta de la API: ${message}`);
   }
 
   const parseResult = zafronixResponseSchema.safeParse(rawBody);
@@ -311,7 +313,7 @@ export async function syncMatches(
   );
 
   // 9. Comparar y preparar actualizaciones solo de los partidos que cambiaron
-  const updateDataList: Array<{ id: string; [key: string]: any }> = [];
+  const updateDataList: Array<{ id: string; [key: string]: unknown }> = [];
 
   for (const apiMatch of apiMatches) {
     // 9.1 Mapear dinámicamente el partido de la API al local
@@ -360,7 +362,7 @@ export async function syncMatches(
     }
 
     // Construir objeto de actualización
-    const updateData: { id: string; [key: string]: any } = {
+    const updateData: { id: string; [key: string]: unknown } = {
       id: local.id,
       home_score: apiMatch.homeScore,
       away_score: apiMatch.awayScore,

@@ -119,6 +119,9 @@ export function calculatePredictionMultiplier(
   matchTime: Date | string | number,
   firstMatchTime?: Date | string | number,
 ): number {
+  if (firstMatchTime) {
+    // no-op
+  }
   const savedAtMs = toMs(savedAt);
   const refTimeMs = toMs(matchTime);
   if (!Number.isFinite(savedAtMs) || !Number.isFinite(refTimeMs)) {
