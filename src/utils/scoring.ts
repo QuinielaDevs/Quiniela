@@ -79,11 +79,22 @@ export function calculateBasePoints(
 
 // ============================================================
 // Multiplicador por antelación (Story 2.4 — AC #1, #6).
-// Premia las predicciones tempranas. Escala por LOTES de días calibrada a la
+// Premia las predicciones tempranas. La antelación se mide contra el kickoff de
+// CADA partido (modelo por-partido): cuanto antes pronosticas respecto a su hora
+// de inicio, mayor el multiplicador. Escala por LOTES de días calibrada a la
 // ventana real del Mundial 2026 (11 jun → 19 jul = 38 días): >=35 días alcanza
-// el máximo 2.50x. Esta misma regla se espeja en SQL (fn_prediction_multiplier);
+// el máximo 2.50x.
+//
+// Regla de Jornada 1: la primera jornada del torneo es la línea base y SIEMPRE
+// vale 1.0x, sin importar la antelación. Los multiplicadores empiezan a aplicar
+// desde la Jornada 2 en adelante (y en las eliminatorias).
+//
+// Esta misma regla se espeja en SQL (fn_prediction_multiplier + fn_save_prediction);
 // si cambia una, cambiar la otra y su vector de pruebas para evitar drift.
 // ============================================================
+
+/** Jornada base del torneo: siempre 1.0x (no acumula antelación). */
+export const BASELINE_MATCHDAY = 1;
 
 export const MIN_MULTIPLIER = 1.0;
 export const MAX_MULTIPLIER = 2.5;
@@ -108,27 +119,32 @@ function toMs(value: Date | string | number): number {
 }
 
 /**
- * Multiplicador por antelación de una predicción respecto al kickoff. Determinista
- * sobre milisegundos UTC (no calendario local). Antelación negativa o tiempos
- * inválidos → MIN_MULTIPLIER (1.00). El valor AUTORITATIVO lo calcula el backend
- * con `now()` del servidor; esta versión TS sirve para la UI predictiva.
- * Si se proporciona `firstMatchTime`, la antelación se mide en relación a ese instante de referencia.
+ * Multiplicador por antelación de una predicción respecto al kickoff del PROPIO
+ * partido (modelo por-partido). Determinista sobre milisegundos UTC (no
+ * calendario local). Antelación negativa o tiempos inválidos → MIN_MULTIPLIER
+ * (1.00). El valor AUTORITATIVO lo calcula el backend con `now()` del servidor;
+ * esta versión TS sirve para la UI predictiva.
+ *
+ * `matchday`: la Jornada 1 (BASELINE_MATCHDAY) siempre devuelve 1.0x. Las
+ * eliminatorias tienen `matchday` null/undefined y sí escalan por antelación.
  */
 export function calculatePredictionMultiplier(
   savedAt: Date | string | number,
   matchTime: Date | string | number,
-  firstMatchTime?: Date | string | number,
+  matchday?: number | null,
 ): number {
-  if (firstMatchTime) {
-    // no-op
-  }
-  const savedAtMs = toMs(savedAt);
-  const refTimeMs = toMs(matchTime);
-  if (!Number.isFinite(savedAtMs) || !Number.isFinite(refTimeMs)) {
+  // Jornada base: 1.0x fijo, sin importar la antelación.
+  if (matchday === BASELINE_MATCHDAY) {
     return MIN_MULTIPLIER;
   }
 
-  const days = (refTimeMs - savedAtMs) / MS_PER_DAY;
+  const savedAtMs = toMs(savedAt);
+  const matchTimeMs = toMs(matchTime);
+  if (!Number.isFinite(savedAtMs) || !Number.isFinite(matchTimeMs)) {
+    return MIN_MULTIPLIER;
+  }
+
+  const days = (matchTimeMs - savedAtMs) / MS_PER_DAY;
   for (const tier of MULTIPLIER_TIERS) {
     if (days >= tier.minDays) return tier.value;
   }

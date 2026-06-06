@@ -92,6 +92,26 @@ async function insertMatch(matchTimeIso: string): Promise<string> {
   return data!.id;
 }
 
+async function insertMatchWithMatchday(
+  matchTimeIso: string,
+  matchday: number,
+): Promise<string> {
+  const { data, error } = await admin
+    .from("matches")
+    .insert({
+      home_team: "Argentina",
+      away_team: "México",
+      match_time: matchTimeIso,
+      status: "scheduled",
+      matchday,
+    })
+    .select("id")
+    .single();
+  expect(error).toBeNull();
+  createdMatchIds.push(data!.id);
+  return data!.id;
+}
+
 async function insertTbdKnockoutMatch(matchTimeIso: string): Promise<string> {
   const { data, error } = await admin
     .from("matches")
@@ -210,6 +230,45 @@ describe("fn_save_prediction: multiplicador y upsert", () => {
     expect(editedRow.away_score_pred).toBe(0);
     // Mismo registro (upsert sobre unique(league_id,user_id,match_id)).
     expect(editedRow.id).toBe(createdRow.id);
+  });
+
+  it("Jornada 1 es línea base: multiplier 1.00 aunque la antelación sea >=35d", async () => {
+    const matchId = await insertMatchWithMatchday(
+      new Date(Date.now() + 40 * DAY_MS).toISOString(),
+      1,
+    );
+    const clientA = createAuthedClient(userA.token);
+
+    const { data, error } = await clientA
+      .rpc("fn_save_prediction", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_home_score_pred: 2,
+        p_away_score_pred: 1,
+      })
+      .single();
+    expect(error).toBeNull();
+    // Sin la regla de Jornada 1 sería 2.50 (40 días de antelación); con ella, 1.00.
+    expect(Number(asPrediction(data).multiplier)).toBe(1.0);
+  });
+
+  it("Jornada 2 sí escala por antelación (>=35d → 2.50)", async () => {
+    const matchId = await insertMatchWithMatchday(
+      new Date(Date.now() + 40 * DAY_MS).toISOString(),
+      2,
+    );
+    const clientA = createAuthedClient(userA.token);
+
+    const { data, error } = await clientA
+      .rpc("fn_save_prediction", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_home_score_pred: 0,
+        p_away_score_pred: 0,
+      })
+      .single();
+    expect(error).toBeNull();
+    expect(Number(asPrediction(data).multiplier)).toBe(2.5);
   });
 
   it("el dueño conserva la lectura de su propia prediccion", async () => {

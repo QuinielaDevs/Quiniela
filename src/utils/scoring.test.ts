@@ -156,15 +156,20 @@ describe("calculatePredictionMultiplier — lotes por antelación (Story 2.4)", 
     expect(calculatePredictionMultiplier("no-date", 0)).toBe(1.0);
   });
 
-  it("calcula en base a firstMatchTime si se especifica", () => {
+  it("Jornada 1 (BASELINE_MATCHDAY) → 1.00 sin importar la antelación", () => {
     const saved = new Date("2026-05-01T00:00:00.000Z");
-    const firstMatchTime = new Date("2026-06-11T00:00:00.000Z"); // 41 días
-    const kickoff = new Date("2026-06-15T00:00:00.000Z"); // kickoff posterior
-    expect(calculatePredictionMultiplier(saved, kickoff, firstMatchTime)).toBe(2.5);
+    const kickoff = new Date("2026-06-11T00:00:00.000Z"); // 41 días → sería 2.50
+    // Sin matchday: escala normal.
+    expect(calculatePredictionMultiplier(saved, kickoff)).toBe(2.5);
+    // Jornada 1: línea base fija.
+    expect(calculatePredictionMultiplier(saved, kickoff, 1)).toBe(1.0);
+  });
 
-    // Si el primer partido ya empezó, la antelación es <= 0, dando 1.00
-    const savedAfterStart = new Date("2026-06-12T00:00:00.000Z");
-    expect(calculatePredictionMultiplier(savedAfterStart, kickoff, firstMatchTime)).toBe(1.0);
+  it("Jornada 2+ y eliminatorias (matchday null) escalan por antelación", () => {
+    const saved = new Date("2026-05-01T00:00:00.000Z");
+    const kickoff = new Date("2026-06-11T00:00:00.000Z"); // 41 días → 2.50
+    expect(calculatePredictionMultiplier(saved, kickoff, 2)).toBe(2.5);
+    expect(calculatePredictionMultiplier(saved, kickoff, null)).toBe(2.5);
   });
 });
 

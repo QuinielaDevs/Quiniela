@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock } from "lucide-react";
+import { Lock, MapPin } from "lucide-react";
 
 import { savePrediction } from "@/app/actions/predictions.actions";
 import {
@@ -38,6 +38,7 @@ export type MatchCardMatch = Pick<
   | "home_source"
   | "away_source"
   | "bracket_slot"
+  | "venue"
 >;
 
 type MatchCardProps = {
@@ -45,7 +46,6 @@ type MatchCardProps = {
   match: MatchCardMatch;
   initialPrediction?: MatchCardPrediction | null;
   disabled?: boolean;
-  firstMatchTime?: string;
 };
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "offline" | "error";
@@ -95,7 +95,6 @@ export function MatchCard({
   match,
   initialPrediction,
   disabled = false,
-  firstMatchTime,
 }: MatchCardProps) {
   const hasInitialPrediction =
     initialPrediction !== null && initialPrediction !== undefined;
@@ -135,7 +134,7 @@ export function MatchCard({
   const nextMultiplier = calculatePredictionMultiplier(
     now,
     match.match_time,
-    firstMatchTime,
+    match.matchday,
   );
   const displayMultiplier = hasInitialPrediction
     ? savedMultiplier
@@ -451,6 +450,12 @@ export function MatchCard({
                 {timeLeft}
               </span>
             </>
+          )}
+          {match.venue && (
+            <span className="flex w-full items-center gap-1 text-muted-foreground">
+              <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{match.venue}</span>
+            </span>
           )}
         </div>
 

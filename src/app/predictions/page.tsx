@@ -63,7 +63,6 @@ export async function PredictionsBoard() {
   const [
     { data: matches },
     { data: predictions },
-    firstMatchResult,
     { data: candidates },
     { data: specialPredictions },
     activePhaseResult,
@@ -71,7 +70,7 @@ export async function PredictionsBoard() {
     supabase
       .from("matches")
       .select(
-        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday, home_source, away_source, bracket_slot",
+        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday, home_source, away_source, bracket_slot, venue",
       )
       .eq("status", "scheduled")
       .order("match_time", { ascending: true }),
@@ -82,11 +81,6 @@ export async function PredictionsBoard() {
       )
       .eq("league_id", leagueId)
       .eq("user_id", userId),
-    supabase
-      .from("matches")
-      .select("match_time")
-      .order("match_time", { ascending: true })
-      .limit(1),
     supabase
       .from("award_candidates")
       .select("*")
@@ -108,8 +102,6 @@ export async function PredictionsBoard() {
       />
     );
   }
-
-  const firstMatchTime = (firstMatchResult.data as { match_time: string }[] | null)?.[0]?.match_time ?? undefined;
 
   // Procesar fase activa del torneo para los premios especiales
   let isAwardsLocked = false;
@@ -146,7 +138,6 @@ export async function PredictionsBoard() {
       leagueId={leagueId}
       matches={matches}
       predictions={predictions ?? []}
-      firstMatchTime={firstMatchTime}
       candidatesByCategory={candidatesByCategory}
       initialSelections={initialSelections}
       isAwardsLocked={isAwardsLocked}

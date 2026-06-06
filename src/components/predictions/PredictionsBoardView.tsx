@@ -21,7 +21,6 @@ type PredictionsBoardViewProps = {
   leagueId: string;
   matches: MatchCardMatch[];
   predictions: BoardPrediction[];
-  firstMatchTime?: string;
   candidatesByCategory: Record<AwardCategory, AwardCandidate[]>;
   initialSelections: Record<AwardCategory, string | null>;
   isAwardsLocked: boolean;
@@ -37,7 +36,6 @@ export function PredictionsBoardView({
   leagueId,
   matches,
   predictions,
-  firstMatchTime,
   candidatesByCategory,
   initialSelections,
   isAwardsLocked,
@@ -96,7 +94,6 @@ export function PredictionsBoardView({
                 key={match.id}
                 leagueId={leagueId}
                 match={match}
-                firstMatchTime={firstMatchTime}
                 initialPrediction={
                   prediction
                     ? {

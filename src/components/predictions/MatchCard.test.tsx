@@ -27,7 +27,12 @@ const MATCH = {
   home_source: null,
   away_source: null,
   bracket_slot: null,
+  venue: "Estadio Monumental",
 };
+
+// Jornada 2+: el multiplicador escala por antelación (la Jornada 1 es línea base
+// fija 1.0x, por eso las pruebas de degradación usan este fixture).
+const MATCH_JORNADA2 = { ...MATCH, matchday: 2 };
 
 const LEAGUE_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -397,6 +402,20 @@ describe("MatchCard", () => {
 
   // ---- Story 2.4: multiplicador, advertencia de degradación y candado ----
 
+  it("muestra el estadio (venue) cuando está presente", () => {
+    renderMatchCard({
+      match: { ...MATCH, venue: "Estadio Azteca" },
+    });
+
+    expect(screen.getByText("Estadio Azteca")).toBeInTheDocument();
+  });
+
+  it("no muestra estadio cuando venue es null", () => {
+    renderMatchCard({ match: { ...MATCH, venue: null } });
+
+    expect(screen.queryByText(/Estadio/)).toBeNull();
+  });
+
   it("muestra el multiplicador guardado de la prediccion", () => {
     renderMatchCard({
       initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
@@ -413,6 +432,7 @@ describe("MatchCard", () => {
       error: null,
     });
     renderMatchCard({
+      match: MATCH_JORNADA2,
       initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 1.3 },
     });
 
@@ -435,6 +455,7 @@ describe("MatchCard", () => {
       error: null,
     });
     renderMatchCard({
+      match: MATCH_JORNADA2,
       initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
     });
 
@@ -460,6 +481,7 @@ describe("MatchCard", () => {
       error: null,
     });
     renderMatchCard({
+      match: MATCH_JORNADA2,
       initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
     });
 
