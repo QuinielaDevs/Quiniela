@@ -49,6 +49,7 @@ context: []
 - [x] `src/app/live/page.tsx` -- Añadir un botón visual y accesible de "Volver" a `/standings` en la cabecera de la página.
 - [x] `src/utils/scoring.ts` -- Modificar `calculatePredictionMultiplier` para que ignore `firstMatchTime` (o calcule los días de antelación respecto al kickoff de cada partido `matchTime` directamente).
 - [x] `src/components/predictions/MatchCard.tsx` -- Cambiar `DEBOUNCE_MS` de `500` a `1500` y añadir un `useEffect` que regrese el `saveState` a `"idle"` después de 3000ms una vez guardado con éxito.
+- [x] `src/components/predictions/MatchCard.tsx` -- Resolver el layout shift (drift) mediante el posicionamiento absoluto del estado de guardado/bloqueo (`absolute right-0 top-0 h-6 flex items-center justify-end whitespace-nowrap`) y un padding-right constante (`pr-36`) en el contenedor de metadatos.
 - [x] `supabase/migrations/20260606150000_revert_multiplier_to_match_time.sql` -- Crear una nueva migración que redefina `public.fn_prediction_multiplier(p_match_time timestamptz)` para que use `p_match_time - now()` en lugar de `v_first_match_time - now()`.
 
 **Acceptance Criteria:**

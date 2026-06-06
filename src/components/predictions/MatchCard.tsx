@@ -427,8 +427,8 @@ export function MatchCard({
         saveState === "error" && "border-destructive/80",
       )}
     >
-      <div className="mb-3 flex min-h-6 items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      <div className="relative mb-3 min-h-6 flex items-start">
+        <div className="flex flex-wrap items-center gap-2 pr-36 text-xs text-muted-foreground min-h-6">
           <span>{phaseLabel}</span>
           {formattedTime && (
             <>
@@ -454,38 +454,40 @@ export function MatchCard({
           )}
         </div>
 
-        {isTbd ? (
-          <div
-            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
-            role="status"
-          >
-            <Lock className="size-3.5" aria-hidden="true" />
-            {TBD_COPY}
-          </div>
-        ) : isLocked ? (
-          <div
-            className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
-            role="status"
-          >
-            <Lock className="size-3.5" aria-hidden="true" />
-            {LOCKED_COPY}
-          </div>
-        ) : (
-          statusCopy && (
+        <div className="absolute right-0 top-0 h-6 flex items-center justify-end whitespace-nowrap">
+          {isTbd ? (
             <div
-              className={cn(
-                "text-xs font-semibold",
-                saveState === "saved" && "text-success",
-                saveState === "offline" && "text-destructive",
-                saveState === "error" && "text-destructive",
-                saveState === "saving" && "text-muted-foreground",
-              )}
-              role={saveState === "error" ? "alert" : "status"}
+              className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+              role="status"
             >
-              {statusCopy}
+              <Lock className="size-3.5" aria-hidden="true" />
+              {TBD_COPY}
             </div>
-          )
-        )}
+          ) : isLocked ? (
+            <div
+              className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+              role="status"
+            >
+              <Lock className="size-3.5" aria-hidden="true" />
+              {LOCKED_COPY}
+            </div>
+          ) : (
+            statusCopy && (
+              <div
+                className={cn(
+                  "text-xs font-semibold",
+                  saveState === "saved" && "text-success",
+                  saveState === "offline" && "text-destructive",
+                  saveState === "error" && "text-destructive",
+                  saveState === "saving" && "text-muted-foreground",
+                )}
+                role={saveState === "error" ? "alert" : "status"}
+              >
+                {statusCopy}
+              </div>
+            )
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
