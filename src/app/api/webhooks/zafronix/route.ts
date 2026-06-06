@@ -8,6 +8,7 @@ import {
   matchFinalizedPayload,
   matchPatchedPayload,
   matchPostponedPayload,
+  ZAFRONIX_HEADERS,
 } from "@/lib/zafronix/contract";
 
 // Ver especificación de contrato y runbook de drift en docs/zafronix-webhook-contract.md
@@ -150,8 +151,8 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. Extraer y validar cabeceras requeridas
-  const timestamp = req.headers.get("x-zafronix-timestamp");
-  const signature = req.headers.get("x-zafronix-signature-256");
+  const timestamp = req.headers.get(ZAFRONIX_HEADERS.timestamp);
+  const signature = req.headers.get(ZAFRONIX_HEADERS.signature);
 
   if (!timestamp || !signature) {
     return NextResponse.json(

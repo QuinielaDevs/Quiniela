@@ -80,6 +80,10 @@ export function verifySignature(
   signature: string,
   secret: string,
 ): boolean {
+  if (!signature || signature.length !== 71 || !signature.startsWith("sha256=")) {
+    return false;
+  }
+
   const expected =
     "sha256=" +
     createHmac("sha256", secret)

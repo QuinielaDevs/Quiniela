@@ -153,6 +153,20 @@ Actualmente, el registro automático de suscriptores para recibir webhooks en vi
    ```
 2. **Registrar la URL:** Envíe una solicitud de registro de subscriber a Zafronix con su URL expuesta (`https://<subdominio>.ngrok-free.app/api/webhooks/zafronix`).
 3. **Disparar un evento:** Ejecute un cambio de estado en el sandbox de Zafronix (ej. finalizando un partido en el año 9999).
-4. **Almacenar la solicitud cruda:** Recupere la solicitud HTTP exacta recibida por su endpoint. Copie el JSON crudo del payload exactamente como se transmitió en la red (sin formatearlo, ya que los cambios de espacios rompen la verificación HMAC) en `tests/fixtures/zafronix/real-delivery.local.json`.
+4. **Almacenar la solicitud cruda:** Recupere la solicitud HTTP exacta recibida por su endpoint. Cree un archivo JSON con la siguiente estructura y guárdelo en `tests/fixtures/zafronix/real-delivery.local.json`:
+   ```json
+   {
+     "headers": {
+       "X-Zafronix-Signature-256": "<firma-recibida>",
+       "X-Zafronix-Timestamp": "<timestamp-recibido>",
+       "X-Zafronix-Event-Type": "<tipo-evento>",
+       "X-Zafronix-Event-Id": "<id-evento>",
+       "X-Zafronix-Webhook-Id": "<id-webhook>",
+       "X-Zafronix-Delivery-Attempt": "<intento>"
+     },
+     "rawBody": "<body-json-exacto-como-cadena>"
+   }
+   ```
+   *Nota: En `rawBody` debe ir el cuerpo JSON crudo del payload exactamente como se transmitió en la red (preservando espacios y caracteres sin formatearlo), ya que cualquier alteración de bytes romperá la verificación HMAC.*
 5. **Configurar secreto local:** Copie el valor de `ZAFRONIX_WEBHOOK_SECRET` que le asignó Zafronix en su `.env.test.local`.
 6. **Ejecutar pruebas:** Corra `npm run test:integration`. El test [zafronix-webhook-real.contract.test.ts](file:///c:/Users/Public/Development/AI-Driven/pija-quiniela/tests/integration/zafronix-webhook-real.contract.test.ts) detectará el archivo local de captura y verificará la firma real de Zafronix contra el handler de producción de forma local.

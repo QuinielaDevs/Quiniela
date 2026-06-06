@@ -4,7 +4,7 @@ baseline_commit: b4dcd51522b36112c0c1400149ae7713899ec3bd
 
 # Story 8.5: Test de Contrato del Webhook de Zafronix (pin del payload + recipe de firma desde docs)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -144,3 +144,19 @@ N/A
 
 - 2026-06-06: Story 8.5 creada (create-story) como follow-up de 8.4. Alcance "B-ahora" (pin de payload + recipe de firma desde docs, offline/determinista); "B-después" (entrega real firmada) diferida y bloqueada por el registro de subscribers de Zafronix. Idempotencia por X-Zafronix-Event-Id marcada como follow-up aparte. Estado → ready-for-dev.
 - 2026-06-06: Implementación completa. Extracción a contract.ts, tests unitarios deterministas verdes, y documentación zafronix-webhook-contract.md finalizada. Estado → review.
+- 2026-06-06: Revisión de código completada, todos los parches aplicados y tests unitarios unitarios/compilación verdes. Estado → done.
+
+### Review Findings
+
+- [x] [Review][Patch] route.ts uses hardcoded header names instead of importing ZAFRONIX_HEADERS [src/app/api/webhooks/zafronix/route.ts]
+- [x] [Review][Patch] Mismatch in fixture structure instructions vs zafronix-webhook-real.contract.test.ts implementation & missing error guards [tests/integration/zafronix-webhook-real.contract.test.ts]
+- [x] [Review][Patch] Fixture real-delivery.local.json is not gitignored [.gitignore]
+- [x] [Review][Patch] DoS vulnerability via buffer allocation in verifySignature [src/lib/zafronix/contract.ts:588]
+- [x] [Review][Patch] Missing unit tests for isWithinReplayWindow helper [tests/unit/zafronix-contract.test.ts]
+- [x] [Review][Defer] Dangerous seconds-to-milliseconds heuristic in route handler for year 9999 sandbox timestamps [src/app/api/webhooks/zafronix/route.ts:167-171] — deferred, pre-existing
+- [x] [Review][Defer] Database query error during external_ref matching is silently ignored [src/app/api/webhooks/zafronix/route.ts:97-101] — deferred, pre-existing
+- [x] [Review][Defer] Failure during NextRequest text stream read returns 500 instead of 400 [src/app/api/webhooks/zafronix/route.ts:183-183] — deferred, pre-existing
+- [x] [Review][Defer] Lack of logging for HMAC signature verification failures [src/app/api/webhooks/zafronix/route.ts:186-193] — deferred, pre-existing
+- [x] [Review][Defer] Weak validation of event ID format, timestamp string format, and status in schemas [src/lib/zafronix/contract.ts] — deferred, pre-existing
+- [x] [Review][Defer] Live sandbox rate limiting failure in zafronix-sandbox-e2e.test.ts [tests/integration/zafronix-sandbox-e2e.test.ts] — deferred, pre-existing
+

@@ -7,6 +7,7 @@ import {
   matchPostponedPayload,
   verifySignature,
   ZAFRONIX_HEADERS,
+  isWithinReplayWindow,
 } from "../../src/lib/zafronix/contract";
 
 import matchFinalizedSample from "../fixtures/zafronix/match-finalized.sample.json";
@@ -86,6 +87,21 @@ describe("Zafronix Webhook Contract Tests (Offline, Deterministic)", () => {
       expect(ZAFRONIX_HEADERS.eventId).toBe("X-Zafronix-Event-Id");
       expect(ZAFRONIX_HEADERS.webhookId).toBe("X-Zafronix-Webhook-Id");
       expect(ZAFRONIX_HEADERS.deliveryAttempt).toBe("X-Zafronix-Delivery-Attempt");
+    });
+  });
+
+  describe("Pin de Ventana de Replay (AC #2 / Helper)", () => {
+    it("debe retornar true si el timestamp está dentro de la ventana de 5 minutos", () => {
+      const now = Date.now();
+      expect(isWithinReplayWindow(now)).toBe(true);
+      expect(isWithinReplayWindow(now - 4 * 60 * 1000)).toBe(true); // 4 minutos en el pasado
+      expect(isWithinReplayWindow(now + 4 * 60 * 1000)).toBe(true); // 4 minutos en el futuro
+    });
+
+    it("debe retornar false si el timestamp está fuera de la ventana de 5 minutos", () => {
+      const now = Date.now();
+      expect(isWithinReplayWindow(now - 6 * 60 * 1000)).toBe(false); // 6 minutos en el pasado
+      expect(isWithinReplayWindow(now + 6 * 60 * 1000)).toBe(false); // 6 minutos en el futuro
     });
   });
 });

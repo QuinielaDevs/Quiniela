@@ -106,4 +106,13 @@ Cierra varios diferidos de seguridad/BD. Verificado: `npm run typecheck` limpio,
 ## Deferred from: code review of 8-3-script-administrativo-de-sincronizacion-y-restauracion-completa.md (2026-06-06)
 - `[ABIERTO]` **Unnormalized Stage Value Insertions** — The script inserts `apiMatch.stage` directly into `public.matches.stage` without mapping or normalizing. This could trigger check or enum constraints in the database if the API values differ from local conventions.
 
+## Deferred from: code review of 8-5-test-de-contrato-del-webhook-de-zafronix.md (2026-06-06)
+- `[ABIERTO]` **Dangerous seconds-to-milliseconds heuristic in route handler for year 9999 sandbox timestamps** — The heuristic in `route.ts` that converts seconds to milliseconds when `timestampMs < 10000000000` will fail for Sandbox requests using year 9999 timestamps (e.g. `253402300800` seconds). The large timestamp will bypass conversion, remain in seconds, and trigger false-positive replay attack rejections.
+- `[ABIERTO]` **Database query error during external_ref matching is silently ignored** — In `findLocalMatch`, if a query on `matches` table returns an error during the `external_ref` lookup, the error is returned in `error` but the function does not halt or log it correctly, instead continuing down the fallback paths.
+- `[ABIERTO]` **Failure during NextRequest text stream read returns 500 instead of 400** — NextRequest `req.text()` might throw an error if the connection resets, which would propagate and return a 500 Internal Server Error instead of a 400 Bad Request.
+- `[ABIERTO]` **Lack of logging for HMAC signature verification failures** — The route handler silently responds with a 401 status code when signature verification fails, without logging diagnostic information (e.g., mismatch warnings, received vs expected timestamp).
+- `[ABIERTO]` **Weak validation of event ID format, timestamp string format, and status in schemas** — The `baseEventSchema` accepts any string for `id` and `ts`, and `matchPostponedPayload` accepts any string for `status`.
+- `[ABIERTO]` **Live sandbox rate limiting failure in zafronix-sandbox-e2e.test.ts** — Integration test suite runs are vulnerable to rate limits (e.g. `429 Too Many Requests`) from the external Sandbox API, causing potential transient failures.
+
+
 
