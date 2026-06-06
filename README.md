@@ -98,6 +98,37 @@ If you wish to just develop locally and not deploy to Vercel, [follow the steps 
 
 > Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
 
+## Testing de integración (Vitest contra Supabase local)
+
+Las pruebas de integración (`npm run test:integration`) corren contra el
+Supabase local (Docker). Requisitos:
+
+- Docker + `npx supabase start` corriendo, con `project_id` == nombre del
+  directorio del proyecto.
+- Un archivo `.env.test.local` (gitignored) generado con las credenciales
+  locales. Lo carga `tests/integration/setup-env.ts`.
+
+```bash
+npx supabase status -o env > .env.test.local
+```
+
+Variables relevantes para los tests (ver `.env.example` para la lista completa):
+
+| Variable | Obligatoria | Para qué |
+| --- | --- | --- |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Sí | Clientes de test contra el Supabase local. |
+| `ZAFRONIX_WEBHOOK_SECRET` | Sí | El handler `POST /api/webhooks/zafronix` responde **500** si falta. Los tests del webhook RE-FIRMAN con exactamente este valor (`tests/integration/helpers/hmac.ts`). En CI se exporta un valor de prueba determinista. |
+| `ZAFRONIX_SANDBOX_KEY` (`zwc_skt_…`) | **Opcional** | Habilita el **ciclo live** contra el Sandbox real de Zafronix (año 9999) en `tests/integration/zafronix-sandbox-e2e.test.ts`. Sin ella, esos casos se **omiten (skip)** y el resto queda verde. **No** se inyecta en CI (mantiene el pipeline offline y no consume el cap de reset 10/h ni la cuota diaria). |
+
+> El ciclo live escribe en el **año 9999** del sandbox (las claves `zwc_skt_…`
+> solo pueden mutar ese año), por lo que los datos reales del Mundial 2026
+> quedan aislados por la propia API. Para activarlo en local, añade a
+> `.env.test.local`:
+>
+> ```env
+> ZAFRONIX_SANDBOX_KEY=zwc_skt_tu_clave_de_sandbox
+> ```
+
 ## Feedback and issues
 
 Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).

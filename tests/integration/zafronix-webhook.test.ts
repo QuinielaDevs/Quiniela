@@ -13,39 +13,20 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createHmac } from "node:crypto";
 import { createServiceRoleClient } from "./setup";
+import {
+  TEST_WEBHOOK_SECRET as WEBHOOK_SECRET,
+  signWebhookHeaders as signPayload,
+} from "./helpers/hmac";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
 import { POST } from "../../src/app/api/webhooks/zafronix/route";
 
 // ── Helpers ─────────────────────────────────────────────────────────
-
-const WEBHOOK_SECRET =
-  process.env.ZAFRONIX_WEBHOOK_SECRET ??
-  "whsec_test_secret_for_integration_tests_only";
+//
+// El esquema HMAC-SHA256 está centralizado en ./helpers/hmac.ts y se
+// reutiliza aquí (`signPayload`) y en zafronix-sandbox-e2e.test.ts.
 
 const WEBHOOK_URL = "http://localhost:3000/api/webhooks/zafronix";
-
-/**
- * Genera cabeceras de webhook válidas para un payload dado.
- * Replica el esquema HMAC-SHA256 de Zafronix:
- *   signature = "sha256=" + HMAC-SHA256(secret, `${timestamp}.${rawBody}`)
- */
-function signPayload(
-  body: string,
-  secret: string = WEBHOOK_SECRET,
-  timestampMs: number = Date.now(),
-) {
-  const sig =
-    "sha256=" +
-    createHmac("sha256", secret)
-      .update(`${timestampMs}.${body}`)
-      .digest("hex");
-  return {
-    "Content-Type": "application/json",
-    "X-Zafronix-Timestamp": String(timestampMs),
-    "X-Zafronix-Signature-256": sig,
-  };
-}
 
 /**
  * Envía un POST al webhook con payload y cabeceras firmadas.
@@ -58,10 +39,15 @@ async function postWebhook(
   timestampMs?: number,
 ): Promise<Response> {
   const body = JSON.stringify(payload);
-  const headers = signPayload(body, secret, timestampMs);
+  const headers = new Headers(signPayload(body, secret, timestampMs));
+  if (overrides) {
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value !== undefined) headers.set(key, value);
+    }
+  }
   const req = new NextRequest(WEBHOOK_URL, {
     method: "POST",
-    headers: new Headers({ ...headers, ...overrides }),
+    headers,
     body,
   });
   return POST(req);
