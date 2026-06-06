@@ -6,6 +6,9 @@ import { createClient } from "@/utils/supabase/server";
 import { PredictionsBoardView } from "@/components/predictions/PredictionsBoardView";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 
+import { groupCandidatesByCategory } from "@/utils/awards";
+import type { AwardCandidate, SpecialPrediction } from "@/types";
+
 type PredictionsPageProps = {
   searchParams?: Promise<{ joined?: string }>;
 };
@@ -57,7 +60,14 @@ export async function PredictionsBoard() {
   // que el usuario navegue las fases; MatchCard los deja en solo-lectura hasta
   // que el bracket se resuelva (fn_match_editable lo bloquea en DB). La RLS deja
   // al dueño leer sus propias predicciones siempre (no espera al kickoff).
-  const [{ data: matches }, { data: predictions }, firstMatchResult] = await Promise.all([
+  const [
+    { data: matches },
+    { data: predictions },
+    firstMatchResult,
+    { data: candidates },
+    { data: specialPredictions },
+    activePhaseResult,
+  ] = await Promise.all([
     supabase
       .from("matches")
       .select(
@@ -77,6 +87,17 @@ export async function PredictionsBoard() {
       .select("match_time")
       .order("match_time", { ascending: true })
       .limit(1),
+    supabase
+      .from("award_candidates")
+      .select("*")
+      .order("category", { ascending: true })
+      .order("display_order", { ascending: true }),
+    supabase
+      .from("special_predictions")
+      .select("category, candidate_id")
+      .eq("league_id", leagueId)
+      .eq("user_id", userId),
+    supabase.rpc("fn_get_active_tournament_phase"),
   ]);
 
   if (!matches || matches.length === 0) {
@@ -90,12 +111,47 @@ export async function PredictionsBoard() {
 
   const firstMatchTime = (firstMatchResult.data as { match_time: string }[] | null)?.[0]?.match_time ?? undefined;
 
+  // Procesar fase activa del torneo para los premios especiales
+  let isAwardsLocked = false;
+  let activePhaseLabel = "Semifinales en adelante";
+  let activePhaseCode = "D";
+  
+  const activePhase = activePhaseResult?.data?.[0] as { edits_locked: boolean; label: string; phase_code: string } | undefined;
+  if (activePhase) {
+    isAwardsLocked = activePhase.edits_locked;
+    activePhaseLabel = activePhase.label;
+    activePhaseCode = activePhase.phase_code;
+  }
+
+  const candidatesByCategory = groupCandidatesByCategory(
+    (candidates ?? []) as AwardCandidate[],
+  );
+
+  const initialSelections = {
+    champion: null as string | null,
+    top_scorer: null as string | null,
+    mvp: null as string | null,
+  };
+  for (const p of (specialPredictions ?? []) as Pick<
+    SpecialPrediction,
+    "category" | "candidate_id"
+  >[]) {
+    if (p.category === "champion" || p.category === "top_scorer" || p.category === "mvp") {
+      initialSelections[p.category] = p.candidate_id;
+    }
+  }
+
   return (
     <PredictionsBoardView
       leagueId={leagueId}
       matches={matches}
       predictions={predictions ?? []}
       firstMatchTime={firstMatchTime}
+      candidatesByCategory={candidatesByCategory}
+      initialSelections={initialSelections}
+      isAwardsLocked={isAwardsLocked}
+      activePhaseLabel={activePhaseLabel}
+      activePhaseCode={activePhaseCode}
     />
   );
 }

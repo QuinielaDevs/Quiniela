@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getClaims = vi.fn();
 const from = vi.fn();
+const rpc = vi.fn();
 const redirect = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
 });
@@ -10,7 +11,7 @@ const redirect = vi.fn((url: string) => {
 vi.mock("next/navigation", () => ({ redirect }));
 
 vi.mock("@/utils/supabase/server", () => ({
-  createClient: vi.fn(async () => ({ auth: { getClaims }, from })),
+  createClient: vi.fn(async () => ({ auth: { getClaims }, from, rpc })),
 }));
 
 // MatchCard es un client component que dispara la Server Action; lo stubbeamos
@@ -60,6 +61,16 @@ describe("/predictions (PredictionsBoard)", () => {
     vi.resetModules();
     vi.clearAllMocks();
     getClaims.mockResolvedValue({ data: { claims: { sub: "user-1" } } });
+    rpc.mockResolvedValue({
+      data: [
+        {
+          edits_locked: false,
+          label: "Before inaugural match",
+          phase_code: "A",
+        },
+      ],
+      error: null,
+    });
   });
 
   it("redirige a login si no hay sesion", async () => {

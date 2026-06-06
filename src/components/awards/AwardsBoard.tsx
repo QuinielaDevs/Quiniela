@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { saveSpecialPrediction } from "@/app/actions/special-predictions.actions";
 import { AWARD_CATEGORIES } from "@/utils/awards";
 import type { AwardCandidate, AwardCategory } from "@/types";
+import { cn } from "@/utils/utils";
 import {
   Card,
   CardContent,
@@ -22,6 +23,7 @@ interface AwardsBoardProps {
   initialSelections: Selections;
   isLocked?: boolean;
   activePhaseLabel?: string;
+  activePhaseCode?: string;
 }
 
 /**
@@ -36,6 +38,7 @@ export function AwardsBoard({
   initialSelections,
   isLocked = false,
   activePhaseLabel = "Semifinales en adelante",
+  activePhaseCode = "D",
 }: AwardsBoardProps) {
   const [selections, setSelections] = useState<Selections>(initialSelections);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -91,6 +94,88 @@ export function AwardsBoard({
           {error}
         </p>
       ) : null}
+
+      {/* Leyenda del sistema de puntuación decreciente */}
+      <div className="rounded-lg border border-white/10 bg-[#1B263B] p-4 text-sm">
+        <h3 className="font-display font-bold text-white mb-2 flex items-center gap-1.5 text-base">
+          <span>🏆</span> Puntuación Especial Decreciente
+        </h3>
+        <p className="text-xs text-white/70 mb-4">
+          ¡Premia tu audacia! Cuanto antes registres tus predicciones de largo plazo en el torneo, más puntos recibirás si aciertas:
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div
+            className={cn(
+              "rounded border p-2 text-center transition-all duration-300 flex flex-col justify-center",
+              activePhaseCode === "A"
+                ? "border-[#E9C46A] bg-[#E9C46A]/15 ring-1 ring-[#E9C46A]"
+                : "border-white/5 bg-white/5 opacity-60"
+            )}
+          >
+            <span className={cn(
+              "block text-[10px] uppercase font-bold tracking-wider",
+              activePhaseCode === "A" ? "text-[#E9C46A]" : "text-white/40"
+            )}>
+              {activePhaseCode === "A" ? "👉 En Curso" : "Antes del Torneo"}
+            </span>
+            <span className="text-lg font-extrabold text-white mt-0.5">50 pts</span>
+          </div>
+
+          <div
+            className={cn(
+              "rounded border p-2 text-center transition-all duration-300 flex flex-col justify-center",
+              activePhaseCode === "B"
+                ? "border-[#E9C46A] bg-[#E9C46A]/15 ring-1 ring-[#E9C46A]"
+                : "border-white/5 bg-white/5 opacity-60"
+            )}
+          >
+            <span className={cn(
+              "block text-[10px] uppercase font-bold tracking-wider",
+              activePhaseCode === "B" ? "text-[#E9C46A]" : "text-white/40"
+            )}>
+              {activePhaseCode === "B" ? "👉 En Curso" : "Fase de Grupos"}
+            </span>
+            <span className="text-lg font-extrabold text-white mt-0.5">25 pts</span>
+          </div>
+
+          <div
+            className={cn(
+              "rounded border p-2 text-center transition-all duration-300 flex flex-col justify-center",
+              activePhaseCode === "C"
+                ? "border-[#E9C46A] bg-[#E9C46A]/15 ring-1 ring-[#E9C46A]"
+                : "border-white/5 bg-white/5 opacity-60"
+            )}
+          >
+            <span className={cn(
+              "block text-[10px] uppercase font-bold tracking-wider",
+              activePhaseCode === "C" ? "text-[#E9C46A]" : "text-white/40"
+            )}>
+              {activePhaseCode === "C" ? "👉 En Curso" : "Eliminatorias"}
+            </span>
+            <span className="text-lg font-extrabold text-white mt-0.5">10 pts</span>
+          </div>
+
+          <div
+            className={cn(
+              "rounded border p-2 text-center transition-all duration-300 flex flex-col justify-center",
+              activePhaseCode === "D"
+                ? "border-yellow-500/40 bg-yellow-500/10 ring-1 ring-yellow-500/50"
+                : "border-white/5 bg-white/5 opacity-60"
+            )}
+          >
+            <span className={cn(
+              "block text-[10px] uppercase font-bold tracking-wider",
+              activePhaseCode === "D" ? "text-yellow-400" : "text-white/40"
+            )}>
+              {activePhaseCode === "D" ? "🔒 Bloqueado" : "Semifinal en adelante"}
+            </span>
+            <span className="text-lg font-extrabold text-white mt-0.5">0 pts</span>
+          </div>
+        </div>
+        <p className="text-[10px] text-white/50 mt-3 text-center italic">
+          * Tu puntuación se calcula en base a la fecha de tu último cambio efectivo.
+        </p>
+      </div>
 
       {AWARD_CATEGORIES.map(({ category, title, hint }) => (
         <Card key={category} className="border-white/10 bg-[#1B263B]">
