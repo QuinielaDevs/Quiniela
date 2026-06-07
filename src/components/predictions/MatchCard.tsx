@@ -47,6 +47,13 @@ export type MatchCardMatch = Pick<
   | "group_label"
 >;
 
+export type PersistedPrediction = {
+  id?: string;
+  homeScorePred: number;
+  awayScorePred: number;
+  multiplier: number;
+};
+
 type MatchCardProps = {
   leagueId: string;
   match: MatchCardMatch;
@@ -55,6 +62,10 @@ type MatchCardProps = {
   // Ordinal de la jornada en curso (la mayor cuyo primer partido ya empezó),
   // base de la distancia para el multiplicador predictivo en la UI.
   currentRoundOrdinal?: number;
+  // Notifica al tablero el último valor PERSISTIDO (guardado o deshecho) para que
+  // al cambiar de pestaña y volver (remontaje) la tarjeta lo recupere y no muestre
+  // el valor del cargado inicial.
+  onPersisted?: (prediction: PersistedPrediction) => void;
 };
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "offline" | "error";
@@ -105,6 +116,7 @@ export function MatchCard({
   initialPrediction,
   disabled = false,
   currentRoundOrdinal = 0,
+  onPersisted,
 }: MatchCardProps) {
   const hasInitialPrediction =
     initialPrediction !== null && initialPrediction !== undefined;
@@ -128,6 +140,13 @@ export function MatchCard({
   // 2 min). Es el timestamp en que expira; null = no hay nada que deshacer.
   const [undoDeadline, setUndoDeadline] = useState<number | null>(null);
   const [undoBusy, setUndoBusy] = useState(false);
+
+  // Guardamos onPersisted en un ref para llamarlo sin meterlo en las deps de
+  // runSave/handleUndo (su identidad puede cambiar en cada render del padre).
+  const onPersistedRef = useRef(onPersisted);
+  useEffect(() => {
+    onPersistedRef.current = onPersisted;
+  }, [onPersisted]);
 
   const requestIdRef = useRef(0);
   const hasUserEditedRef = useRef(false);
@@ -285,6 +304,14 @@ export function MatchCard({
           pendingRef.current = null;
           if (result.data) {
             setSavedMultiplier(result.data.multiplier);
+            // Reporta el guardado al tablero para sobrevivir al remontaje al
+            // cambiar de pestaña (el prop inicial no se actualiza solo).
+            onPersistedRef.current?.({
+              id: result.data.id,
+              homeScorePred: prediction.homeScorePred,
+              awayScorePred: prediction.awayScorePred,
+              multiplier: result.data.multiplier,
+            });
           }
           setHasSavedPrediction(true);
           setUndoDeadline(scoreChanged ? Date.now() + UNDO_WINDOW_MS : null);
@@ -407,6 +434,12 @@ export function MatchCard({
       setHasSavedPrediction(true);
       setUndoDeadline(null);
       setSaveState("saved");
+      onPersistedRef.current?.({
+        id: result.data.id,
+        homeScorePred: restored.homeScorePred,
+        awayScorePred: restored.awayScorePred,
+        multiplier: result.data.multiplier,
+      });
     } else {
       // Ventana vencida u otro error: ocultamos el botón y avisamos.
       setUndoDeadline(null);

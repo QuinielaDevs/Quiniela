@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
-import { MatchCard, type MatchCardMatch } from "@/components/predictions/MatchCard";
+import {
+  MatchCard,
+  type MatchCardMatch,
+  type PersistedPrediction,
+} from "@/components/predictions/MatchCard";
 import { ScrollableTabs } from "@/components/ui/ScrollableTabs";
 import {
   buildPhases,
@@ -69,6 +73,18 @@ export function PredictionsBoardView({
     [predictions],
   );
 
+  // Cache de los últimos valores PERSISTIDOS por el usuario en esta sesión. Vive
+  // en un ref (no provoca re-render → no perturba la tarjeta activa ni su botón
+  // de "Deshacer"). Al cambiar de pestaña y volver, las tarjetas se remontan y
+  // leen de aquí el último guardado en vez del prop del cargado inicial.
+  const persistedRef = useRef(new Map<string, PersistedPrediction>());
+  const handlePersisted = useCallback(
+    (matchId: string, prediction: PersistedPrediction) => {
+      persistedRef.current.set(matchId, prediction);
+    },
+    [],
+  );
+
   const visibleMatches = useMemo(
     () => matches.filter((match) => phaseKeyForMatch(match) === activeKey),
     [matches, activeKey],
@@ -87,24 +103,36 @@ export function PredictionsBoardView({
   );
 
   const renderCard = (match: MatchCardMatch) => {
-    const prediction = predictionByMatch.get(match.id);
+    // El override de la sesión (último guardado/deshecho) gana sobre el prop del
+    // cargado inicial, para que el remontaje al volver a la pestaña no muestre
+    // un valor obsoleto.
+    const override = persistedRef.current.get(match.id);
+    const stored = predictionByMatch.get(match.id);
+    const initialPrediction = override
+      ? {
+          id: override.id,
+          homeScorePred: override.homeScorePred,
+          awayScorePred: override.awayScorePred,
+          multiplier: override.multiplier,
+        }
+      : stored
+        ? {
+            id: stored.id,
+            homeScorePred: stored.home_score_pred,
+            awayScorePred: stored.away_score_pred,
+            multiplier: stored.multiplier ?? undefined,
+            updatedAt: stored.updated_at ?? undefined,
+          }
+        : null;
+
     return (
       <MatchCard
         key={match.id}
         leagueId={leagueId}
         match={match}
         currentRoundOrdinal={currentRoundOrdinal}
-        initialPrediction={
-          prediction
-            ? {
-                id: prediction.id,
-                homeScorePred: prediction.home_score_pred,
-                awayScorePred: prediction.away_score_pred,
-                multiplier: prediction.multiplier ?? undefined,
-                updatedAt: prediction.updated_at ?? undefined,
-              }
-            : null
-        }
+        initialPrediction={initialPrediction}
+        onPersisted={(prediction) => handlePersisted(match.id, prediction)}
       />
     );
   };

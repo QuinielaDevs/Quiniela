@@ -558,6 +558,35 @@ describe("MatchCard", () => {
     expect(savePrediction).toHaveBeenCalledTimes(1);
   });
 
+  it("reporta el valor persistido vía onPersisted tras guardar", async () => {
+    const onPersisted = vi.fn();
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: {
+        ...SAVED_PREDICTION,
+        home_score_pred: 1,
+        away_score_pred: 0,
+        multiplier: 1,
+      },
+      error: null,
+    });
+    renderMatchCard({ onPersisted });
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(1500);
+    });
+    await flushPromises();
+
+    expect(onPersisted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        homeScorePred: 1,
+        awayScorePred: 0,
+        multiplier: 1,
+      }),
+    );
+  });
+
   // ---- Slot TBD de eliminatoria (equipos aun sin resolver) ----
 
   it("muestra el origen del bracket y deja el slot TBD en solo-lectura", () => {
