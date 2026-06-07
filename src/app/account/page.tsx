@@ -1,9 +1,14 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { TopNav } from "@/components/layout/TopNav";
+import { NoLeagueState } from "@/components/join/NoLeagueState";
+import { LogoutButton } from "@/components/logout-button";
+import {
+  AccountLeaguesPanel,
+  type AccountLeagueMembershipView,
+} from "@/components/account/AccountLeaguesPanel";
 import {
   ProfileSummaryCard,
   type AccountGameProfileView,
@@ -14,6 +19,7 @@ import {
 } from "@/components/account/BadgeHistory";
 import { materializeCurrentMemberAwards } from "@/app/account/account-awards";
 import { createClient } from "@/utils/supabase/server";
+import type { LeagueRole, PaymentStatus } from "@/types";
 
 type AccountProfile = {
   display_name: string;
@@ -22,6 +28,18 @@ type AccountProfile = {
 
 type AccountLeague = {
   name: string;
+};
+
+type AccountMembershipRow = {
+  league_id: string;
+  role: LeagueRole;
+  payment_status: PaymentStatus;
+  joined_at: string;
+  wager_balance: number;
+  leagues: {
+    name: string;
+    requires_payment: boolean;
+  } | null;
 };
 
 export async function AccountBoard() {
@@ -33,10 +51,9 @@ export async function AccountBoard() {
 
   const { data: memberships, error: membershipError } = await supabase
     .from("league_members")
-    .select("league_id, joined_at")
+    .select("league_id, role, payment_status, joined_at, wager_balance, leagues(name, requires_payment)")
     .eq("user_id", userId)
-    .order("joined_at", { ascending: false })
-    .limit(1);
+    .order("joined_at", { ascending: false });
 
   if (membershipError) {
     console.warn("No se pudo cargar la membresía de cuenta", {
@@ -51,19 +68,29 @@ export async function AccountBoard() {
     );
   }
 
-  const leagueId = memberships?.[0]?.league_id;
+  const membershipRows = (memberships ?? []) as unknown as AccountMembershipRow[];
+  const leagueId = membershipRows[0]?.league_id;
   if (!leagueId) {
     return (
       <>
         <PageHeader />
-        <EmptyState
-          title="Aún no perteneces a una liga"
-          body="Crea tu propia quiniela o únete con un enlace de invitación para desbloquear tu perfil."
-          cta={{ href: "/leagues/new", label: "Crear una liga" }}
-        />
+        <NoLeagueState body="Únete con un código de invitación o crea tu propia quiniela para desbloquear tu perfil." />
       </>
     );
   }
+
+  const accountLeagues: AccountLeagueMembershipView[] = membershipRows.map(
+    (membership) => ({
+      leagueId: membership.league_id,
+      leagueName: membership.leagues?.name ?? "Liga sin nombre",
+      role: membership.role,
+      paymentStatus: membership.payment_status,
+      joinedAt: membership.joined_at,
+      wagerBalance: Number(membership.wager_balance),
+      requiresPayment: membership.leagues?.requires_payment ?? false,
+      isCurrent: membership.league_id === leagueId,
+    }),
+  );
 
   const materialized = await materializeCurrentMemberAwards({
     supabase,
@@ -176,7 +203,10 @@ export async function AccountBoard() {
             badges={badgeRows}
           />
         </div>
-        <BadgeHistory badges={badgeRows} />
+        <div className="flex flex-col gap-4">
+          <AccountLeaguesPanel leagues={accountLeagues} />
+          <BadgeHistory badges={badgeRows} />
+        </div>
       </div>
     </>
   );
@@ -184,11 +214,16 @@ export async function AccountBoard() {
 
 function PageHeader() {
   return (
-    <header className="space-y-1">
-      <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent lg:hidden">
-        PIJA Quiniela
-      </p>
-      <h1 className="font-display text-2xl font-bold lg:text-4xl">Mi Cuenta</h1>
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-1">
+        <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent lg:hidden">
+          PIJA Quiniela
+        </p>
+        <h1 className="font-display text-2xl font-bold lg:text-4xl">
+          Mi Cuenta
+        </h1>
+      </div>
+      <LogoutButton />
     </header>
   );
 }
@@ -200,31 +235,6 @@ function ErrorState() {
       <p className="mt-2 text-sm text-muted-foreground">
         Intenta de nuevo en unos segundos.
       </p>
-    </div>
-  );
-}
-
-function EmptyState({
-  title,
-  body,
-  cta,
-}: {
-  title: string;
-  body: string;
-  cta?: { href: string; label: string };
-}) {
-  return (
-    <div className="rounded-md border border-border bg-card p-6 text-center text-card-foreground">
-      <h2 className="font-display text-lg font-bold">{title}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{body}</p>
-      {cta && (
-        <Link
-          href={cta.href}
-          className="mt-4 inline-flex h-12 items-center justify-center rounded-sm bg-primary px-6 font-semibold text-primary-foreground"
-        >
-          {cta.label}
-        </Link>
-      )}
     </div>
   );
 }

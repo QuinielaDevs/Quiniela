@@ -260,6 +260,57 @@ describe("fn_set_member_payment_status", () => {
   });
 });
 
+describe("fn_promote_member_to_admin", () => {
+  it("un admin promueve a otro miembro como admin", async () => {
+    const adminUser = await createAuthedUser();
+    const member = await createAuthedUser();
+    const leagueId = await seedLeague(adminUser, [member]);
+
+    const client = createAuthedClient(adminUser.token);
+    const { data, error } = await client
+      .rpc("fn_promote_member_to_admin", {
+        p_league_id: leagueId,
+        p_user_id: member.id,
+      })
+      .single();
+
+    expect(error).toBeNull();
+    expect((data as { role: string }).role).toBe("admin");
+
+    const { data: row } = await admin
+      .from("league_members")
+      .select("role")
+      .eq("league_id", leagueId)
+      .eq("user_id", member.id)
+      .single();
+    expect(row!.role).toBe("admin");
+  });
+
+  it("un no-admin no puede promover miembros", async () => {
+    const adminUser = await createAuthedUser();
+    const member = await createAuthedUser();
+    const target = await createAuthedUser();
+    const leagueId = await seedLeague(adminUser, [member, target]);
+
+    const memberClient = createAuthedClient(member.token);
+    const { error } = await memberClient
+      .rpc("fn_promote_member_to_admin", {
+        p_league_id: leagueId,
+        p_user_id: target.id,
+      })
+      .single();
+    expect(error?.code).toBe(RLS_VIOLATION);
+
+    const { data: stillMember } = await admin
+      .from("league_members")
+      .select("role")
+      .eq("league_id", leagueId)
+      .eq("user_id", target.id)
+      .single();
+    expect(stillMember!.role).toBe("member");
+  });
+});
+
 describe("fn_remove_member (expulsión + cascada)", () => {
   it("un admin expulsa a un miembro y el trigger borra en cascada sus predicciones, medallas y perfil en la liga", async () => {
     const adminUser = await createAuthedUser();

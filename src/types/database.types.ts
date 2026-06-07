@@ -924,6 +924,24 @@ export type Database = {
         Args: { p_match_time: string }
         Returns: number
       }
+      fn_promote_member_to_admin: {
+        Args: { p_league_id: string; p_user_id: string }
+        Returns: {
+          id: string
+          joined_at: string
+          league_id: string
+          payment_status: string
+          role: string
+          user_id: string
+          wager_balance: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "league_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fn_remove_member: {
         Args: { p_league_id: string; p_user_id: string }
         Returns: undefined
@@ -1133,4 +1151,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

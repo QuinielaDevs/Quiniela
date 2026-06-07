@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/server";
 import { PredictionsBoardView } from "@/components/predictions/PredictionsBoardView";
-import { JoinByCodeForm } from "@/components/join/JoinByCodeForm";
+import { NoLeagueState } from "@/components/join/NoLeagueState";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { TopNav } from "@/components/layout/TopNav";
 
@@ -140,38 +140,6 @@ export async function PredictionsBoard() {
       activePhaseLabel={activePhaseLabel}
       activePhaseCode={activePhaseCode}
     />
-  );
-}
-
-// Estado para usuario logueado sin liga: puede unirse al instante con un código
-// (entrada manual) o crear su propia liga. El formulario es un client component.
-function NoLeagueState() {
-  return (
-    <div className="rounded-md border border-border bg-card p-6 text-card-foreground">
-      <h2 className="font-display text-lg font-bold">
-        Aún no perteneces a una liga
-      </h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        ¿Tienes un código de invitación? Únete al instante. Si no, crea tu propia
-        quiniela.
-      </p>
-
-      <div className="mt-5">
-        <JoinByCodeForm />
-      </div>
-
-      <div className="relative my-5 text-center text-sm">
-        <span className="relative z-10 bg-card px-2 text-muted-foreground">o</span>
-        <div className="absolute inset-0 top-1/2 -z-0 border-t border-border" />
-      </div>
-
-      <Link
-        href="/leagues/new"
-        className="inline-flex h-12 w-full items-center justify-center rounded-sm border border-border bg-background px-6 font-semibold text-foreground transition-colors hover:bg-card"
-      >
-        Crear una liga
-      </Link>
-    </div>
   );
 }
 

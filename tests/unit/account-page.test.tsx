@@ -8,7 +8,11 @@ const redirect = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
 });
 
-vi.mock("next/navigation", () => ({ redirect, usePathname: () => "/account" }));
+vi.mock("next/navigation", () => ({
+  redirect,
+  usePathname: () => "/account",
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 vi.mock("@/utils/supabase/server", () => ({
   createClient: vi.fn(async () => ({ auth: { getClaims }, from })),

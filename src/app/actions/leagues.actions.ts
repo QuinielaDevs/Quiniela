@@ -7,9 +7,11 @@ import { generateInviteCode, INVITE_CODE_ALPHABET } from "@/utils/invite-code";
 import { getJoinLeagueErrorMessage } from "@/utils/join-league-errors";
 import {
   createLeagueSchema,
+  promoteMemberToAdminSchema,
   removeMemberSchema,
   setMemberPaymentStatusSchema,
   type CreateLeagueInput,
+  type PromoteMemberToAdminInput,
   type RemoveMemberInput,
   type SetMemberPaymentStatusInput,
 } from "@/app/actions/leagues.schema";
@@ -221,6 +223,45 @@ export async function setMemberPaymentStatus(
     return { success: true, data: data as LeagueMember, error: null };
   } catch (e) {
     console.error("Excepción inesperada al actualizar estado de pago del miembro:", e);
+    return { success: false, data: null, error: ADMIN_SAVE_ERROR };
+  }
+}
+
+/**
+ * Promueve un miembro a admin de la liga. El RPC `fn_promote_member_to_admin`
+ * aplica admin-gating server-side y evita updates directos sobre league_members.
+ */
+export async function promoteMemberToAdmin(
+  input: PromoteMemberToAdminInput,
+): Promise<ServerActionResult<LeagueMember>> {
+  try {
+    const parsed = promoteMemberToAdminSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+      };
+    }
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .rpc("fn_promote_member_to_admin", {
+        p_league_id: parsed.data.leagueId,
+        p_user_id: parsed.data.userId,
+      })
+      .single();
+
+    if (error) {
+      console.error("Error al promover miembro a admin:", error);
+      return { success: false, data: null, error: toAdminError(error) };
+    }
+
+    revalidatePath("/standings");
+    revalidatePath("/standings/manage");
+    return { success: true, data: data as LeagueMember, error: null };
+  } catch (e) {
+    console.error("Excepción inesperada al promover miembro a admin:", e);
     return { success: false, data: null, error: ADMIN_SAVE_ERROR };
   }
 }

@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { UserMinus } from "lucide-react";
+import { ShieldCheck, UserMinus } from "lucide-react";
 
 import {
+  promoteMemberToAdmin,
   removeMember,
   setMemberPaymentStatus,
 } from "@/app/actions/leagues.actions";
@@ -104,6 +105,34 @@ export function MemberAdminList({
     });
   }
 
+  function promoteToAdmin(member: AdminMemberView) {
+    setError(null);
+    setPendingUserId(member.userId);
+    setRows((prev) =>
+      prev.map((r) =>
+        r.userId === member.userId ? { ...r, role: "admin" } : r,
+      ),
+    );
+
+    startTransition(async () => {
+      const result = await promoteMemberToAdmin({
+        leagueId,
+        userId: member.userId,
+      });
+      setPendingUserId(null);
+      if (!result.success) {
+        setError(result.error);
+        setRows((prev) =>
+          prev.map((r) =>
+            r.userId === member.userId ? { ...r, role: member.role } : r,
+          ),
+        );
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   if (rows.length === 0) {
     return (
       <div className="rounded-md border border-border bg-card p-6 text-center text-card-foreground">
@@ -130,6 +159,7 @@ export function MemberAdminList({
         {rows.map((member) => {
           const isSelf = member.userId === currentUserId;
           const isPaid = member.paymentStatus === "paid";
+          const isAdmin = member.role === "admin";
           const isRowPending = pendingUserId === member.userId;
           return (
             <li
@@ -148,9 +178,21 @@ export function MemberAdminList({
                   {member.displayName}
                 </span>
                 <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {member.role === "admin" ? "Admin" : "Miembro"}
+                  {isAdmin ? "Admin" : "Miembro"}
                 </span>
               </div>
+
+              {!isSelf && !isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => promoteToAdmin(member)}
+                  disabled={isPending && isRowPending}
+                  aria-label={`Hacer admin a ${member.displayName}`}
+                  className="inline-flex size-12 shrink-0 items-center justify-center rounded-full text-primary disabled:opacity-50"
+                >
+                  <ShieldCheck className="size-5" aria-hidden="true" />
+                </button>
+              )}
 
               {/* Toggle de pago interactivo (AC #3). */}
               <button

@@ -8,6 +8,7 @@ import { StandingsTable } from "@/components/standings/StandingsTable";
 import { PaymentBanner } from "@/components/standings/PaymentBanner";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { TopNav } from "@/components/layout/TopNav";
+import { NoLeagueState } from "@/components/join/NoLeagueState";
 import {
   type StandingMatch,
   type StandingMember,
@@ -45,11 +46,7 @@ export async function StandingsBoard() {
   const leagueId = memberships?.[0]?.league_id;
   if (!leagueId) {
     return (
-      <EmptyState
-        title="Aún no perteneces a una liga"
-        body="Crea tu propia quiniela o únete a una con un enlace de invitación para ver la tabla de posiciones."
-        cta={{ href: "/leagues/new", label: "Crear una liga" }}
-      />
+      <NoLeagueState body="Únete con un código de invitación o crea tu propia quiniela para ver la tabla de posiciones." />
     );
   }
 
@@ -154,31 +151,6 @@ export async function StandingsBoard() {
         predictions={predictions}
       />
     </>
-  );
-}
-
-function EmptyState({
-  title,
-  body,
-  cta,
-}: {
-  title: string;
-  body: string;
-  cta?: { href: string; label: string };
-}) {
-  return (
-    <div className="rounded-md border border-border bg-card p-6 text-center text-card-foreground">
-      <h2 className="font-display text-lg font-bold">{title}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{body}</p>
-      {cta && (
-        <Link
-          href={cta.href}
-          className="mt-4 inline-flex h-12 items-center justify-center rounded-sm bg-primary px-6 font-semibold text-primary-foreground"
-        >
-          {cta.label}
-        </Link>
-      )}
-    </div>
   );
 }
 

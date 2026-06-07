@@ -13,6 +13,7 @@ import type {
 } from "@/types";
 import { AwardsBoard } from "@/components/awards/AwardsBoard";
 import { TopNav } from "@/components/layout/TopNav";
+import { NoLeagueState } from "@/components/join/NoLeagueState";
 
 const outfit = Outfit({ subsets: ["latin"], display: "swap" });
 
@@ -117,9 +118,7 @@ async function AwardsContent({ searchParams }: AwardsPageProps) {
           </header>
 
           {leagues.length === 0 ? (
-            <p className="rounded-lg border border-white/10 bg-[#1B263B] px-4 py-6 text-center text-sm text-white/70">
-              Únete a una liga para pronosticar los premios de la Copa.
-            </p>
+            <NoLeagueState body="Únete con un código de invitación o crea tu propia quiniela para pronosticar los premios de la Copa." />
           ) : (
             <AwardsForLeague
               leagues={leagues}

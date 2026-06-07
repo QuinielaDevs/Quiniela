@@ -11,11 +11,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemberAdminList, type AdminMemberView } from "./MemberAdminList";
 
 const setMemberPaymentStatus = vi.fn();
+const promoteMemberToAdmin = vi.fn();
 const removeMember = vi.fn();
 const refresh = vi.fn();
 
 vi.mock("@/app/actions/leagues.actions", () => ({
   setMemberPaymentStatus: (args: unknown) => setMemberPaymentStatus(args),
+  promoteMemberToAdmin: (args: unknown) => promoteMemberToAdmin(args),
   removeMember: (args: unknown) => removeMember(args),
 }));
 
@@ -60,6 +62,11 @@ beforeEach(() => {
     data: {},
     error: null,
   });
+  promoteMemberToAdmin.mockResolvedValue({
+    success: true,
+    data: {},
+    error: null,
+  });
   removeMember.mockResolvedValue({ success: true, data: null, error: null });
 });
 
@@ -96,6 +103,21 @@ describe("MemberAdminList", () => {
       screen.queryByLabelText("Dar de baja a Cris"),
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Dar de baja a Diego")).toBeInTheDocument();
+  });
+
+  it("permite promover a admin a otro miembro de la liga", async () => {
+    renderList();
+
+    fireEvent.click(screen.getByLabelText("Hacer admin a Diego"));
+
+    await waitFor(() =>
+      expect(promoteMemberToAdmin).toHaveBeenCalledWith({
+        leagueId: "L1",
+        userId: "user-2",
+      }),
+    );
+    expect(screen.queryByLabelText("Hacer admin a Diego")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Admin")).toHaveLength(2);
   });
 
   it("el flujo de baja abre el diálogo y al confirmar llama removeMember", async () => {

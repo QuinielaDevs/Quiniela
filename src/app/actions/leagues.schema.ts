@@ -64,6 +64,20 @@ export type SetMemberPaymentStatusInput = z.input<
 >;
 
 /**
+ * Esquema para promover a un miembro como admin de liga. Las guardas duras
+ * (admin-gating, membresía existente, aislamiento por liga) viven en
+ * `fn_promote_member_to_admin`.
+ */
+export const promoteMemberToAdminSchema = z.object({
+  leagueId: z.string().uuid("Liga inválida."),
+  userId: z.string().uuid("Miembro inválido."),
+});
+
+export type PromoteMemberToAdminInput = z.input<
+  typeof promoteMemberToAdminSchema
+>;
+
+/**
  * Esquema de la expulsión de un miembro (Story 3.3 — AC #4). Las guardas duras
  * (admin, no auto-expulsión, no quedarse sin admin) viven en `fn_remove_member`.
  */
