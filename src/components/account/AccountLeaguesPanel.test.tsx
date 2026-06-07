@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountLeaguesPanel } from "@/components/account/AccountLeaguesPanel";
 
@@ -12,6 +12,11 @@ beforeEach(() => {
     configurable: true,
     value: { writeText },
   });
+});
+
+afterEach(() => {
+  cleanup();
+  writeText.mockReset();
 });
 
 describe("AccountLeaguesPanel", () => {
@@ -52,8 +57,7 @@ describe("AccountLeaguesPanel", () => {
     expect(screen.getByText("Miembro")).toBeInTheDocument();
     expect(screen.getByText("Pago al día")).toBeInTheDocument();
     expect(screen.getByText("Sin pago requerido")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /crear liga/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /crear liga/i })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /crear liga/i })).toBeNull();
     expect(screen.getByText("ABCDN234")).toBeInTheDocument();
     expect(screen.getByText("WXYZ9876")).toBeInTheDocument();
 
@@ -67,6 +71,41 @@ describe("AccountLeaguesPanel", () => {
     expect(
       screen.getByRole("button", {
         name: "Código de invitación de Liga Principal copiado",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("copia el enlace de invitación de la liga", async () => {
+    render(
+      <AccountLeaguesPanel
+        leagues={[
+          {
+            leagueId: "league-1",
+            leagueName: "Liga Principal",
+            inviteCode: "ABCDN234",
+            role: "admin",
+            paymentStatus: "paid",
+            joinedAt: "2026-06-05T12:00:00.000Z",
+            wagerBalance: 12.5,
+            requiresPayment: true,
+            isCurrent: true,
+          },
+        ]}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Copiar enlace de invitación de Liga Principal",
+      }),
+    );
+
+    expect(writeText).toHaveBeenCalledWith(
+      `${window.location.origin}/join/ABCDN234`,
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Enlace de invitación de Liga Principal copiado",
       }),
     ).toBeInTheDocument();
   });

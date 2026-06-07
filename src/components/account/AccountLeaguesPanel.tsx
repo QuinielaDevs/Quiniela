@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CircleDollarSign, Crown, ListChecks, Plus, Shield } from "lucide-react";
+import { CircleDollarSign, Crown, ListChecks, Shield } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,8 +33,11 @@ const paymentLabels: Record<PaymentStatus, string> = {
   pending: "Pago pendiente",
 };
 
+type CopyTarget = "code" | "link";
+
 type CopyState = {
   leagueId: string;
+  target: CopyTarget;
   status: "copied" | "error";
 } | null;
 
@@ -55,42 +58,51 @@ export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
   const currentLeague = leagues.find((league) => league.isCurrent);
   const [copyState, setCopyState] = useState<CopyState>(null);
 
-  async function copyInviteCode(league: AccountLeagueMembershipView) {
+  function buildInviteLink(league: AccountLeagueMembershipView): string {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    return `${origin}/join/${league.inviteCode}`;
+  }
+
+  async function copyToClipboard(
+    league: AccountLeagueMembershipView,
+    target: CopyTarget,
+  ) {
+    const value =
+      target === "code" ? league.inviteCode : buildInviteLink(league);
     try {
-      await navigator.clipboard.writeText(league.inviteCode);
-      setCopyState({ leagueId: league.leagueId, status: "copied" });
+      await navigator.clipboard.writeText(value);
+      setCopyState({ leagueId: league.leagueId, target, status: "copied" });
     } catch {
-      setCopyState({ leagueId: league.leagueId, status: "error" });
+      setCopyState({ leagueId: league.leagueId, target, status: "error" });
     }
   }
 
   return (
     <section className="rounded-md border border-border bg-card p-4 text-card-foreground">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Mis ligas
-          </p>
-          <h2 className="mt-1 font-display text-xl font-bold">
-            {currentLeague?.leagueName ?? "Sin liga actual"}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {leagues.length === 1
-              ? "Estás jugando en 1 liga."
-              : `Estás jugando en ${leagues.length} ligas.`}
-          </p>
-        </div>
-
-        <Button type="button" variant="outline" size="sm" disabled>
-          <Plus aria-hidden="true" />
-          Crear liga
-        </Button>
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Mis ligas
+        </p>
+        <h2 className="mt-1 font-display text-xl font-bold">
+          {currentLeague?.leagueName ?? "Sin liga actual"}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {leagues.length === 1
+            ? "Estás jugando en 1 liga."
+            : `Estás jugando en ${leagues.length} ligas.`}
+        </p>
       </div>
 
       <div className="mt-4 divide-y divide-border border-t border-border">
         {leagues.map((league) => {
-          const isCopied =
+          const isCodeCopied =
             copyState?.leagueId === league.leagueId &&
+            copyState.target === "code" &&
+            copyState.status === "copied";
+          const isLinkCopied =
+            copyState?.leagueId === league.leagueId &&
+            copyState.target === "link" &&
             copyState.status === "copied";
 
           return (
@@ -143,24 +155,41 @@ export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
                     {league.inviteCode}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyInviteCode(league)}
-                  aria-label={
-                    isCopied
-                      ? `Código de invitación de ${league.leagueName} copiado`
-                      : `Copiar código de invitación de ${league.leagueName}`
-                  }
-                >
-                  {isCopied ? "Copiado" : "Copiar código"}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(league, "code")}
+                    aria-label={
+                      isCodeCopied
+                        ? `Código de invitación de ${league.leagueName} copiado`
+                        : `Copiar código de invitación de ${league.leagueName}`
+                    }
+                  >
+                    {isCodeCopied ? "Copiado" : "Copiar código"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(league, "link")}
+                    aria-label={
+                      isLinkCopied
+                        ? `Enlace de invitación de ${league.leagueName} copiado`
+                        : `Copiar enlace de invitación de ${league.leagueName}`
+                    }
+                  >
+                    {isLinkCopied ? "Copiado" : "Copiar enlace"}
+                  </Button>
+                </div>
               </div>
               {copyState?.leagueId === league.leagueId &&
                 copyState.status === "error" && (
                   <p className="mt-2 text-xs text-destructive" role="status">
-                    No pudimos copiar el código. Puedes seleccionarlo manualmente.
+                    {copyState.target === "code"
+                      ? "No pudimos copiar el código. Puedes seleccionarlo manualmente."
+                      : "No pudimos copiar el enlace. Intenta de nuevo."}
                   </p>
                 )}
             </article>
