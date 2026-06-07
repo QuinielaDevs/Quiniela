@@ -169,7 +169,7 @@ export function AwardsBoard({
             )}>
               {activePhaseCode === "D" ? "🔒 Bloqueado" : "Semifinal en adelante"}
             </span>
-            <span className="text-lg font-extrabold text-white mt-0.5">0 pts</span>
+            <span className="text-lg font-extrabold text-white mt-0.5">2 pts</span>
           </div>
         </div>
         <p className="text-[10px] text-white/50 mt-3 text-center italic">

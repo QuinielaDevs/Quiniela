@@ -36,7 +36,8 @@ export function resolvePhase(
 
 /**
  * Score a correct special prediction made at `predictedAt` (FR-16).
- * Returns the phase reward, or 0 when edits were locked (Fase D).
+ * Returns the phase reward. `editsLocked` prevents new edits, but does not zero
+ * out a correct prediction's reward.
  */
 export function scoreAward(
   predictedAt: Date,
@@ -44,6 +45,6 @@ export function scoreAward(
   phases: readonly TournamentPhaseConfig[] = TOURNAMENT_PHASES_2026,
 ): number {
   if (!isCorrect) return 0;
-  const { rewardPoints, editsLocked } = resolvePhase(predictedAt, phases);
-  return editsLocked ? 0 : rewardPoints;
+  const { rewardPoints } = resolvePhase(predictedAt, phases);
+  return rewardPoints;
 }
