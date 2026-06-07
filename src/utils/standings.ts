@@ -10,6 +10,7 @@
 // ============================================================
 import {
   POINTS_EXACT,
+  POINTS_RESULT,
   calculateBasePoints,
   calculatePredictionPoints,
 } from "@/utils/scoring";
@@ -22,6 +23,9 @@ export type StandingMember = {
   avatarUrl: string;
   paymentStatus: PaymentStatus;
   joinedAt: string; // ISO 8601 UTC (league_members.joined_at)
+  /** Saldo de puntos de duelos (league_members.wager_balance). Toda la liga,
+   *  no por jornada. 2º criterio de desempato. Opcional → 0 si no se provee. */
+  duelPoints?: number;
 };
 
 export type StandingMatch = {
@@ -48,7 +52,12 @@ export type StandingRow = {
   avatarUrl: string;
   paymentStatus: PaymentStatus;
   totalPoints: number;
+  /** Aciertos de marcador EXACTO (5 pts): equipo y score, incluye empates exactos. */
   exactCount: number;
+  /** Aciertos solo de resultado/ganador o empate (2 pts), sin el marcador exacto. */
+  resultCount: number;
+  /** Saldo de puntos de duelos usado en el desempate y mostrado en General. */
+  duelPoints: number;
 };
 
 export type ProjectedStandingRow = StandingRow & {
@@ -66,7 +75,8 @@ function round2(value: number): number {
  * @param phaseKeyOrMatchday  undefined = acumulado (General); string/número = fase/jornada específica.
  *
  * Desempate (Story 3.1 AC #5): puntos desc → marcadores exactos desc →
- * puntos de duelos 1v1 desc (Epic 5, hoy constante 0) → joined_at asc.
+ * saldo de duelos (wager_balance) desc → joined_at asc. El saldo de duelos
+ * llega vía `member.duelPoints` (0 si no se provee).
  */
 export function buildStandings(
   members: StandingMember[],
@@ -95,6 +105,7 @@ export function buildStandings(
   const rows = members.map((member) => {
     let totalPoints = 0;
     let exactCount = 0;
+    let resultCount = 0;
 
     for (const match of matchesInScope) {
       const pred = predictionByKey.get(`${member.userId}:${match.id}`);
@@ -109,15 +120,16 @@ export function buildStandings(
       );
       totalPoints += calculatePredictionPoints(base, pred.multiplier);
       if (base === POINTS_EXACT) exactCount += 1;
+      else if (base === POINTS_RESULT) resultCount += 1;
     }
 
     return {
       member,
       totalPoints: round2(totalPoints),
       exactCount,
-      // Duelos 1v1 (Epic 5) aún no existen → inerte. Seam explícito para que
-      // Epic 5 lo conecte sin reescribir el orden.
-      duelPoints: 0,
+      resultCount,
+      // Saldo de duelos (wager_balance) de toda la liga. 2º criterio de desempate.
+      duelPoints: member.duelPoints ?? 0,
     };
   });
 
@@ -142,6 +154,8 @@ export function buildStandings(
     paymentStatus: row.member.paymentStatus,
     totalPoints: row.totalPoints,
     exactCount: row.exactCount,
+    resultCount: row.resultCount,
+    duelPoints: row.duelPoints,
   }));
 }
 
@@ -172,6 +186,7 @@ export function buildProjectedStandings(
     let totalPoints = 0;
     let livePoints = 0;
     let exactCount = 0;
+    let resultCount = 0;
 
     for (const match of matchesInScope) {
       const pred = predictionByKey.get(`${member.userId}:${match.id}`);
@@ -188,6 +203,7 @@ export function buildProjectedStandings(
       totalPoints += points;
       if (match.status === "live") livePoints += points;
       if (base === POINTS_EXACT) exactCount += 1;
+      else if (base === POINTS_RESULT) resultCount += 1;
     }
 
     return {
@@ -195,7 +211,8 @@ export function buildProjectedStandings(
       totalPoints: round2(totalPoints),
       livePoints: round2(livePoints),
       exactCount,
-      duelPoints: 0,
+      resultCount,
+      duelPoints: member.duelPoints ?? 0,
     };
   });
 
@@ -216,6 +233,8 @@ export function buildProjectedStandings(
     paymentStatus: row.member.paymentStatus,
     totalPoints: row.totalPoints,
     exactCount: row.exactCount,
+    resultCount: row.resultCount,
+    duelPoints: row.duelPoints,
     livePoints: row.livePoints,
   }));
 }
