@@ -435,7 +435,9 @@ describe("MatchCard", () => {
   });
 
   it("una edicion que NO degrada el multiplicador no abre advertencia y guarda normal", async () => {
-    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z")); // 8 dias → 1.3x
+    // J2 con jornada en curso 0 (default) → nextMultiplier = 1.25; igual al
+    // guardado, así que editar NO degrada y no abre advertencia.
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z"));
     vi.mocked(savePrediction).mockResolvedValue({
       success: true,
       data: SAVED_PREDICTION,
@@ -443,7 +445,7 @@ describe("MatchCard", () => {
     });
     renderMatchCard({
       match: MATCH_JORNADA2,
-      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 1.3 },
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 1.25 },
     });
 
     fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));

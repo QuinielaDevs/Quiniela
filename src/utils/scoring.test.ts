@@ -163,15 +163,23 @@ describe("calculatePredictionMultiplier — distancia en jornadas", () => {
     expect(calculatePredictionMultiplier(null, null, 0)).toBe(1.0);
   });
 
+  it("la referencia tiene piso en la jornada 1 (pre-torneo, current 0)", () => {
+    // Pre-torneo (current 0) la J1 es la referencia → J2 está a 1 de distancia.
+    expect(calculatePredictionMultiplier(2, "group", 0)).toBe(1.25); // J2
+    expect(calculatePredictionMultiplier(3, "group", 0)).toBe(1.5); // J3
+    expect(calculatePredictionMultiplier(null, "round-32", 0)).toBe(1.75);
+  });
+
   it("escala lineal +0.25 por jornada de distancia, tope 2.5x", () => {
     // J2 (ordinal 2) con la jornada en curso variando la distancia.
     expect(calculatePredictionMultiplier(2, "group", 2)).toBe(1.0); // dist 0
     expect(calculatePredictionMultiplier(2, "group", 1)).toBe(1.25); // dist 1
-    expect(calculatePredictionMultiplier(2, "group", 0)).toBe(1.5); // dist 2
+    expect(calculatePredictionMultiplier(3, "group", 1)).toBe(1.5); // dist 2
+    expect(calculatePredictionMultiplier(3, "group", 2)).toBe(1.25); // J2 en curso
   });
 
   it("eliminatorias escalan por su ordinal de ronda", () => {
-    // Final (ordinal 8) con jornada en curso 0 → distancia 8 → tope 2.5x.
+    // Final (ordinal 8) con jornada en curso 0 → distancia 7 (piso 1) → tope 2.5x.
     expect(calculatePredictionMultiplier(null, "final", 0)).toBe(2.5);
     // Cuartos (ordinal 6) con J3 en curso (3) → distancia 3 → 1.75x.
     expect(calculatePredictionMultiplier(null, "quarter", 3)).toBe(1.75);

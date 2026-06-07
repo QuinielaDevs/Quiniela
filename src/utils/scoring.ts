@@ -200,7 +200,10 @@ export function calculatePredictionMultiplier(
   if (target == null || target <= BASELINE_MATCHDAY) {
     return MIN_MULTIPLIER;
   }
-  const distance = Math.max(0, target - currentOrdinal);
+  // Referencia con piso en la jornada 1: pre-torneo (current 0) la J2 queda a
+  // distancia 1 (1.25x), no 2. Espeja greatest(fn_current_round_ordinal(), 1).
+  const reference = Math.max(currentOrdinal, BASELINE_MATCHDAY);
+  const distance = Math.max(0, target - reference);
   return multiplierForDistance(distance);
 }
 
