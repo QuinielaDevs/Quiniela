@@ -71,6 +71,7 @@ export function normalizeTeamName(name: string): string {
     case "türkiye":
       return "Türkiye";
     case "ivory coast":
+    case "côte d'ivoire":
     case "cote d'ivoire":
     case "cote d''ivoire":
       return "Cote d'Ivoire";
