@@ -587,6 +587,8 @@ describe("MatchCard", () => {
     expect(screen.getByText("Ganador 98")).toBeInTheDocument();
     expect(screen.getByText("Pendiente de clasificacion")).toBeInTheDocument();
     expect(screen.getByText("Semis")).toBeInTheDocument();
+    // El número de partido del bracket permite ubicar a qué cruce se refiere.
+    expect(screen.getByText("Partido 101")).toBeInTheDocument();
     expect(
       screen.getByLabelText("Incrementar goles de Ganador 97"),
     ).toBeDisabled();

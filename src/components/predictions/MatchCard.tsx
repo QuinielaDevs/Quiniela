@@ -516,6 +516,13 @@ export function MatchCard({
       <div className="relative mb-3 min-h-6 flex items-start">
         <div className="flex flex-wrap items-center gap-2 pr-36 text-xs text-muted-foreground min-h-6">
           <span>{phaseLabel}</span>
+          {/* Número de partido del bracket (solo eliminatorias). Permite ubicar
+              a qué cruce se refiere un origen TBD como "Ganador 74". */}
+          {match.bracket_slot != null && (
+            <span className="rounded-sm border border-accent/60 bg-accent/10 px-1.5 py-0.5 font-semibold text-accent">
+              Partido {match.bracket_slot}
+            </span>
+          )}
           {formattedTime && (
             <>
               <span>·</span>
