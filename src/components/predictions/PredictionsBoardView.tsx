@@ -31,6 +31,9 @@ type PredictionsBoardViewProps = {
   isAwardsLocked: boolean;
   activePhaseLabel: string;
   activePhaseCode: string;
+  // Jornada en curso (server-authoritative): base de la distancia para el
+  // multiplicador predictivo que muestra cada tarjeta.
+  currentRoundOrdinal: number;
 };
 
 // Tablero táctil con navegación por fase (UX-DR-7). Agrupa los partidos por
@@ -46,6 +49,7 @@ export function PredictionsBoardView({
   isAwardsLocked,
   activePhaseLabel,
   activePhaseCode,
+  currentRoundOrdinal,
 }: PredictionsBoardViewProps) {
   const phases = useMemo(() => {
     const matchPhases = buildPhases(matches);
@@ -89,6 +93,7 @@ export function PredictionsBoardView({
         key={match.id}
         leagueId={leagueId}
         match={match}
+        currentRoundOrdinal={currentRoundOrdinal}
         initialPrediction={
           prediction
             ? {

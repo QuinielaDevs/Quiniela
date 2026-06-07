@@ -92,6 +92,7 @@ export async function PredictionsBoard() {
     { data: candidates },
     { data: specialPredictions },
     activePhaseResult,
+    { data: currentRoundOrdinal },
   ] = await Promise.all([
     supabase
       .from("matches")
@@ -118,6 +119,8 @@ export async function PredictionsBoard() {
       .eq("league_id", leagueId)
       .eq("user_id", userId),
     supabase.rpc("fn_get_active_tournament_phase"),
+    // Jornada en curso (server-authoritative) para el multiplicador predictivo.
+    supabase.rpc("fn_current_round_ordinal"),
   ]);
 
   if (!matches || matches.length === 0) {
@@ -177,6 +180,7 @@ export async function PredictionsBoard() {
         isAwardsLocked={isAwardsLocked}
         activePhaseLabel={activePhaseLabel}
         activePhaseCode={activePhaseCode}
+        currentRoundOrdinal={currentRoundOrdinal ?? 0}
       />
     </>
   );

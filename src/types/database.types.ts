@@ -934,10 +934,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fn_current_round_ordinal: { Args: never; Returns: number }
+      fn_leave_league: { Args: { p_league_id: string }; Returns: undefined }
       fn_match_editable: { Args: { p_match_id: string }; Returns: boolean }
+      fn_match_round_ordinal: {
+        Args: { p_matchday: number; p_stage: string }
+        Returns: number
+      }
       fn_match_unlocked: { Args: { p_match_id: string }; Returns: boolean }
       fn_prediction_multiplier: {
-        Args: { p_match_time: string }
+        Args: { p_matchday: number; p_stage: string }
         Returns: number
       }
       fn_promote_member_to_admin: {

@@ -52,6 +52,9 @@ type MatchCardProps = {
   match: MatchCardMatch;
   initialPrediction?: MatchCardPrediction | null;
   disabled?: boolean;
+  // Ordinal de la jornada en curso (la mayor cuyo primer partido ya empezó),
+  // base de la distancia para el multiplicador predictivo en la UI.
+  currentRoundOrdinal?: number;
 };
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "offline" | "error";
@@ -101,6 +104,7 @@ export function MatchCard({
   match,
   initialPrediction,
   disabled = false,
+  currentRoundOrdinal = 0,
 }: MatchCardProps) {
   const hasInitialPrediction =
     initialPrediction !== null && initialPrediction !== undefined;
@@ -148,9 +152,9 @@ export function MatchCard({
   const isTbd = isMatchTbd(match);
   const isLocked = isMatchLocked(match, now);
   const nextMultiplier = calculatePredictionMultiplier(
-    now,
-    match.match_time,
     match.matchday,
+    match.stage,
+    currentRoundOrdinal,
   );
   const displayMultiplier = hasSavedPrediction
     ? savedMultiplier

@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { CircleDollarSign, Crown, ListChecks, Shield } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  CircleDollarSign,
+  Crown,
+  ListChecks,
+  LogOut,
+  Shield,
+} from "lucide-react";
 
+import { leaveLeague } from "@/app/actions/leagues.actions";
+import { LeaveLeagueDialog } from "@/components/account/LeaveLeagueDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { LeagueRole, PaymentStatus } from "@/types";
@@ -55,8 +64,39 @@ function formatJoinedAt(value: string): string {
 }
 
 export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
+  const router = useRouter();
   const currentLeague = leagues.find((league) => league.isCurrent);
   const [copyState, setCopyState] = useState<CopyState>(null);
+  const [leavingLeague, setLeavingLeague] =
+    useState<AccountLeagueMembershipView | null>(null);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [isLeaving, startLeaving] = useTransition();
+
+  function openLeaveDialog(league: AccountLeagueMembershipView) {
+    setLeaveError(null);
+    setLeavingLeague(league);
+  }
+
+  function closeLeaveDialog() {
+    if (isLeaving) return;
+    setLeavingLeague(null);
+    setLeaveError(null);
+  }
+
+  function confirmLeave() {
+    if (!leavingLeague) return;
+    const target = leavingLeague;
+    setLeaveError(null);
+    startLeaving(async () => {
+      const result = await leaveLeague({ leagueId: target.leagueId });
+      if (!result.success) {
+        setLeaveError(result.error ?? "No pudimos procesar tu salida.");
+        return;
+      }
+      setLeavingLeague(null);
+      router.refresh();
+    });
+  }
 
   function buildInviteLink(league: AccountLeagueMembershipView): string {
     const origin =
@@ -192,10 +232,31 @@ export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
                       : "No pudimos copiar el enlace. Intenta de nuevo."}
                   </p>
                 )}
+
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => openLeaveDialog(league)}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-destructive hover:underline"
+                  aria-label={`Abandonar la liga ${league.leagueName}`}
+                >
+                  <LogOut className="size-4" aria-hidden="true" />
+                  Abandonar liga
+                </button>
+              </div>
             </article>
           );
         })}
       </div>
+
+      <LeaveLeagueDialog
+        open={leavingLeague !== null}
+        leagueName={leavingLeague?.leagueName ?? ""}
+        pending={isLeaving}
+        error={leaveError}
+        onConfirm={confirmLeave}
+        onCancel={closeLeaveDialog}
+      />
     </section>
   );
 }
