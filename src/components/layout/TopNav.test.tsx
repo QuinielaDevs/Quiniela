@@ -25,5 +25,9 @@ describe("TopNav", () => {
 
     const duels = screen.getByRole("link", { name: /duelos/i });
     expect(duels).not.toHaveAttribute("aria-current", "page");
+
+    const rules = screen.getByRole("link", { name: /reglas/i });
+    expect(rules).toHaveAttribute("href", "/rules");
+    expect(rules).not.toHaveAttribute("aria-current", "page");
   });
 });
