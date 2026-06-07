@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lock, MapPin } from "lucide-react";
 
-import { savePrediction } from "@/app/actions/predictions.actions";
+import {
+  revertPrediction,
+  savePrediction,
+} from "@/app/actions/predictions.actions";
 import {
   MAX_PREDICTION_SCORE,
   SAVE_ERROR,
   TRANSIENT_SAVE_ERROR,
+  UNDO_ERROR,
+  UNDO_WINDOW_MS,
 } from "@/app/actions/predictions.constants";
 import { GoalPicker } from "@/components/predictions/GoalPicker";
 import { calculatePredictionMultiplier, MIN_MULTIPLIER } from "@/utils/scoring";
@@ -102,13 +107,23 @@ export function MatchCard({
   const initialPredictionId = initialPrediction?.id;
   const initialHomeScore = initialPrediction?.homeScorePred ?? 0;
   const initialAwayScore = initialPrediction?.awayScorePred ?? 0;
-  const savedMultiplier = initialPrediction?.multiplier ?? MIN_MULTIPLIER;
+  const initialMultiplier = initialPrediction?.multiplier ?? MIN_MULTIPLIER;
 
   const [homeScore, setHomeScore] = useState(initialHomeScore);
   const [awayScore, setAwayScore] = useState(initialAwayScore);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [warningOpen, setWarningOpen] = useState(false);
+  // Multiplicador realmente guardado en el servidor (se refresca tras cada
+  // guardado/deshacer) y si ya existe una predicción persistida. Antes esto se
+  // derivaba del prop inicial y quedaba "congelado" mostrando un valor obsoleto.
+  const [savedMultiplier, setSavedMultiplier] = useState(initialMultiplier);
+  const [hasSavedPrediction, setHasSavedPrediction] =
+    useState(hasInitialPrediction);
+  // Ventana de gracia local para "deshacer cambio" (espejo de fn_revert_prediction,
+  // 2 min). Es el timestamp en que expira; null = no hay nada que deshacer.
+  const [undoDeadline, setUndoDeadline] = useState<number | null>(null);
+  const [undoBusy, setUndoBusy] = useState(false);
 
   const requestIdRef = useRef(0);
   const hasUserEditedRef = useRef(false);
@@ -137,7 +152,7 @@ export function MatchCard({
     match.match_time,
     match.matchday,
   );
-  const displayMultiplier = hasInitialPrediction
+  const displayMultiplier = hasSavedPrediction
     ? savedMultiplier
     : nextMultiplier;
 
@@ -215,10 +230,15 @@ export function MatchCard({
     setError(null);
     setWarningOpen(false);
     setNow(Date.now());
+    setSavedMultiplier(initialMultiplier);
+    setHasSavedPrediction(hasInitialPrediction);
+    setUndoDeadline(null);
+    setUndoBusy(false);
   }, [
     hasInitialPrediction,
     initialAwayScore,
     initialHomeScore,
+    initialMultiplier,
     initialPredictionId,
     leagueId,
     match.id,
@@ -249,8 +269,21 @@ export function MatchCard({
         if (requestId !== requestIdRef.current) return;
 
         if (result.success) {
+          // ¿Este guardado cambió el marcador respecto al último guardado? Solo
+          // entonces el servidor stasheó el estado previo y se puede deshacer.
+          const prevSaved = lastSavedRef.current;
+          const scoreChanged =
+            prevSaved !== null &&
+            (prevSaved.homeScorePred !== prediction.homeScorePred ||
+              prevSaved.awayScorePred !== prediction.awayScorePred);
+
           lastSavedRef.current = prediction;
           pendingRef.current = null;
+          if (result.data) {
+            setSavedMultiplier(result.data.multiplier);
+          }
+          setHasSavedPrediction(true);
+          setUndoDeadline(scoreChanged ? Date.now() + UNDO_WINDOW_MS : null);
           setSaveState("saved");
           setError(null);
           return;
@@ -333,12 +366,59 @@ export function MatchCard({
     }
   }, [saveState]);
 
+  // Oculta el botón de deshacer al expirar la ventana de gracia (2 min).
+  useEffect(() => {
+    if (undoDeadline === null) return;
+    const remaining = undoDeadline - Date.now();
+    if (remaining <= 0) {
+      setUndoDeadline(null);
+      return;
+    }
+    const timer = setTimeout(() => setUndoDeadline(null), remaining);
+    return () => clearTimeout(timer);
+  }, [undoDeadline]);
+
+  // Deshace el último cambio: el servidor restaura marcador + multiplicador
+  // previos (server-authoritative) si la ventana sigue vigente. Tras restaurar,
+  // alineamos lastSavedRef para que el auto-guardado no vuelva a disparar.
+  const handleUndo = useCallback(async () => {
+    setUndoBusy(true);
+    setError(null);
+
+    const result = await revertPrediction({ leagueId, matchId: match.id });
+
+    if (result.success && result.data) {
+      const restored = {
+        homeScorePred: result.data.home_score_pred,
+        awayScorePred: result.data.away_score_pred,
+      };
+      requestIdRef.current += 1; // invalida cualquier guardado en vuelo
+      lastSavedRef.current = restored;
+      pendingRef.current = null;
+      hasUserEditedRef.current = true;
+      degradeAckRef.current = false;
+      setHomeScore(restored.homeScorePred);
+      setAwayScore(restored.awayScorePred);
+      setSavedMultiplier(result.data.multiplier);
+      setHasSavedPrediction(true);
+      setUndoDeadline(null);
+      setSaveState("saved");
+    } else {
+      // Ventana vencida u otro error: ocultamos el botón y avisamos.
+      setUndoDeadline(null);
+      setSaveState("error");
+      setError(result.error ?? UNDO_ERROR);
+    }
+
+    setUndoBusy(false);
+  }, [leagueId, match.id]);
+
   // Intercepta una edición: si bajaría el multiplicador guardado y no se ha
   // confirmado aún, abre la advertencia ANTES de tocar el estado/debounce.
   const requestScoreChange = useCallback(
     (applyEdit: () => void) => {
       const wouldDegrade =
-        hasInitialPrediction &&
+        hasSavedPrediction &&
         !degradeAckRef.current &&
         savedMultiplier > MIN_MULTIPLIER &&
         nextMultiplier < savedMultiplier;
@@ -350,7 +430,7 @@ export function MatchCard({
       }
       applyEdit();
     },
-    [hasInitialPrediction, savedMultiplier, nextMultiplier],
+    [hasSavedPrediction, savedMultiplier, nextMultiplier],
   );
 
   const handleHomeScoreChange = useCallback(
@@ -392,6 +472,8 @@ export function MatchCard({
     saveState === "saving" ||
     saveState === "offline" ||
     isLocked;
+
+  const canUndo = undoDeadline !== null && !isLocked && !isTbd && !disabled;
 
   const phaseLabel = match.matchday
     ? `Jornada ${match.matchday}`
@@ -549,6 +631,23 @@ export function MatchCard({
           />
         </div>
       </div>
+
+      {canUndo && (
+        <div className="mt-3 flex flex-col gap-2 rounded-sm border border-border bg-background p-2 pl-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-muted-foreground">
+            Cambiaste tu pronóstico. Puedes deshacerlo y conservar tu
+            multiplicador.
+          </span>
+          <button
+            type="button"
+            onClick={handleUndo}
+            disabled={undoBusy}
+            className="h-9 shrink-0 rounded-sm border border-border px-4 text-sm font-semibold disabled:opacity-50"
+          >
+            {undoBusy ? "Deshaciendo…" : "Deshacer cambio"}
+          </button>
+        </div>
+      )}
 
       {warningOpen && (
         <div

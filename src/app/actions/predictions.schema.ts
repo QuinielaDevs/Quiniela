@@ -22,3 +22,14 @@ export const savePredictionSchema = z.object({
 });
 
 export type SavePredictionInput = z.input<typeof savePredictionSchema>;
+
+/**
+ * Entrada de "deshacer cambio" de prediccion: identifica liga + partido. El
+ * servidor decide si la ventana de gracia sigue vigente y qué restaurar.
+ */
+export const revertPredictionSchema = z.object({
+  leagueId: z.string().uuid("Liga invalida."),
+  matchId: z.string().uuid("Partido invalido."),
+});
+
+export type RevertPredictionInput = z.input<typeof revertPredictionSchema>;

@@ -496,6 +496,10 @@ export type Database = {
           match_id: string
           multiplier: number
           points_earned: number | null
+          prev_away_score_pred: number | null
+          prev_home_score_pred: number | null
+          prev_multiplier: number | null
+          prev_saved_at: string | null
           updated_at: string
           user_id: string
         }
@@ -509,6 +513,10 @@ export type Database = {
           match_id: string
           multiplier?: number
           points_earned?: number | null
+          prev_away_score_pred?: number | null
+          prev_home_score_pred?: number | null
+          prev_multiplier?: number | null
+          prev_saved_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -522,6 +530,10 @@ export type Database = {
           match_id?: string
           multiplier?: number
           points_earned?: number | null
+          prev_away_score_pred?: number | null
+          prev_home_score_pred?: number | null
+          prev_multiplier?: number | null
+          prev_saved_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -840,6 +852,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fn_ensure_default_predictions: {
+        Args: { p_league_id: string }
+        Returns: number
+      }
       fn_get_active_tournament_phase: {
         Args: never
         Returns: {
@@ -946,6 +962,32 @@ export type Database = {
         Args: { p_league_id: string; p_user_id: string }
         Returns: undefined
       }
+      fn_revert_prediction: {
+        Args: { p_league_id: string; p_match_id: string }
+        Returns: {
+          away_score_pred: number
+          created_at: string
+          evaluated_at: string | null
+          home_score_pred: number
+          id: string
+          league_id: string
+          match_id: string
+          multiplier: number
+          points_earned: number | null
+          prev_away_score_pred: number | null
+          prev_home_score_pred: number | null
+          prev_multiplier: number | null
+          prev_saved_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "predictions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fn_save_prediction: {
         Args: {
           p_away_score_pred: number
@@ -963,6 +1005,10 @@ export type Database = {
           match_id: string
           multiplier: number
           points_earned: number | null
+          prev_away_score_pred: number | null
+          prev_home_score_pred: number | null
+          prev_multiplier: number | null
+          prev_saved_at: string | null
           updated_at: string
           user_id: string
         }

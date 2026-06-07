@@ -2,13 +2,17 @@
 
 import { createClient } from "@/utils/supabase/server";
 import {
+  revertPredictionSchema,
   savePredictionSchema,
+  type RevertPredictionInput,
   type SavePredictionInput,
 } from "@/app/actions/predictions.schema";
 import {
   PREDICTION_LOCKED_ERROR,
   SAVE_ERROR,
   TRANSIENT_SAVE_ERROR,
+  UNDO_ERROR,
+  UNDO_EXPIRED_ERROR,
 } from "@/app/actions/predictions.constants";
 import type { Prediction, ServerActionResult } from "@/types";
 
@@ -100,5 +104,54 @@ export async function savePrediction(
       data: null,
       error: toSafeSaveError(error),
     };
+  }
+}
+
+// La RPC fn_revert_prediction lanza errcode P0003 cuando la ventana de gracia
+// (2 min) ya pasó. Es DEFINITIVO: el cliente debe ocultar el botón de deshacer.
+function isUndoExpiredError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const maybeError = error as SupabaseErrorLike;
+  const message = (maybeError.message ?? "").toLowerCase();
+  return maybeError.code === "P0003" || message.includes("ventana");
+}
+
+/**
+ * Deshace (revierte) el último cambio de marcador del usuario restaurando el
+ * estado anterior — marcador y multiplicador — vía la RPC `fn_revert_prediction`.
+ * El multiplicador restaurado lo decide el servidor (no el cliente), y solo si
+ * el cambio ocurrió dentro de la ventana de gracia. NUNCA propaga excepciones.
+ */
+export async function revertPrediction(
+  input: RevertPredictionInput,
+): Promise<ServerActionResult<Prediction>> {
+  try {
+    const parsed = revertPredictionSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? "Datos invalidos.",
+      };
+    }
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .rpc("fn_revert_prediction", {
+        p_league_id: parsed.data.leagueId,
+        p_match_id: parsed.data.matchId,
+      })
+      .single();
+
+    if (error) {
+      if (isUndoExpiredError(error)) {
+        return { success: false, data: null, error: UNDO_EXPIRED_ERROR };
+      }
+      return { success: false, data: null, error: UNDO_ERROR };
+    }
+
+    return { success: true, data: data as Prediction, error: null };
+  } catch {
+    return { success: false, data: null, error: UNDO_ERROR };
   }
 }

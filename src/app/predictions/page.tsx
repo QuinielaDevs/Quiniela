@@ -51,6 +51,15 @@ export async function PredictionsBoard() {
     return <NoLeagueState />;
   }
 
+  // Auto-guardado de predicciones por defecto (0-0): garantiza que cada partido
+  // editable tenga un pronóstico aunque el usuario no lo toque, de modo que un
+  // 0-0 sin modificar cuente como predicción. Idempotente y best-effort: si
+  // falla no rompe el render del tablero. Debe ejecutarse ANTES de leer las
+  // predicciones para incluir las recién creadas en la misma carga.
+  await supabase.rpc("fn_ensure_default_predictions", {
+    p_league_id: leagueId,
+  });
+
   // Partidos programados de todo el torneo + predicciones propias del usuario.
   // Se incluyen los slots TBD de eliminatoria (equipos aún sin resolver) para
   // que el usuario navegue las fases; MatchCard los deja en solo-lectura hasta

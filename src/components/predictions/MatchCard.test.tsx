@@ -3,7 +3,10 @@ import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MatchCard } from "@/components/predictions/MatchCard";
-import { savePrediction } from "@/app/actions/predictions.actions";
+import {
+  revertPrediction,
+  savePrediction,
+} from "@/app/actions/predictions.actions";
 import {
   MAX_PREDICTION_SCORE,
   PREDICTION_LOCKED_ERROR,
@@ -12,6 +15,7 @@ import {
 
 vi.mock("@/app/actions/predictions.actions", () => ({
   savePrediction: vi.fn(),
+  revertPrediction: vi.fn(),
 }));
 
 const MATCH = {
@@ -47,6 +51,10 @@ const SAVED_PREDICTION = {
   multiplier: 1,
   points_earned: null,
   evaluated_at: null,
+  prev_home_score_pred: null,
+  prev_away_score_pred: null,
+  prev_multiplier: null,
+  prev_saved_at: null,
   created_at: "2026-06-03T18:00:00.000Z",
   updated_at: "2026-06-03T18:00:00.000Z",
 };
@@ -82,6 +90,7 @@ describe("MatchCard", () => {
     cleanup();
     vi.useFakeTimers();
     vi.mocked(savePrediction).mockReset();
+    vi.mocked(revertPrediction).mockReset();
     setOnline(true);
   });
 
@@ -579,5 +588,96 @@ describe("MatchCard", () => {
     expect(
       screen.getByLabelText("Incrementar goles de Ganador 97"),
     ).toBeDisabled();
+  });
+
+  // ---- Deshacer cambio (ventana de gracia) ----
+
+  async function editAndSave() {
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    await act(async () => {
+      vi.advanceTimersByTime(1500);
+    });
+    await flushPromises();
+  }
+
+  it("muestra 'Deshacer cambio' tras editar una prediccion existente y la restaura", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: { ...SAVED_PREDICTION, home_score_pred: 2, multiplier: 1 },
+      error: null,
+    });
+    vi.mocked(revertPrediction).mockResolvedValue({
+      success: true,
+      data: {
+        ...SAVED_PREDICTION,
+        home_score_pred: 1,
+        away_score_pred: 0,
+        multiplier: 2.5,
+      },
+      error: null,
+    });
+    renderMatchCard({
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 1 },
+    });
+
+    await editAndSave();
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("button", { name: "Deshacer cambio" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Deshacer cambio" }));
+    await flushPromises();
+
+    expect(revertPrediction).toHaveBeenCalledWith({
+      leagueId: LEAGUE_ID,
+      matchId: MATCH.id,
+    });
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("2.5x")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Deshacer cambio" }),
+    ).toBeNull();
+  });
+
+  it("no ofrece deshacer al guardar una prediccion nueva (sin cambio previo)", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: { ...SAVED_PREDICTION, home_score_pred: 1, away_score_pred: 0 },
+      error: null,
+    });
+    renderMatchCard({ initialPrediction: null });
+
+    await editAndSave();
+
+    expect(savePrediction).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("button", { name: "Deshacer cambio" }),
+    ).toBeNull();
+  });
+
+  it("oculta 'Deshacer cambio' al expirar la ventana de gracia (2 min)", async () => {
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: { ...SAVED_PREDICTION, home_score_pred: 2, multiplier: 1 },
+      error: null,
+    });
+    renderMatchCard({
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 1 },
+    });
+
+    await editAndSave();
+    expect(
+      screen.getByRole("button", { name: "Deshacer cambio" }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(2 * 60 * 1000);
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "Deshacer cambio" }),
+    ).toBeNull();
+    expect(revertPrediction).not.toHaveBeenCalled();
   });
 });
