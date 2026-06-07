@@ -109,7 +109,7 @@ export function LoginForm({
             <div className="mt-4 text-center text-sm">
               ¿No tienes una cuenta?{" "}
               <Link
-                href="/auth/sign-up"
+                href={`/auth/sign-up?next=${encodeURIComponent(safeNext)}`}
                 className="underline underline-offset-4"
               >
                 Regístrate
