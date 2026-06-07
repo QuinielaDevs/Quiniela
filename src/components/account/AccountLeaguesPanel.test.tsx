@@ -1,16 +1,28 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountLeaguesPanel } from "@/components/account/AccountLeaguesPanel";
 
+const writeText = vi.fn();
+
+beforeEach(() => {
+  writeText.mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
+});
+
 describe("AccountLeaguesPanel", () => {
-  it("muestra liga actual y ligas donde participa", () => {
+  it("muestra liga actual y ligas donde participa", async () => {
     render(
       <AccountLeaguesPanel
         leagues={[
           {
             leagueId: "league-1",
             leagueName: "Liga Principal",
+            inviteCode: "ABCDN234",
             role: "admin",
             paymentStatus: "paid",
             joinedAt: "2026-06-05T12:00:00.000Z",
@@ -21,6 +33,7 @@ describe("AccountLeaguesPanel", () => {
           {
             leagueId: "league-2",
             leagueName: "Liga Amigos",
+            inviteCode: "WXYZ9876",
             role: "member",
             paymentStatus: "pending",
             joinedAt: "2026-06-01T12:00:00.000Z",
@@ -41,5 +54,20 @@ describe("AccountLeaguesPanel", () => {
     expect(screen.getByText("Sin pago requerido")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /crear liga/i })).toBeNull();
     expect(screen.getByRole("button", { name: /crear liga/i })).toBeDisabled();
+    expect(screen.getByText("ABCDN234")).toBeInTheDocument();
+    expect(screen.getByText("WXYZ9876")).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Copiar código de invitación de Liga Principal",
+      }),
+    );
+
+    expect(writeText).toHaveBeenCalledWith("ABCDN234");
+    expect(
+      screen.getByRole("button", {
+        name: "Código de invitación de Liga Principal copiado",
+      }),
+    ).toBeInTheDocument();
   });
 });

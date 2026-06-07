@@ -38,6 +38,7 @@ type AccountMembershipRow = {
   wager_balance: number;
   leagues: {
     name: string;
+    invite_code: string;
     requires_payment: boolean;
   } | null;
 };
@@ -51,7 +52,7 @@ export async function AccountBoard() {
 
   const { data: memberships, error: membershipError } = await supabase
     .from("league_members")
-    .select("league_id, role, payment_status, joined_at, wager_balance, leagues(name, requires_payment)")
+    .select("league_id, role, payment_status, joined_at, wager_balance, leagues(name, invite_code, requires_payment)")
     .eq("user_id", userId)
     .order("joined_at", { ascending: false });
 
@@ -83,6 +84,7 @@ export async function AccountBoard() {
     (membership) => ({
       leagueId: membership.league_id,
       leagueName: membership.leagues?.name ?? "Liga sin nombre",
+      inviteCode: membership.leagues?.invite_code ?? "",
       role: membership.role,
       paymentStatus: membership.payment_status,
       joinedAt: membership.joined_at,
