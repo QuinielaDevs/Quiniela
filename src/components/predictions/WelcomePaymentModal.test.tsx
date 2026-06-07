@@ -24,7 +24,7 @@ describe("WelcomePaymentModal", () => {
       screen.getByText("Pago móvil al 0414-1234567"),
     ).toBeInTheDocument();
 
-    const cta = screen.getByRole("link", { name: "Ver cómo pagar" });
+    const cta = screen.getByRole("link", { name: "Reglas" });
     expect(cta).toHaveAttribute("href", "/rules");
   });
 

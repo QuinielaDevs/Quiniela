@@ -100,7 +100,7 @@ export function WelcomePaymentModal({
             href="/rules"
             className="flex h-12 flex-1 items-center justify-center rounded-sm bg-primary text-sm font-semibold text-primary-foreground"
           >
-            Ver cómo pagar
+            Reglas
           </Link>
         </div>
       </div>
