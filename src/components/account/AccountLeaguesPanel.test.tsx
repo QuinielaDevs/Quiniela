@@ -39,9 +39,7 @@ describe("AccountLeaguesPanel", () => {
     expect(screen.getByText("Miembro")).toBeInTheDocument();
     expect(screen.getByText("Pago al día")).toBeInTheDocument();
     expect(screen.getByText("Sin pago requerido")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /crear liga/i })).toHaveAttribute(
-      "href",
-      "/leagues/new",
-    );
+    expect(screen.queryByRole("link", { name: /crear liga/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /crear liga/i })).toBeDisabled();
   });
 });

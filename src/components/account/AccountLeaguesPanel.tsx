@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CircleDollarSign, Crown, ListChecks, Plus, Shield } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -63,11 +62,9 @@ export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
           </p>
         </div>
 
-        <Button asChild variant="outline" size="sm">
-          <Link href="/leagues/new">
-            <Plus aria-hidden="true" />
-            Crear liga
-          </Link>
+        <Button type="button" variant="outline" size="sm" disabled>
+          <Plus aria-hidden="true" />
+          Crear liga
         </Button>
       </div>
 
