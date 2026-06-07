@@ -1,21 +1,20 @@
 import { execFileSync } from "node:child_process";
-import { basename } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   createAnonClient,
   createAuthedClient,
   createServiceRoleClient,
 } from "./setup";
+import { supabaseDbContainerName } from "./local-postgres";
 import type { Prediction } from "@/types";
 
 function runSql(sql: string): void {
-  const containerName = `supabase_db_${basename(process.cwd()).toLowerCase()}`;
   execFileSync(
     "docker",
     [
       "exec",
       "-i",
-      containerName,
+      supabaseDbContainerName(),
       "psql",
       "-v",
       "ON_ERROR_STOP=1",
