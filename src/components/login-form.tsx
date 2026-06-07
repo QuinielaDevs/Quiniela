@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function LoginForm({
-  next = "/protected",
+  next = "/predictions",
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div"> & { next?: string }) {

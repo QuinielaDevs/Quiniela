@@ -19,6 +19,7 @@ export function getSafeNextPath(
   try {
     const url = new URL(candidate, LOCAL_ORIGIN);
     if (url.origin !== LOCAL_ORIGIN) return fallback;
+    if (url.pathname === "/protected") return fallback;
 
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {

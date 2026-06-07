@@ -18,7 +18,7 @@ async function HomeEntry() {
     redirect("/predictions");
   }
 
-  return <LoginForm next="/protected" />;
+  return <LoginForm />;
 }
 
 export default function Home() {

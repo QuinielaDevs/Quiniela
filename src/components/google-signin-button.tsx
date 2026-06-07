@@ -14,7 +14,7 @@ import { useState } from "react";
  * (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET). En local sin credenciales el
  * botón existe pero el proveedor devolverá error hasta configurarlas.
  */
-export function GoogleSignInButton({ next = "/protected" }: { next?: string }) {
+export function GoogleSignInButton({ next = "/predictions" }: { next?: string }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -59,4 +59,19 @@ describe("LoginForm", () => {
     });
     expect(screen.getByText("Google next: /predictions")).toBeInTheDocument();
   });
+
+  it("normaliza /protected hacia /predictions para evitar la vista legado", async () => {
+    signInWithPassword.mockResolvedValue({ error: null });
+
+    render(<LoginForm next="/protected" />);
+
+    await userEvent.type(screen.getByLabelText("Correo electrónico"), "cris@test.local");
+    await userEvent.type(screen.getByLabelText("Contraseña"), "Password123!");
+    await userEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith("/predictions");
+    });
+    expect(screen.getByText("Google next: /predictions")).toBeInTheDocument();
+  });
 });
