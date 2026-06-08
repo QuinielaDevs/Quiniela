@@ -19,7 +19,6 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createServiceRoleClient } from "./setup";
 import { restoreZafronixData } from "../../scripts/restore-zafronix-data";
 import matchesFixture from "../fixtures/zafronix/matches-response.sample.json";
-import type { ZafronixMatch } from "../../src/lib/zafronix/matches";
 
 const admin = createServiceRoleClient();
 const TEST_REFS = ["2026-001", "2026-073", "2026-104"];

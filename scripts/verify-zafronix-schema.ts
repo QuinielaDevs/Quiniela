@@ -14,6 +14,36 @@
 import { config } from "dotenv";
 import { z } from "zod";
 
+// Interfaces locales para narrowing seguro de respuestas JSON sin usar `any`
+interface ApiEnvelope {
+  data?: ApiMatch[];
+}
+interface ApiMatch {
+  id?: string;
+  matchNo?: number | null;
+  kickoffUtc?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  result?: string | null;
+  referee?: string | { name?: string; country?: string } | null;
+  [key: string]: unknown;
+}
+interface TournamentTeam {
+  name?: string;
+  iso?: string | null;
+  code?: string;
+  [key: string]: unknown;
+}
+interface TournamentEnvelope {
+  teams?: TournamentTeam[];
+}
+interface RosterPlayer {
+  name?: string;
+  position?: string | null;
+  jersey?: number | null;
+  [key: string]: unknown;
+}
+
 // Cargar variables de entorno
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -147,7 +177,7 @@ async function verifyMatchesEndpoint(
 ): Promise<EndpointReport> {
   console.log("\n━━━ GET /matches?year=2026 ━━━━━━━━━━━━━━━━━━━━━━━━━");
   const res = await fetchWithRetry(MATCHES_URL, apiKey);
-  const raw = await res.json();
+  const raw: unknown = await res.json();
 
   console.log(`  HTTP ${res.status} | ETag: ${res.headers.get("etag") ?? "none"}`);
   console.log(`  RateLimit-Remaining: ${res.headers.get("x-ratelimit-remaining") ?? "N/A"}`);
@@ -159,15 +189,12 @@ async function verifyMatchesEndpoint(
     console.log(`  Zod errors: ${JSON.stringify(parseResult.error?.issues)}`);
   }
 
-  const data: Record<string, unknown>[] = (raw as any)?.data ?? [];
+  const data: ApiMatch[] = (raw as ApiEnvelope)?.data ?? [];
   console.log(`  Match count: ${data.length}`);
 
   // Analyze first, last, and a finished match
   const first = data[0] as Record<string, unknown> | undefined;
   const last = data[data.length - 1] as Record<string, unknown> | undefined;
-  const finished = data.find(
-    (m: any) => m.homeScore !== null && m.homeScore !== undefined,
-  ) as Record<string, unknown> | undefined;
 
   const issues: FieldReport[] = [];
   const specialFields: Record<string, unknown[]> = {
@@ -238,7 +265,7 @@ async function verifyTournamentEndpoint(
 ): Promise<EndpointReport> {
   console.log("\n━━━ GET /tournaments/2026 ━━━━━━━━━━━━━━━━━━━━━━━━━");
   const res = await fetchWithRetry(TOURNAMENT_URL, apiKey);
-  const raw = await res.json();
+  const raw: unknown = await res.json();
 
   console.log(`  HTTP ${res.status}`);
 
@@ -249,7 +276,7 @@ async function verifyTournamentEndpoint(
     console.log(`  Zod errors: ${JSON.stringify(parseResult.error?.issues)}`);
   }
 
-  const teams = (raw as any)?.teams ?? [];
+  const teams = (raw as TournamentEnvelope)?.teams ?? [];
   console.log(`  Team count: ${teams.length}`);
 
   // Check all teams have required fields
@@ -264,13 +291,13 @@ async function verifyTournamentEndpoint(
     }
   }
 
-  const allHaveCode = teams.every((t: any) => typeof t.code === "string" && t.code.length > 0);
+  const allHaveCode = teams.every((t: TournamentTeam) => typeof t.code === "string" && (t.code as string).length > 0);
   if (!allHaveCode) {
     issues.push({ field: "teams[*].code", expectedType: "string", actualType: "missing_in_some", sampleValue: null, status: "missing" });
   }
 
-  const isoValues = new Set(teams.filter((t: any) => t.iso !== null && t.iso !== undefined).map((t: any) => t.iso));
-  const nullIsoCount = teams.filter((t: any) => t.iso === null || t.iso === undefined).length;
+  const isoValues = new Set(teams.filter((t: TournamentTeam) => t.iso !== null && t.iso !== undefined).map((t: TournamentTeam) => t.iso));
+  const nullIsoCount = teams.filter((t: TournamentTeam) => t.iso === null || t.iso === undefined).length;
 
   const specialFields: Record<string, unknown[]> = {
     iso_sample: [...isoValues].slice(0, 5),
@@ -291,10 +318,9 @@ async function verifyRosterEndpoint(
   apiKey: string,
   teamName: string,
 ): Promise<EndpointReport> {
-  const url = ROSTER_URL(teamName);
   console.log(`\n━━━ GET /teams/${teamName}/roster?year=2026 ━━━━━`);
   const res = await fetchWithRetry(ROSTER_URL(teamName), apiKey);
-  const raw = await res.json();
+  const raw = (await res.json()) as RosterPlayer[];
 
   console.log(`  HTTP ${res.status}`);
 
@@ -343,7 +369,7 @@ async function verifyRosterEndpoint(
     }
   }
 
-  const allHaveName = raw.every((p: any) => typeof p.name === "string" && p.name.length > 0);
+  const allHaveName = raw.every((p: RosterPlayer) => typeof p.name === "string" && (p.name as string).length > 0);
 
   return {
     endpoint: `GET /teams/${teamName}/roster?year=2026`,
@@ -382,8 +408,8 @@ async function main() {
 
     // 3. Roster (use first team from tournament)
     const tourneyRes = await fetchWithRetry(TOURNAMENT_URL, apiKey);
-    const tourneyRaw = await tourneyRes.json();
-    const firstTeam = (tourneyRaw as any)?.teams?.[0]?.name;
+    const tourneyRaw: unknown = await tourneyRes.json();
+    const firstTeam = (tourneyRaw as TournamentEnvelope)?.teams?.[0]?.name;
     if (firstTeam) {
       reports.push(await verifyRosterEndpoint(apiKey, firstTeam));
     } else {

@@ -13,7 +13,6 @@
 
 import { config } from "dotenv";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { z } from "zod";
 
 import {
   zafronixResponseSchema,

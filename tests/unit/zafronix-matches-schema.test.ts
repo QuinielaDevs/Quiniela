@@ -20,6 +20,12 @@ import matchesResponseFixture from "../fixtures/zafronix/matches-response.sample
 
 // ── Helpers para construir fixtures inline ──────────────────────────
 
+function omit<T extends object, K extends keyof T>(obj: T, key: K): Omit<T, K> {
+  const { [key]: _omitted, ...rest } = obj;
+  void _omitted;
+  return rest;
+}
+
 function makeMatch(overrides: Partial<ZafronixMatch> = {}): ZafronixMatch {
   return {
     id: "2026-001",
@@ -103,13 +109,13 @@ describe("Pin del Schema Canónico (REST API GET /matches)", () => {
 
   describe("Validación de campos requeridos", () => {
     it("rechaza match sin id", () => {
-      const { id, ...withoutId } = makeMatch();
+      const withoutId = omit(makeMatch(), "id");
       const result = zafronixMatchSchema.safeParse(withoutId);
       expect(result.success).toBe(false);
     });
 
     it("acepta match sin matchNo (opcional)", () => {
-      const { matchNo, ...without } = makeMatch();
+      const without = omit(makeMatch(), "matchNo");
       const result = zafronixMatchSchema.safeParse(without);
       expect(result.success).toBe(true);
     });
@@ -157,7 +163,7 @@ describe("Pin del Schema Canónico (REST API GET /matches)", () => {
     });
 
     it("acepta match sin referee (undefined)", () => {
-      const { referee, ...without } = makeMatch();
+      const without = omit(makeMatch(), "referee");
       const result = zafronixMatchSchema.safeParse(without);
       expect(result.success).toBe(true);
     });
@@ -312,15 +318,15 @@ describe("resolveMatchNo", () => {
   });
 
   it("extrae del id si matchNo no está presente", () => {
-    const { matchNo, ...m } = makeMatch();
+    const m = omit(makeMatch(), "matchNo");
     m.id = "2026-073";
-    expect(resolveMatchNo(m as ZafronixMatch)).toBe(73);
+    expect(resolveMatchNo(m)).toBe(73);
   });
 
   it("retorna null si ambos faltan", () => {
-    const { matchNo, ...m } = makeMatch();
+    const m = omit(makeMatch(), "matchNo");
     m.id = "bad";
-    expect(resolveMatchNo(m as ZafronixMatch)).toBeNull();
+    expect(resolveMatchNo(m)).toBeNull();
   });
 });
 
