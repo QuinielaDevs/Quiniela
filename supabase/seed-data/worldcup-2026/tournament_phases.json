@@ -1,0 +1,38 @@
+[
+  {
+    "phase_code": "A",
+    "reward_points": 50,
+    "starts_at": null,
+    "ends_at": "2026-06-11T19:00:00Z",
+    "edits_locked": false,
+    "label": "Before inaugural match",
+    "sort_order": 0
+  },
+  {
+    "phase_code": "B",
+    "reward_points": 25,
+    "starts_at": "2026-06-11T19:00:00Z",
+    "ends_at": "2026-06-28T19:00:00Z",
+    "edits_locked": false,
+    "label": "Group stage",
+    "sort_order": 1
+  },
+  {
+    "phase_code": "C",
+    "reward_points": 10,
+    "starts_at": "2026-06-28T19:00:00Z",
+    "ends_at": "2026-07-14T19:00:00Z",
+    "edits_locked": false,
+    "label": "Round of 32 + Round of 16 + Quarterfinals",
+    "sort_order": 2
+  },
+  {
+    "phase_code": "D",
+    "reward_points": 2,
+    "starts_at": "2026-07-14T19:00:00Z",
+    "ends_at": null,
+    "edits_locked": true,
+    "label": "Semifinals onward",
+    "sort_order": 3
+  }
+]

@@ -54,9 +54,9 @@ config({ path: ".env" });
 
 // ── Constantes ──────────────────────────────────────────────────────
 
-const ZAFRONIX_MATCHES_URL =
+export const ZAFRONIX_MATCHES_URL =
   "https://api.zafronix.com/fifa/worldcup/v1/matches?year=2026";
-const ZAFRONIX_TOURNAMENT_URL =
+export const ZAFRONIX_TOURNAMENT_URL =
   "https://api.zafronix.com/fifa/worldcup/v1/tournaments/2026";
 
 
@@ -106,7 +106,7 @@ interface LocalMatch {
 /**
  * Realiza una petición externa con reintentos y tiempo límite de respuesta (timeout).
  */
-async function fetchWithRetry(
+export async function fetchWithRetry(
   url: string,
   options: RequestInit,
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
@@ -144,7 +144,7 @@ async function fetchWithRetry(
 /**
  * Ejecuta una tarea asíncrona sobre una lista de elementos agrupados en lotes (concurrencia controlada).
  */
-async function runInBatches<T, R>(
+export async function runInBatches<T, R>(
   items: T[],
   batchSize: number,
   fn: (item: T) => Promise<R>,
@@ -320,7 +320,7 @@ async function correctEvaluatedPredictions(
  * últimos 2 → jornada 3. Partidos sin group_label o sin kickoffUtc quedan
  * con matchday null.
  */
-function computeMatchdays(
+export function computeMatchdays(
   matches: ZafronixMatch[],
 ): Map<string, number | null> {
   const map = new Map<string, number | null>();
@@ -357,7 +357,7 @@ function computeMatchdays(
  * code (FIFA 3-letras). El caller deriva de aquí tanto el teamCodeMap para
  * matches como los datos para award_candidates.
  */
-async function fetchTournamentTeams(
+export async function fetchTournamentTeams(
   apiKey: string,
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<ZafronixTeam[]> {
@@ -402,7 +402,7 @@ async function fetchTournamentTeams(
  * Obtiene el plantel completo de un equipo desde
  * GET /teams/{name}/roster?year=2026.
  */
-async function fetchTeamRoster(
+export async function fetchTeamRoster(
   teamName: string,
   apiKey: string,
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
