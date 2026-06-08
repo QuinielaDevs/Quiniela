@@ -3,15 +3,9 @@ import {
   calculateBasePoints,
   calculatePredictionMultiplier,
   calculatePredictionPoints,
+  currentRoundOrdinal,
+  roundOrdinal,
 } from "./scoring";
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-// Helper: arma un par (savedAt, matchTime) con `days` de antelación exacta.
-function multiplierForDays(days: number): number {
-  const savedAt = 0;
-  const matchTime = days * MS_PER_DAY;
-  return calculatePredictionMultiplier(savedAt, matchTime);
-}
 
 // Motor de puntuación base (Story 2.1 — AC #4, #5). Lógica pura, sin DB ni DOM.
 // Reglas: marcador exacto = 5; resultado acertado (mismo ganador/empate) = 2;
@@ -109,67 +103,90 @@ describe("calculateBasePoints — guarda defensiva de marcadores inválidos", ()
   });
 });
 
-describe("calculatePredictionMultiplier — lotes por antelación (Story 2.4)", () => {
-  it("< 7 días → 1.00 (borde 6.99d)", () => {
-    expect(multiplierForDays(6.99)).toBe(1.0);
+describe("roundOrdinal — ordinal de ronda", () => {
+  it("grupos usan su matchday (1/2/3)", () => {
+    expect(roundOrdinal(1, "group")).toBe(1);
+    expect(roundOrdinal(2, "group")).toBe(2);
+    expect(roundOrdinal(3, "group")).toBe(3);
   });
 
-  it(">= 7 días → 1.30 (borde exacto 7d)", () => {
-    expect(multiplierForDays(7)).toBe(1.3);
+  it("eliminatorias por stage: 32avos=4 … Final=8", () => {
+    expect(roundOrdinal(null, "round-32")).toBe(4);
+    expect(roundOrdinal(null, "round-16")).toBe(5);
+    expect(roundOrdinal(null, "quarter")).toBe(6);
+    expect(roundOrdinal(null, "semi")).toBe(7);
+    expect(roundOrdinal(null, "third-place")).toBe(8);
+    expect(roundOrdinal(null, "final")).toBe(8);
   });
 
-  it(">= 14 días → 1.60 (borde exacto 14d)", () => {
-    expect(multiplierForDays(14)).toBe(1.6);
+  it("ronda desconocida (sin matchday ni stage mapeable) → null", () => {
+    expect(roundOrdinal(null, null)).toBeNull();
+    expect(roundOrdinal(null, "otros")).toBeNull();
+  });
+});
+
+describe("currentRoundOrdinal — jornada en curso", () => {
+  const J1 = "2026-06-11T00:00:00.000Z";
+  const J2 = "2026-06-18T00:00:00.000Z";
+  const matches = [
+    { matchday: 1, stage: "group", match_time: J1, status: "finished" },
+    { matchday: 2, stage: "group", match_time: J2, status: "scheduled" },
+    { matchday: null, stage: "final", match_time: "2026-07-19T00:00:00.000Z", status: "scheduled" },
+  ];
+
+  it("0 antes de que empiece cualquier partido", () => {
+    expect(currentRoundOrdinal(matches, "2026-06-01T00:00:00.000Z")).toBe(0);
   });
 
-  it(">= 21 días → 1.90 (borde exacto 21d)", () => {
-    expect(multiplierForDays(21)).toBe(1.9);
+  it("=1 cuando ya empezó la J1 pero no la J2", () => {
+    expect(currentRoundOrdinal(matches, "2026-06-12T00:00:00.000Z")).toBe(1);
   });
 
-  it(">= 28 días → 2.20 (borde exacto 28d)", () => {
-    expect(multiplierForDays(28)).toBe(2.2);
+  it("=2 cuando ya empezó la J2", () => {
+    expect(currentRoundOrdinal(matches, "2026-06-19T00:00:00.000Z")).toBe(2);
   });
 
-  it(">= 35 días → 2.50 (borde exacto 35d y 38d)", () => {
-    expect(multiplierForDays(35)).toBe(2.5);
-    expect(multiplierForDays(38)).toBe(2.5);
+  it("ignora partidos cancelados", () => {
+    const withCanceled = [
+      { matchday: 3, stage: "group", match_time: J1, status: "canceled" },
+    ];
+    expect(currentRoundOrdinal(withCanceled, "2026-06-12T00:00:00.000Z")).toBe(0);
+  });
+});
+
+describe("calculatePredictionMultiplier — distancia en jornadas", () => {
+  it("Jornada 1 (línea base) → 1.00 sin importar la distancia", () => {
+    expect(calculatePredictionMultiplier(1, "group", 0)).toBe(1.0);
   });
 
-  it("0 días o antelación negativa (después del kickoff) → 1.00", () => {
-    expect(multiplierForDays(0)).toBe(1.0);
-    expect(multiplierForDays(-3)).toBe(1.0);
+  it("ronda desconocida → 1.00 (defensivo)", () => {
+    expect(calculatePredictionMultiplier(null, null, 0)).toBe(1.0);
   });
 
-  it("acepta Date y string ISO además de números", () => {
-    const saved = new Date("2026-05-01T00:00:00.000Z");
-    const kickoff = new Date("2026-06-11T00:00:00.000Z"); // 41 días
-    expect(calculatePredictionMultiplier(saved, kickoff)).toBe(2.5);
-    expect(
-      calculatePredictionMultiplier(
-        "2026-06-10T00:00:00.000Z",
-        "2026-06-11T00:00:00.000Z",
-      ),
-    ).toBe(1.0); // 1 día
+  it("la referencia tiene piso en la jornada 1 (pre-torneo, current 0)", () => {
+    // Pre-torneo (current 0) la J1 es la referencia → J2 está a 1 de distancia.
+    expect(calculatePredictionMultiplier(2, "group", 0)).toBe(1.25); // J2
+    expect(calculatePredictionMultiplier(3, "group", 0)).toBe(1.5); // J3
+    expect(calculatePredictionMultiplier(null, "round-32", 0)).toBe(1.75);
   });
 
-  it("tiempos inválidos → 1.00 (defensivo)", () => {
-    expect(calculatePredictionMultiplier("no-date", 0)).toBe(1.0);
+  it("escala lineal +0.25 por jornada de distancia, tope 2.5x", () => {
+    // J2 (ordinal 2) con la jornada en curso variando la distancia.
+    expect(calculatePredictionMultiplier(2, "group", 2)).toBe(1.0); // dist 0
+    expect(calculatePredictionMultiplier(2, "group", 1)).toBe(1.25); // dist 1
+    expect(calculatePredictionMultiplier(3, "group", 1)).toBe(1.5); // dist 2
+    expect(calculatePredictionMultiplier(3, "group", 2)).toBe(1.25); // J2 en curso
   });
 
-  it("Jornada 1 (BASELINE_MATCHDAY) → 1.00 sin importar la antelación", () => {
-    const saved = new Date("2026-05-01T00:00:00.000Z");
-    const kickoff = new Date("2026-06-11T00:00:00.000Z"); // 41 días → sería 2.50
-    // Sin matchday: escala normal.
-    expect(calculatePredictionMultiplier(saved, kickoff)).toBe(2.5);
-    // Jornada 1: línea base fija.
-    expect(calculatePredictionMultiplier(saved, kickoff, 1)).toBe(1.0);
+  it("eliminatorias escalan por su ordinal de ronda", () => {
+    // Final (ordinal 8) con jornada en curso 0 → distancia 7 (piso 1) → tope 2.5x.
+    expect(calculatePredictionMultiplier(null, "final", 0)).toBe(2.5);
+    // Cuartos (ordinal 6) con J3 en curso (3) → distancia 3 → 1.75x.
+    expect(calculatePredictionMultiplier(null, "quarter", 3)).toBe(1.75);
   });
 
-  it("Jornada 2+ y eliminatorias (matchday null) escalan por antelación", () => {
-    const saved = new Date("2026-05-01T00:00:00.000Z");
-    const kickoff = new Date("2026-06-11T00:00:00.000Z"); // 41 días → 2.50
-    expect(calculatePredictionMultiplier(saved, kickoff, 2)).toBe(2.5);
-    expect(calculatePredictionMultiplier(saved, kickoff, null)).toBe(2.5);
+  it("distancia negativa (ronda ya en curso o pasada) → 1.00", () => {
+    expect(calculatePredictionMultiplier(2, "group", 5)).toBe(1.0);
   });
 });
 

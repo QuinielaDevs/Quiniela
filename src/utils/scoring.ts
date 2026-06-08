@@ -78,19 +78,21 @@ export function calculateBasePoints(
 }
 
 // ============================================================
-// Multiplicador por antelación (Story 2.4 — AC #1, #6).
-// Premia las predicciones tempranas. La antelación se mide contra el kickoff de
-// CADA partido (modelo por-partido): cuanto antes pronosticas respecto a su hora
-// de inicio, mayor el multiplicador. Escala por LOTES de días calibrada a la
-// ventana real del Mundial 2026 (11 jun → 19 jul = 38 días): >=35 días alcanza
-// el máximo 2.50x.
+// Multiplicador por antelación — por DISTANCIA EN JORNADAS.
+// Premia pronosticar con jornadas de antelación: el multiplicador depende de
+// cuántas jornadas por delante está la ronda del partido respecto a la jornada
+// EN CURSO (la última cuyo primer partido ya empezó). Lineal +0.25 por jornada
+// de distancia, tope 2.50x. Conforme avanza el torneo la distancia se acorta y
+// el multiplicador baja (penalización por editar tarde).
 //
-// Regla de Jornada 1: la primera jornada del torneo es la línea base y SIEMPRE
-// vale 1.0x, sin importar la antelación. Los multiplicadores empiezan a aplicar
-// desde la Jornada 2 en adelante (y en las eliminatorias).
+// Rondas como jornadas consecutivas: J1=1, J2=2, J3=3, 32avos=4, Octavos=5,
+// Cuartos=6, Semis=7, 3er puesto=8, Final=8.
 //
-// Esta misma regla se espeja en SQL (fn_prediction_multiplier + fn_save_prediction);
-// si cambia una, cambiar la otra y su vector de pruebas para evitar drift.
+// Regla de Jornada 1: la primera jornada es la línea base y SIEMPRE vale 1.0x.
+//
+// Esta misma regla se espeja en SQL (fn_match_round_ordinal +
+// fn_current_round_ordinal + fn_prediction_multiplier + fn_save_prediction); si
+// cambia una, cambiar la otra y su vector de pruebas para evitar drift.
 // ============================================================
 
 /** Jornada base del torneo: siempre 1.0x (no acumula antelación). */
@@ -99,18 +101,37 @@ export const BASELINE_MATCHDAY = 1;
 export const MIN_MULTIPLIER = 1.0;
 export const MAX_MULTIPLIER = 2.5;
 
-/** Umbrales (días de antelación → multiplicador), ordenados de mayor a menor. */
-export const MULTIPLIER_TIERS: ReadonlyArray<{ minDays: number; value: number }> =
-  [
-    { minDays: 35, value: 2.5 },
-    { minDays: 28, value: 2.2 },
-    { minDays: 21, value: 1.9 },
-    { minDays: 14, value: 1.6 },
-    { minDays: 7, value: 1.3 },
-    { minDays: 0, value: 1.0 },
-  ];
+/** Incremento del multiplicador por cada jornada de distancia. */
+export const MULTIPLIER_STEP = 0.25;
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+/**
+ * Tabla distancia-en-jornadas → multiplicador (para mostrar en Reglas). Lineal
+ * +0.25 por jornada hasta el tope 2.5x (distancia 6+). Distancia 0 = 1.0x.
+ */
+export const MULTIPLIER_TIERS: ReadonlyArray<{
+  distance: number;
+  value: number;
+}> = [
+  { distance: 1, value: 1.25 },
+  { distance: 2, value: 1.5 },
+  { distance: 3, value: 1.75 },
+  { distance: 4, value: 2.0 },
+  { distance: 5, value: 2.25 },
+  { distance: 6, value: 2.5 },
+];
+
+/**
+ * Ordinales secuenciales de las rondas de eliminatoria (los grupos usan su
+ * `matchday` 1/2/3). Espeja public.fn_match_round_ordinal en SQL.
+ */
+const KNOCKOUT_ORDINALS: Readonly<Record<string, number>> = {
+  "round-32": 4,
+  "round-16": 5,
+  quarter: 6,
+  semi: 7,
+  "third-place": 8,
+  final: 8,
+};
 
 function toMs(value: Date | string | number): number {
   if (value instanceof Date) return value.getTime();
@@ -119,36 +140,71 @@ function toMs(value: Date | string | number): number {
 }
 
 /**
- * Multiplicador por antelación de una predicción respecto al kickoff del PROPIO
- * partido (modelo por-partido). Determinista sobre milisegundos UTC (no
- * calendario local). Antelación negativa o tiempos inválidos → MIN_MULTIPLIER
- * (1.00). El valor AUTORITATIVO lo calcula el backend con `now()` del servidor;
- * esta versión TS sirve para la UI predictiva.
- *
- * `matchday`: la Jornada 1 (BASELINE_MATCHDAY) siempre devuelve 1.0x. Las
- * eliminatorias tienen `matchday` null/undefined y sí escalan por antelación.
+ * Ordinal secuencial de la ronda de un partido (J1=1, J2=2, J3=3, 32avos=4 …
+ * Final=8). Grupos → su `matchday`; eliminatorias → por `stage`. null si no se
+ * puede determinar. Espeja public.fn_match_round_ordinal.
+ */
+export function roundOrdinal(
+  matchday: number | null | undefined,
+  stage: string | null | undefined,
+): number | null {
+  if (stage && KNOCKOUT_ORDINALS[stage] != null) return KNOCKOUT_ORDINALS[stage];
+  if (matchday != null) return matchday;
+  return null;
+}
+
+/**
+ * Ordinal de la "jornada en curso": la mayor ronda cuyo primer partido ya
+ * empezó (match_time <= now). 0 si el torneo aún no inicia. Espeja
+ * public.fn_current_round_ordinal (calculado en cliente sobre la lista cargada).
+ */
+export function currentRoundOrdinal(
+  matches: ReadonlyArray<{
+    matchday: number | null;
+    stage: string | null;
+    match_time: Date | string | number;
+    status?: string | null;
+  }>,
+  now: Date | string | number = Date.now(),
+): number {
+  const nowMs = toMs(now);
+  let current = 0;
+  for (const match of matches) {
+    if (match.status === "canceled") continue;
+    if (toMs(match.match_time) > nowMs) continue;
+    const ordinal = roundOrdinal(match.matchday, match.stage);
+    if (ordinal != null && ordinal > current) current = ordinal;
+  }
+  return current;
+}
+
+/** Multiplicador para una distancia (en jornadas). Distancia <= 0 → 1.0x. */
+export function multiplierForDistance(distance: number): number {
+  if (!Number.isFinite(distance) || distance <= 0) return MIN_MULTIPLIER;
+  return Math.min(MAX_MULTIPLIER, MIN_MULTIPLIER + MULTIPLIER_STEP * distance);
+}
+
+/**
+ * Multiplicador por antelación basado en la DISTANCIA EN JORNADAS entre la ronda
+ * del partido y la jornada en curso (`currentOrdinal`). Jornada 1 (línea base) o
+ * ronda desconocida → 1.0x. El valor AUTORITATIVO lo calcula el backend
+ * (fn_prediction_multiplier con la jornada en curso del servidor); esta versión
+ * TS sirve para la UI predictiva.
  */
 export function calculatePredictionMultiplier(
-  savedAt: Date | string | number,
-  matchTime: Date | string | number,
-  matchday?: number | null,
+  matchday: number | null | undefined,
+  stage: string | null | undefined,
+  currentOrdinal: number,
 ): number {
-  // Jornada base: 1.0x fijo, sin importar la antelación.
-  if (matchday === BASELINE_MATCHDAY) {
+  const target = roundOrdinal(matchday, stage);
+  if (target == null || target <= BASELINE_MATCHDAY) {
     return MIN_MULTIPLIER;
   }
-
-  const savedAtMs = toMs(savedAt);
-  const matchTimeMs = toMs(matchTime);
-  if (!Number.isFinite(savedAtMs) || !Number.isFinite(matchTimeMs)) {
-    return MIN_MULTIPLIER;
-  }
-
-  const days = (matchTimeMs - savedAtMs) / MS_PER_DAY;
-  for (const tier of MULTIPLIER_TIERS) {
-    if (days >= tier.minDays) return tier.value;
-  }
-  return MIN_MULTIPLIER;
+  // Referencia con piso en la jornada 1: pre-torneo (current 0) la J2 queda a
+  // distancia 1 (1.25x), no 2. Espeja greatest(fn_current_round_ordinal(), 1).
+  const reference = Math.max(currentOrdinal, BASELINE_MATCHDAY);
+  const distance = Math.max(0, target - reference);
+  return multiplierForDistance(distance);
 }
 
 /**

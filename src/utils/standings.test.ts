@@ -341,3 +341,49 @@ describe("buildProjectedStandings", () => {
     expect(rows.map((r) => r.userId)).toEqual(["early", "late"]);
   });
 });
+
+describe("buildStandings — detalle de criterios (exactos/resultado/duelos)", () => {
+  it("cuenta exactos (5 pts) y resultados (2 pts) por separado", () => {
+    const members = [member("a")];
+    const matches = [
+      match("m1", { homeScore: 2, awayScore: 1 }),
+      match("m2", { homeScore: 0, awayScore: 0 }),
+      match("m3", { homeScore: 1, awayScore: 3 }),
+    ];
+    const predictions = [
+      // exacto
+      prediction("a", "m1", { homeScorePred: 2, awayScorePred: 1 }),
+      // resultado (empate) pero marcador distinto → result
+      prediction("a", "m2", { homeScorePred: 1, awayScorePred: 1 }),
+      // fallado (predijo local, ganó visitante) → ni exacto ni result
+      prediction("a", "m3", { homeScorePred: 2, awayScorePred: 0 }),
+    ];
+
+    const rows = buildStandings(members, matches, predictions);
+
+    expect(rows[0]).toMatchObject({ exactCount: 1, resultCount: 1 });
+  });
+
+  it("usa el saldo de duelos (duelPoints) como desempate tras puntos y exactos", () => {
+    // Mismos puntos y exactos: gana quien tiene más saldo de duelos.
+    const members = [
+      member("low", { duelPoints: 3, joinedAt: "2026-06-01T00:00:00.000Z" }),
+      member("high", { duelPoints: 50, joinedAt: "2026-06-02T00:00:00.000Z" }),
+    ];
+    const matches = [match("m1", { homeScore: 2, awayScore: 1 })];
+    const predictions = [
+      prediction("low", "m1", { homeScorePred: 2, awayScorePred: 1 }),
+      prediction("high", "m1", { homeScorePred: 2, awayScorePred: 1 }),
+    ];
+
+    const rows = buildStandings(members, matches, predictions);
+
+    expect(rows.map((r) => r.userId)).toEqual(["high", "low"]);
+    expect(rows[0]).toMatchObject({ userId: "high", duelPoints: 50 });
+  });
+
+  it("duelPoints por defecto es 0 cuando el miembro no lo provee", () => {
+    const rows = buildStandings([member("a")], [], []);
+    expect(rows[0]).toMatchObject({ duelPoints: 0, resultCount: 0 });
+  });
+});

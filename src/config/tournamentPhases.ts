@@ -19,7 +19,7 @@ export interface TournamentPhaseConfig {
   /** Stable key. Matches tournament_phases.phase_code. */
   readonly code: AwardPhase;
   /** Points for a correct special prediction made during this phase (FR-16). */
-  readonly rewardPoints: 50 | 25 | 10 | 0;
+  readonly rewardPoints: 50 | 25 | 10 | 2;
   /** Inclusive lower bound (UTC). `null` = open-ended start (before tournament). */
   readonly startsAt: string | null;
   /** Exclusive upper bound (UTC). `null` = open-ended end (tournament over). */
@@ -49,7 +49,7 @@ const rawPhases = [
   { code: 'A' as const, rewardPoints: 50 as const, startsAt: null,              endsAt: INAUGURAL_KICKOFF, editsLocked: false, label: 'Before inaugural match' },
   { code: 'B' as const, rewardPoints: 25 as const, startsAt: INAUGURAL_KICKOFF, endsAt: KNOCKOUT_START,    editsLocked: false, label: 'Group stage' },
   { code: 'C' as const, rewardPoints: 10 as const, startsAt: KNOCKOUT_START,    endsAt: SEMIFINAL_START,   editsLocked: false, label: 'Round of 32 + Round of 16 + Quarterfinals' },
-  { code: 'D' as const, rewardPoints: 0 as const,  startsAt: SEMIFINAL_START,   endsAt: null,              editsLocked: true,  label: 'Semifinals onward' },
+  { code: 'D' as const, rewardPoints: 2 as const,  startsAt: SEMIFINAL_START,   endsAt: null,              editsLocked: true,  label: 'Semifinals onward' },
 ] as const;
 
 /**

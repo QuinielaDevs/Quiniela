@@ -7,10 +7,12 @@ import { generateInviteCode, INVITE_CODE_ALPHABET } from "@/utils/invite-code";
 import { getJoinLeagueErrorMessage } from "@/utils/join-league-errors";
 import {
   createLeagueSchema,
+  leaveLeagueSchema,
   promoteMemberToAdminSchema,
   removeMemberSchema,
   setMemberPaymentStatusSchema,
   type CreateLeagueInput,
+  type LeaveLeagueInput,
   type PromoteMemberToAdminInput,
   type RemoveMemberInput,
   type SetMemberPaymentStatusInput,
@@ -302,5 +304,60 @@ export async function removeMember(
   } catch (e) {
     console.error("Excepción inesperada al expulsar al miembro:", e);
     return { success: false, data: null, error: ADMIN_SAVE_ERROR };
+  }
+}
+
+const LEAVE_LEAGUE_ERROR =
+  "No pudimos procesar tu salida de la liga. Intenta de nuevo.";
+
+// La RPC fn_leave_league lanza mensajes estables; los mapeamos a texto de UI.
+function toLeaveLeagueError(
+  error: { code?: string | null; message?: string | null } | null,
+): string {
+  if (!error) return LEAVE_LEAGUE_ERROR;
+  // 42501 (único admin / no autenticado) y P0002 (no miembro) traen mensajes
+  // legibles desde la función; los propagamos tal cual.
+  if (error.code === INSUFFICIENT_PRIVILEGE || error.code === "P0002") {
+    return error.message ?? LEAVE_LEAGUE_ERROR;
+  }
+  return error.message ?? LEAVE_LEAGUE_ERROR;
+}
+
+/**
+ * Abandona la liga (auto-baja del usuario actual). El RPC `fn_leave_league`
+ * (SECURITY DEFINER) valida pertenencia y bloquea salir si eres el único admin;
+ * un trigger borra en cascada tus predicciones/medallas/perfil en esa liga.
+ * NUNCA propaga excepciones; revalida las vistas afectadas.
+ */
+export async function leaveLeague(
+  input: LeaveLeagueInput,
+): Promise<ServerActionResult<null>> {
+  try {
+    const parsed = leaveLeagueSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+      };
+    }
+
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("fn_leave_league", {
+      p_league_id: parsed.data.leagueId,
+    });
+
+    if (error) {
+      console.error("Error al abandonar la liga:", error);
+      return { success: false, data: null, error: toLeaveLeagueError(error) };
+    }
+
+    revalidatePath("/account");
+    revalidatePath("/standings");
+    revalidatePath("/predictions");
+    return { success: true, data: null, error: null };
+  } catch (e) {
+    console.error("Excepción inesperada al abandonar la liga:", e);
+    return { success: false, data: null, error: LEAVE_LEAGUE_ERROR };
   }
 }

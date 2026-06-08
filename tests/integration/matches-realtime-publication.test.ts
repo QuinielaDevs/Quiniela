@@ -1,15 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { basename } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { supabaseDbContainerName } from "./local-postgres";
 
 function queryLocalPostgres(sql: string): string {
-  const projectName = basename(process.cwd()).toLowerCase();
   return execFileSync(
     "docker",
     [
       "exec",
-      `supabase_db_${projectName}`,
+      supabaseDbContainerName(),
       "psql",
       "-U",
       "postgres",

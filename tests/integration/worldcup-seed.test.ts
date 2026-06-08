@@ -1,19 +1,15 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { basename } from "node:path";
 
 import { describe, expect, it } from "vitest";
-
-function containerName(): string {
-  return `supabase_db_${basename(process.cwd()).toLowerCase()}`;
-}
+import { supabaseDbContainerName } from "./local-postgres";
 
 function queryLocalPostgres(sql: string): string {
   return execFileSync(
     "docker",
     [
       "exec",
-      containerName(),
+      supabaseDbContainerName(),
       "psql",
       "-U",
       "postgres",
@@ -32,7 +28,7 @@ function runSql(sql: string): void {
     [
       "exec",
       "-i",
-      containerName(),
+      supabaseDbContainerName(),
       "psql",
       "-v",
       "ON_ERROR_STOP=1",
@@ -51,7 +47,7 @@ function queryLocalPostgresScript(sql: string): string {
     [
       "exec",
       "-i",
-      containerName(),
+      supabaseDbContainerName(),
       "psql",
       "-q",
       "-U",

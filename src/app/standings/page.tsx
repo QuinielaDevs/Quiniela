@@ -22,6 +22,7 @@ type MemberRow = {
   role: LeagueRole;
   payment_status: PaymentStatus;
   joined_at: string;
+  wager_balance: number;
   profiles: { display_name: string; avatar_url: string } | null;
 };
 
@@ -57,7 +58,7 @@ export async function StandingsBoard() {
     await Promise.all([
       supabase
         .from("league_members")
-        .select("user_id, role, payment_status, joined_at, profiles(display_name, avatar_url)")
+        .select("user_id, role, payment_status, joined_at, wager_balance, profiles(display_name, avatar_url)")
         .eq("league_id", leagueId),
       supabase
         .from("matches")
@@ -105,6 +106,7 @@ export async function StandingsBoard() {
     avatarUrl: m.profiles?.avatar_url ?? "/assets/avatars/default-player.svg",
     paymentStatus: m.payment_status,
     joinedAt: m.joined_at,
+    duelPoints: Number(m.wager_balance ?? 0),
   }));
 
   const currentMember = rows.find((m) => m.user_id === userId);

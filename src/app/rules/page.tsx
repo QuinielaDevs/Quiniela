@@ -34,7 +34,7 @@ const specialAwards = [
   { label: "Antes del partido inaugural", points: "50 pts" },
   { label: "Fase de grupos", points: "25 pts" },
   { label: "Octavos y cuartos", points: "10 pts" },
-  { label: "Desde semifinales", points: "Bloqueado" },
+  { label: "Desde semifinales", points: "2 pts" },
 ];
 
 export default function RulesPage() {
@@ -120,25 +120,26 @@ export default function RulesPage() {
               </h2>
               <p className="text-sm leading-6 text-muted-foreground">
                 La Jornada 1 siempre vale {MIN_MULTIPLIER.toFixed(1)}x. Desde
-                la Jornada 2 y en eliminatorias, el multiplicador se calcula por
-                la antelación contra el kickoff de cada partido. Si editas una
-                predicción tarde, puede bajar.
+                la Jornada 2 y en eliminatorias, el multiplicador depende de
+                cuántas jornadas de antelación pronosticas respecto a la jornada
+                en curso: cada jornada por delante suma. Si editas tarde (ya
+                avanzó el torneo), baja.
               </p>
             </div>
 
             <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {MULTIPLIER_TIERS.map((tier) => (
                 <div
-                  key={tier.minDays}
+                  key={tier.distance}
                   className="flex items-center justify-between rounded-sm border border-border bg-background px-3 py-2"
                 >
                   <span className="text-sm text-muted-foreground">
-                    {tier.minDays === 0
-                      ? "Menos de 7 días"
-                      : `${tier.minDays}+ días antes`}
+                    {tier.distance === 1
+                      ? "1 jornada antes"
+                      : `${tier.distance} jornadas antes`}
                   </span>
                   <span className="font-display text-lg font-bold text-accent">
-                    {tier.value.toFixed(1)}x
+                    {tier.value.toFixed(2)}x
                   </span>
                 </div>
               ))}

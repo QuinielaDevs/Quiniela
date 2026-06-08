@@ -46,6 +46,10 @@ export function StandingsTable({
     [members, matches, predictions, activeKey],
   );
 
+  // El saldo de duelos es de toda la liga (no por jornada): solo se muestra en
+  // la pestaña General para no confundir con un valor por-jornada.
+  const showDuels = activeKey === "general";
+
   if (members.length === 0) {
     return (
       <div className="rounded-md border border-border bg-card p-6 text-center text-card-foreground">
@@ -67,6 +71,14 @@ export function StandingsTable({
         onSelect={setActiveKey}
         ariaLabel="Filtro por jornada"
       />
+
+      <p className="text-xs text-muted-foreground">
+        Desempate: puntos → <strong className="font-semibold">exactos</strong>{" "}
+        (marcador exacto, 5 pts) →{" "}
+        <strong className="font-semibold">duelos</strong> (saldo). También se
+        muestran los aciertos de <strong className="font-semibold">resultado</strong>{" "}
+        (solo ganador o empate, 2 pts).
+      </p>
 
       <ol className="flex flex-col gap-2">
         {rows.map((row) => {
@@ -96,14 +108,42 @@ export function StandingsTable({
                 className="size-9 shrink-0 rounded-full border border-border object-cover"
               />
 
-              <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="truncate text-sm font-semibold">
                   {row.displayName}
                 </span>
-                <PaymentStatusBadge
-                  status={row.paymentStatus}
-                  className="mt-1 self-start"
-                />
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <PaymentStatusBadge status={row.paymentStatus} />
+                  <span
+                    className="text-xs text-muted-foreground"
+                    aria-label={`${row.exactCount} aciertos exactos`}
+                  >
+                    <span className="font-semibold text-foreground">
+                      {row.exactCount}
+                    </span>{" "}
+                    exactos
+                  </span>
+                  <span
+                    className="text-xs text-muted-foreground"
+                    aria-label={`${row.resultCount} aciertos de resultado`}
+                  >
+                    <span className="font-semibold text-foreground">
+                      {row.resultCount}
+                    </span>{" "}
+                    result.
+                  </span>
+                  {showDuels && (
+                    <span
+                      className="text-xs text-muted-foreground"
+                      aria-label={`${row.duelPoints} puntos de duelos`}
+                    >
+                      <span className="font-semibold text-foreground">
+                        {row.duelPoints.toFixed(1)}
+                      </span>{" "}
+                      duelos
+                    </span>
+                  )}
+                </div>
               </div>
 
               <span

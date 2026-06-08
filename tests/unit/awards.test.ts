@@ -121,20 +121,20 @@ describe("resolvePhase & scoreAward", () => {
   it("resuelve la frontera exacta de semifinales como Fase D (edits locked)", () => {
     const phase = resolvePhase(SEMIFINAL);
     expect(phase.code).toBe("D");
-    expect(phase.rewardPoints).toBe(0);
+    expect(phase.rewardPoints).toBe(2);
     expect(phase.editsLocked).toBe(true);
 
-    expect(scoreAward(SEMIFINAL, true)).toBe(0);
+    expect(scoreAward(SEMIFINAL, true)).toBe(2);
   });
 
   it("resuelve la Fase D para fechas muy posteriores", () => {
     const t = new Date(SEMIFINAL.getTime() + 1000 * 60 * 60 * 24 * 30);
     const phase = resolvePhase(t);
     expect(phase.code).toBe("D");
-    expect(phase.rewardPoints).toBe(0);
+    expect(phase.rewardPoints).toBe(2);
     expect(phase.editsLocked).toBe(true);
 
-    expect(scoreAward(t, true)).toBe(0);
+    expect(scoreAward(t, true)).toBe(2);
   });
 
   it("lanza un error ruidoso para fechas inválidas", () => {
@@ -168,4 +168,3 @@ describe("resolvePhase & scoreAward", () => {
     expect(() => resolvePhase(insideGap, gapPhases)).toThrow("resolvePhase: no phase covers");
   });
 });
-

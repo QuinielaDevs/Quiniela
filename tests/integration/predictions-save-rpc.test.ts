@@ -1,21 +1,20 @@
 import { execFileSync } from "node:child_process";
-import { basename } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   createAnonClient,
   createAuthedClient,
   createServiceRoleClient,
 } from "./setup";
+import { supabaseDbContainerName } from "./local-postgres";
 import type { Prediction } from "@/types";
 
 function runSql(sql: string): void {
-  const containerName = `supabase_db_${basename(process.cwd()).toLowerCase()}`;
   execFileSync(
     "docker",
     [
       "exec",
       "-i",
-      containerName,
+      supabaseDbContainerName(),
       "psql",
       "-v",
       "ON_ERROR_STOP=1",
@@ -34,8 +33,8 @@ function asPrediction(row: unknown): Prediction {
 }
 
 // Story 2.4 — RPC fn_save_prediction (server-authoritative):
-//  - calcula y persiste `multiplier` con now() del servidor (lotes de días);
-//  - recalcula a la baja al editar cuando el kickoff está más cerca;
+//  - calcula y persiste `multiplier` por distancia de jornadas;
+//  - recalcula a la baja cuando la jornada en curso avanza;
 //  - el rol `authenticated` NO puede escribir `multiplier` directamente;
 //  - bloquea escritura (RPC y directa) tras match_time - 1 minuto;
 //  - el dueño conserva la lectura de su propia predicción.
@@ -189,7 +188,7 @@ afterEach(async () => {
 });
 
 describe("fn_save_prediction: multiplicador y upsert", () => {
-  it("guarda una prediccion futura (>=35d) con multiplier 2.50 y recalcula a la baja al acercarse el kickoff", async () => {
+  it("guarda una prediccion futura con multiplier defensivo 1.00 si no hay jornada ni etapa", async () => {
     const matchId = await insertMatch(
       new Date(Date.now() + 40 * DAY_MS).toISOString(),
     );
@@ -205,10 +204,10 @@ describe("fn_save_prediction: multiplicador y upsert", () => {
       .single();
     expect(e1).toBeNull();
     const createdRow = asPrediction(created);
-    expect(Number(createdRow.multiplier)).toBe(2.5);
+    expect(Number(createdRow.multiplier)).toBe(1);
     expect(createdRow.home_score_pred).toBe(2);
 
-    // Simula que el kickoff se acerca: ahora a 10 días → al re-guardar baja a 1.30.
+    // Sin matchday/stage la ronda es desconocida, así que la RPC conserva 1.00.
     const { error: upErr } = await admin
       .from("matches")
       .update({ match_time: new Date(Date.now() + 10 * DAY_MS).toISOString() })
@@ -225,7 +224,7 @@ describe("fn_save_prediction: multiplicador y upsert", () => {
       .single();
     expect(e2).toBeNull();
     const editedRow = asPrediction(edited);
-    expect(Number(editedRow.multiplier)).toBe(1.3);
+    expect(Number(editedRow.multiplier)).toBe(1);
     expect(editedRow.home_score_pred).toBe(3);
     expect(editedRow.away_score_pred).toBe(0);
     // Mismo registro (upsert sobre unique(league_id,user_id,match_id)).
@@ -252,7 +251,7 @@ describe("fn_save_prediction: multiplicador y upsert", () => {
     expect(Number(asPrediction(data).multiplier)).toBe(1.0);
   });
 
-  it("Jornada 2 sí escala por antelación (>=35d → 2.50)", async () => {
+  it("Jornada 2 escala por distancia pre-torneo (J2 → 1.25)", async () => {
     const matchId = await insertMatchWithMatchday(
       new Date(Date.now() + 40 * DAY_MS).toISOString(),
       2,
@@ -268,7 +267,7 @@ describe("fn_save_prediction: multiplicador y upsert", () => {
       })
       .single();
     expect(error).toBeNull();
-    expect(Number(asPrediction(data).multiplier)).toBe(2.5);
+    expect(Number(asPrediction(data).multiplier)).toBe(1.25);
   });
 
   it("el dueño conserva la lectura de su propia prediccion", async () => {
@@ -292,7 +291,7 @@ describe("fn_save_prediction: multiplicador y upsert", () => {
       .eq("match_id", matchId);
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
-    expect(Number(data![0]!.multiplier)).toBe(1.6); // 20 días → 1.60
+    expect(Number(data![0]!.multiplier)).toBe(1); // ronda desconocida → 1.00
   });
 
   it("un NO miembro no puede guardar via RPC", async () => {
@@ -381,7 +380,7 @@ describe("fn_save_prediction: bloqueo por kickoff (cierra diferido de 2.1)", () 
       })
       .single();
     expect(error).toBeNull();
-    expect(Number(asPrediction(data).multiplier)).toBe(1.6); // 15 días → 1.60, no manipulable
+    expect(Number(asPrediction(data).multiplier)).toBe(1); // ronda desconocida → 1.00, no manipulable
 
     // Update directo de multiplier sigue denegado por privilegio de columna.
     const { error: tamper } = await clientA

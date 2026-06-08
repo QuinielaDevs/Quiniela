@@ -20,6 +20,10 @@ function uniqueInvite(): string {
   return `INV-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function uniqueBracketSlot(): number {
+  return Math.floor(10_000 + Math.random() * 1_000_000);
+}
+
 async function createAuthedUser(): Promise<{ id: string; token: string }> {
   const email = uniqueEmail("default-pred");
   const password = "Password123!";
@@ -112,6 +116,13 @@ beforeAll(async () => {
     wager_balance: 100,
   });
   expect(memberError).toBeNull();
+
+  const client = createAuthedClient(user.token);
+  const { error: baselineError } = await client.rpc(
+    "fn_ensure_default_predictions",
+    { p_league_id: leagueId },
+  );
+  expect(baselineError).toBeNull();
 });
 
 afterEach(async () => {
@@ -123,6 +134,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   for (const id of createdLeagueIds) {
+    await admin.from("predictions").delete().eq("league_id", id);
     await admin.from("leagues").delete().eq("id", id);
   }
   while (createdUserIds.length > 0) {
@@ -143,7 +155,7 @@ describe("fn_ensure_default_predictions", () => {
       matchTimeIso: new Date(Date.now() + DAY_MS).toISOString(),
       homeCode: null,
       awayCode: null,
-      bracketSlot: 99,
+      bracketSlot: uniqueBracketSlot(),
     });
 
     const client = createAuthedClient(user.token);

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { useTransition, useState } from "react";
 
 import { joinLeagueByInvite } from "@/app/actions/leagues.actions";
@@ -131,7 +132,18 @@ export function JoinLeagueCard({
             {isPending ? "Uniéndote..." : "Unirme a la liga"}
           </Button>
         ) : (
-          <GoogleSignInButton next={nextPath} />
+          <div className="space-y-3">
+            <GoogleSignInButton next={nextPath} />
+            <p className="text-center text-sm text-muted-foreground">
+              ¿Prefieres correo?{" "}
+              <Link
+                href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                Inicia sesión o regístrate
+              </Link>
+            </p>
+          </div>
         )}
 
         {error && (

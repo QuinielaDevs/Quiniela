@@ -12,20 +12,23 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getSafeNextPath } from "@/utils/redirect";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function SignUpForm({
+  next = "/predictions",
   className,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & { next?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const safeNext = getSafeNextPath(next);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +47,9 @@ export function SignUpForm({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/predictions`,
+          // Tras confirmar el correo, el usuario vuelve a su destino (p. ej. el
+          // invite /join/CODE) en vez de perderlo en /predictions.
+          emailRedirectTo: `${window.location.origin}${safeNext}`,
         },
       });
       if (error) throw error;

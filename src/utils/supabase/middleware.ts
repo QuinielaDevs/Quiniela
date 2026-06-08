@@ -52,11 +52,19 @@ export async function updateSession(request: NextRequest) {
     !user &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth") &&
+    // /join muestra la invitación a usuarios no logueados (la tarjeta ofrece
+    // registro/login conservando el invite); no lo interceptamos hacia login.
+    !request.nextUrl.pathname.startsWith("/join") &&
     !request.nextUrl.pathname.startsWith("/api/webhooks")
   ) {
-    // no user, potentially respond by redirecting the user to the login page
+    // Usuario no autenticado: lo mandamos a login PERO conservando el destino
+    // original en `?next` para volver tras autenticarse (no se pierde el invite
+    // ni cualquier otro deep link protegido).
+    const intended = `${request.nextUrl.pathname}${request.nextUrl.search}`;
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
+    url.search = "";
+    url.searchParams.set("next", intended);
     return NextResponse.redirect(url);
   }
 

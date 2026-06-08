@@ -15,6 +15,7 @@ type MemberRow = {
   user_id: string;
   payment_status: PaymentStatus;
   joined_at: string;
+  wager_balance: number;
   profiles: { display_name: string; avatar_url: string } | null;
 };
 
@@ -42,7 +43,7 @@ export async function LiveBoard() {
   const [{ data: memberRows }, { data: matchRows }] = await Promise.all([
     supabase
       .from("league_members")
-      .select("user_id, payment_status, joined_at, profiles(display_name, avatar_url)")
+      .select("user_id, payment_status, joined_at, wager_balance, profiles(display_name, avatar_url)")
       .eq("league_id", leagueId),
     supabase
       .from("matches")
@@ -88,6 +89,7 @@ export async function LiveBoard() {
       avatarUrl: member.profiles?.avatar_url ?? "/assets/avatars/default-player.svg",
       paymentStatus: member.payment_status,
       joinedAt: member.joined_at,
+      duelPoints: Number(member.wager_balance ?? 0),
     }),
   );
 

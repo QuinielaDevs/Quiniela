@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/server";
 import { PredictionsBoardView } from "@/components/predictions/PredictionsBoardView";
+import { WelcomePaymentModal } from "@/components/predictions/WelcomePaymentModal";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { TopNav } from "@/components/layout/TopNav";
@@ -39,17 +40,37 @@ export async function PredictionsBoard() {
   if (!userId) redirect("/auth/login");
 
   // Liga del usuario: la más reciente (un selector multi-liga es trabajo de Epic 3).
+  // Traemos también el estado de pago y los datos de cobro de la liga para el
+  // recordatorio de bienvenida (modal) de miembros con pago pendiente.
   const { data: memberships } = await supabase
     .from("league_members")
-    .select("league_id, joined_at")
+    .select(
+      "league_id, joined_at, payment_status, leagues(name, requires_payment, payment_amount, payment_instructions)",
+    )
     .eq("user_id", userId)
     .order("joined_at", { ascending: false })
     .limit(1);
 
-  const leagueId = memberships?.[0]?.league_id;
+  const membership = memberships?.[0];
+  const leagueId = membership?.league_id;
   if (!leagueId) {
     return <NoLeagueState />;
   }
+
+  // Modal de bienvenida + pago: se muestra mientras el pago siga pendiente y la
+  // liga lo requiera. El componente cliente lo abre en cada visita (cerrable).
+  const league = membership?.leagues as unknown as
+    | {
+        name: string;
+        requires_payment: boolean;
+        payment_amount: number | null;
+        payment_instructions: string | null;
+      }
+    | null
+    | undefined;
+  const showWelcomePayment =
+    Boolean(league?.requires_payment) &&
+    membership?.payment_status === "pending";
 
   // Auto-guardado de predicciones por defecto (0-0): garantiza que cada partido
   // editable tenga un pronóstico aunque el usuario no lo toque, de modo que un
@@ -71,6 +92,7 @@ export async function PredictionsBoard() {
     { data: candidates },
     { data: specialPredictions },
     activePhaseResult,
+    { data: currentRoundOrdinal },
   ] = await Promise.all([
     supabase
       .from("matches")
@@ -97,6 +119,8 @@ export async function PredictionsBoard() {
       .eq("league_id", leagueId)
       .eq("user_id", userId),
     supabase.rpc("fn_get_active_tournament_phase"),
+    // Jornada en curso (server-authoritative) para el multiplicador predictivo.
+    supabase.rpc("fn_current_round_ordinal"),
   ]);
 
   if (!matches || matches.length === 0) {
@@ -139,16 +163,26 @@ export async function PredictionsBoard() {
   }
 
   return (
-    <PredictionsBoardView
-      leagueId={leagueId}
-      matches={matches}
-      predictions={predictions ?? []}
-      candidatesByCategory={candidatesByCategory}
-      initialSelections={initialSelections}
-      isAwardsLocked={isAwardsLocked}
-      activePhaseLabel={activePhaseLabel}
-      activePhaseCode={activePhaseCode}
-    />
+    <>
+      {showWelcomePayment && league && (
+        <WelcomePaymentModal
+          leagueName={league.name}
+          amount={league.payment_amount}
+          instructions={league.payment_instructions}
+        />
+      )}
+      <PredictionsBoardView
+        leagueId={leagueId}
+        matches={matches}
+        predictions={predictions ?? []}
+        candidatesByCategory={candidatesByCategory}
+        initialSelections={initialSelections}
+        isAwardsLocked={isAwardsLocked}
+        activePhaseLabel={activePhaseLabel}
+        activePhaseCode={activePhaseCode}
+        currentRoundOrdinal={currentRoundOrdinal ?? 0}
+      />
+    </>
   );
 }
 

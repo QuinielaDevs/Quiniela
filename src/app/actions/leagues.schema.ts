@@ -87,3 +87,13 @@ export const removeMemberSchema = z.object({
 });
 
 export type RemoveMemberInput = z.input<typeof removeMemberSchema>;
+
+/**
+ * Entrada de "abandonar liga" (auto-baja). Solo identifica la liga; el usuario
+ * lo resuelve el servidor (auth.uid()) y las guardas viven en `fn_leave_league`.
+ */
+export const leaveLeagueSchema = z.object({
+  leagueId: z.string().uuid("Liga inválida."),
+});
+
+export type LeaveLeagueInput = z.input<typeof leaveLeagueSchema>;
