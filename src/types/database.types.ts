@@ -563,6 +563,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active_league_id: string | null
           avatar_url: string
           created_at: string
           display_name: string
@@ -570,6 +571,7 @@ export type Database = {
           id: string
         }
         Insert: {
+          active_league_id?: string | null
           avatar_url?: string
           created_at?: string
           display_name?: string
@@ -577,13 +579,22 @@ export type Database = {
           id: string
         }
         Update: {
+          active_league_id?: string | null
           avatar_url?: string
           created_at?: string
           display_name?: string
           email?: string | null
           id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_active_league_id_fkey"
+            columns: ["active_league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       special_predictions: {
         Row: {
@@ -1039,6 +1050,23 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "league_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      fn_set_active_league: {
+        Args: { p_league_id: string }
+        Returns: {
+          active_league_id: string | null
+          avatar_url: string
+          created_at: string
+          display_name: string
+          email: string | null
+          id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
           isOneToOne: true
           isSetofReturn: false
         }

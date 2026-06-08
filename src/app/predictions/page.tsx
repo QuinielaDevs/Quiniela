@@ -10,6 +10,7 @@ import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { TopNav } from "@/components/layout/TopNav";
 
 import { groupCandidatesByCategory } from "@/utils/awards";
+import { getActiveLeagueMembership } from "@/utils/active-league";
 import type { AwardCandidate, SpecialPrediction } from "@/types";
 
 type PredictionsPageProps = {
@@ -39,38 +40,18 @@ export async function PredictionsBoard() {
   const userId = claimsData?.claims?.sub;
   if (!userId) redirect("/auth/login");
 
-  // Liga del usuario: la más reciente (un selector multi-liga es trabajo de Epic 3).
-  // Traemos también el estado de pago y los datos de cobro de la liga para el
-  // recordatorio de bienvenida (modal) de miembros con pago pendiente.
-  const { data: memberships } = await supabase
-    .from("league_members")
-    .select(
-      "league_id, joined_at, payment_status, leagues(name, requires_payment, payment_amount, payment_instructions)",
-    )
-    .eq("user_id", userId)
-    .order("joined_at", { ascending: false })
-    .limit(1);
-
-  const membership = memberships?.[0];
-  const leagueId = membership?.league_id;
+  const membership = await getActiveLeagueMembership({ supabase, userId });
+  const leagueId = membership?.leagueId;
   if (!leagueId) {
     return <NoLeagueState />;
   }
 
   // Modal de bienvenida + pago: se muestra mientras el pago siga pendiente y la
   // liga lo requiera. El componente cliente lo abre en cada visita (cerrable).
-  const league = membership?.leagues as unknown as
-    | {
-        name: string;
-        requires_payment: boolean;
-        payment_amount: number | null;
-        payment_instructions: string | null;
-      }
-    | null
-    | undefined;
+  const league = membership.league;
   const showWelcomePayment =
-    Boolean(league?.requires_payment) &&
-    membership?.payment_status === "pending";
+    Boolean(league?.requiresPayment) &&
+    membership.paymentStatus === "pending";
 
   // Auto-guardado de predicciones por defecto (0-0): garantiza que cada partido
   // editable tenga un pronóstico aunque el usuario no lo toque, de modo que un
@@ -167,8 +148,8 @@ export async function PredictionsBoard() {
       {showWelcomePayment && league && (
         <WelcomePaymentModal
           leagueName={league.name}
-          amount={league.payment_amount}
-          instructions={league.payment_instructions}
+          amount={league.paymentAmount}
+          instructions={league.paymentInstructions}
         />
       )}
       <PredictionsBoardView

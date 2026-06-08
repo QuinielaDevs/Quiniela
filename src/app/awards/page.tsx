@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Outfit } from "next/font/google";
 
 import { createClient } from "@/utils/supabase/server";
+import { getActiveLeagueMembership } from "@/utils/active-league";
 import { groupCandidatesByCategory } from "@/utils/awards";
 import { cn } from "@/utils/utils";
 import type {
@@ -99,6 +100,10 @@ async function AwardsContent({ searchParams }: AwardsPageProps) {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const { league: requestedLeague } = await searchParams;
+  const activeMembership = await getActiveLeagueMembership({
+    supabase,
+    userId: user.id,
+  });
 
   return (
     <>
@@ -122,6 +127,7 @@ async function AwardsContent({ searchParams }: AwardsPageProps) {
           ) : (
             <AwardsForLeague
               leagues={leagues}
+              activeLeagueId={activeMembership?.leagueId ?? null}
               requestedLeague={requestedLeague}
               userId={user.id}
             />
@@ -139,15 +145,19 @@ async function AwardsContent({ searchParams }: AwardsPageProps) {
  */
 async function AwardsForLeague({
   leagues,
+  activeLeagueId,
   requestedLeague,
   userId,
 }: {
   leagues: Array<{ id: string; name: string }>;
+  activeLeagueId: string | null;
   requestedLeague: string | undefined;
   userId: string;
 }) {
   const activeLeague =
-    leagues.find((l) => l.id === requestedLeague) ?? leagues[0];
+    leagues.find((l) => l.id === requestedLeague) ??
+    leagues.find((l) => l.id === activeLeagueId) ??
+    leagues[0];
 
   // El llamador garantiza leagues.length > 0; este guard satisface a TS.
   if (!activeLeague) return null;

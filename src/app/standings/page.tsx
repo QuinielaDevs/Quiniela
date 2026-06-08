@@ -9,6 +9,7 @@ import { PaymentBanner } from "@/components/standings/PaymentBanner";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { TopNav } from "@/components/layout/TopNav";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
+import { getActiveLeagueMembership } from "@/utils/active-league";
 import {
   type StandingMatch,
   type StandingMember,
@@ -36,15 +37,8 @@ export async function StandingsBoard() {
   const userId = claimsData?.claims?.sub;
   if (!userId) redirect("/auth/login");
 
-  // Liga del usuario: la más reciente (selector multi-liga es trabajo futuro).
-  const { data: memberships } = await supabase
-    .from("league_members")
-    .select("league_id, joined_at")
-    .eq("user_id", userId)
-    .order("joined_at", { ascending: false })
-    .limit(1);
-
-  const leagueId = memberships?.[0]?.league_id;
+  const membership = await getActiveLeagueMembership({ supabase, userId });
+  const leagueId = membership?.leagueId;
   if (!leagueId) {
     return (
       <NoLeagueState body="Únete con un código de invitación o crea tu propia quiniela para ver la tabla de posiciones." />

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountLeaguesPanel } from "@/components/account/AccountLeaguesPanel";
-import { leaveLeague } from "@/app/actions/leagues.actions";
+import { leaveLeague, setActiveLeague } from "@/app/actions/leagues.actions";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/app/actions/leagues.actions", () => ({
   leaveLeague: vi.fn(),
+  setActiveLeague: vi.fn(),
 }));
 
 const writeText = vi.fn();
@@ -28,6 +29,7 @@ afterEach(() => {
   writeText.mockReset();
   refresh.mockReset();
   vi.mocked(leaveLeague).mockReset();
+  vi.mocked(setActiveLeague).mockReset();
 });
 
 const SINGLE_LEAGUE = [
@@ -85,6 +87,11 @@ describe("AccountLeaguesPanel", () => {
     expect(screen.queryByRole("button", { name: /crear liga/i })).toBeNull();
     expect(screen.getByText("ABCDN234")).toBeInTheDocument();
     expect(screen.getByText("WXYZ9876")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Usar Liga Amigos como liga actual",
+      }),
+    ).toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole("button", {
@@ -98,6 +105,52 @@ describe("AccountLeaguesPanel", () => {
         name: "Código de invitación de Liga Principal copiado",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("permite cambiar la liga activa desde la lista", async () => {
+    vi.mocked(setActiveLeague).mockResolvedValue({
+      success: true,
+      data: null,
+      error: null,
+    });
+
+    render(
+      <AccountLeaguesPanel
+        leagues={[
+          {
+            leagueId: "league-1",
+            leagueName: "Liga Principal",
+            inviteCode: "ABCDN234",
+            role: "admin",
+            paymentStatus: "paid",
+            joinedAt: "2026-06-05T12:00:00.000Z",
+            wagerBalance: 12.5,
+            requiresPayment: true,
+            isCurrent: true,
+          },
+          {
+            leagueId: "league-2",
+            leagueName: "Liga Amigos",
+            inviteCode: "WXYZ9876",
+            role: "member",
+            paymentStatus: "pending",
+            joinedAt: "2026-06-01T12:00:00.000Z",
+            wagerBalance: 4,
+            requiresPayment: false,
+            isCurrent: false,
+          },
+        ]}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Usar Liga Amigos como liga actual",
+      }),
+    );
+
+    expect(setActiveLeague).toHaveBeenCalledWith({ leagueId: "league-2" });
+    expect(refresh).toHaveBeenCalled();
   });
 
   it("copia el enlace de invitación de la liga", async () => {

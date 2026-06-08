@@ -34,6 +34,8 @@ function tableBuilder(result: { data: unknown; error?: unknown }) {
   }
   builder.single = () =>
     Promise.resolve({ error: result.error ?? null, data: result.data });
+  builder.maybeSingle = () =>
+    Promise.resolve({ error: result.error ?? null, data: result.data });
   builder.then = (
     resolve: (value: { data: unknown; error: unknown }) => unknown,
   ) => resolve({ error: result.error ?? null, data: result.data });

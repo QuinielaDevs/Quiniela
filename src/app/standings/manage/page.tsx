@@ -13,6 +13,7 @@ import {
   MatchAdminList,
   type AdminMatchView,
 } from "@/components/standings/MatchAdminList";
+import { getActiveLeagueMembership } from "@/utils/active-league";
 import type { LeagueRole, MatchStatus, PaymentStatus } from "@/types";
 
 // Fila de league_members embebiendo el perfil (FK user_id → profiles.id).
@@ -50,15 +51,8 @@ export async function ManageBoard() {
   const userId = claimsData?.claims?.sub;
   if (!userId) redirect("/auth/login");
 
-  // Liga del usuario: la más reciente (igual que /standings).
-  const { data: memberships } = await supabase
-    .from("league_members")
-    .select("league_id, joined_at")
-    .eq("user_id", userId)
-    .order("joined_at", { ascending: false })
-    .limit(1);
-
-  const leagueId = memberships?.[0]?.league_id;
+  const membership = await getActiveLeagueMembership({ supabase, userId });
+  const leagueId = membership?.leagueId;
   if (!leagueId) {
     return (
       <NoLeagueState body="Únete con un código de invitación o crea tu propia quiniela para administrarla." />

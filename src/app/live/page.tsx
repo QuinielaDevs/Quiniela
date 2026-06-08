@@ -8,6 +8,7 @@ import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { TopNav } from "@/components/layout/TopNav";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
 import { createClient } from "@/utils/supabase/server";
+import { getActiveLeagueMembership } from "@/utils/active-league";
 import type { PaymentStatus } from "@/types";
 import type { StandingMember, StandingPrediction } from "@/utils/standings";
 
@@ -26,14 +27,8 @@ export async function LiveBoard() {
   const userId = claimsData?.claims?.sub;
   if (!userId) redirect("/auth/login");
 
-  const { data: memberships } = await supabase
-    .from("league_members")
-    .select("league_id, joined_at")
-    .eq("user_id", userId)
-    .order("joined_at", { ascending: false })
-    .limit(1);
-
-  const leagueId = memberships?.[0]?.league_id;
+  const membership = await getActiveLeagueMembership({ supabase, userId });
+  const leagueId = membership?.leagueId;
   if (!leagueId) {
     return (
       <NoLeagueState body="Únete con un código de invitación o crea tu propia quiniela para ver la tabla en vivo." />
