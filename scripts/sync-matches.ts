@@ -32,8 +32,6 @@ const ZAFRONIX_API_URL =
   "https://api.zafronix.com/fifa/worldcup/v1/matches?year=2026";
 const ETAG_CONFIG_KEY = "zafronix_matches_etag";
 
-
-
 /**
  * Realiza una petición externa con reintentos y tiempo límite de respuesta (timeout).
  */
@@ -248,8 +246,8 @@ export async function syncMatches(
     const canUpdateTeams =
       local.bracket_slot !== null &&
       local.bracket_slot !== undefined &&
-      apiMatch.homeTeam !== null &&
-      apiMatch.awayTeam !== null &&
+      typeof apiMatch.homeTeam === "string" &&
+      typeof apiMatch.awayTeam === "string" &&
       !isPlaceholderTeam(apiMatch.homeTeam) &&
       !isPlaceholderTeam(apiMatch.awayTeam);
 
