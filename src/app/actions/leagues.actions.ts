@@ -84,7 +84,7 @@ export async function createLeague(
         }
       : {};
 
-    let lastError: { code?: string; message: string } | null = null;
+    let lastError: { code?: string; message: string; details?: string; hint?: string } | null = null;
 
     for (let attempt = 0; attempt < MAX_INVITE_RETRIES; attempt++) {
       const { data: league, error } = await supabase
@@ -109,7 +109,11 @@ export async function createLeague(
       if (error.code !== UNIQUE_VIOLATION) break;
     }
 
-    if (lastError?.code === "23503") {
+    if (lastError) {
+      console.error("[createLeague] RPC error:", JSON.stringify(lastError, null, 2));
+    }
+
+    if (lastError?.code === "23503" || lastError?.message?.includes("leagues_created_by_fkey")) {
       return {
         success: false,
         data: null,
