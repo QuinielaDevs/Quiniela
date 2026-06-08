@@ -32,6 +32,7 @@ export function LeagueCreateForm() {
   const [isPending, startTransition] = useTransition();
 
   const [name, setName] = useState("");
+  const [headerWord, setHeaderWord] = useState("PIJA");
   const [predictionMode, setPredictionMode] = useState<PredictionMode>("dual");
   const [requiresPayment, setRequiresPayment] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -48,6 +49,7 @@ export function LeagueCreateForm() {
 
       const result = await createLeague({
         name,
+        headerWord,
         predictionMode,
         requiresPayment,
         paymentAmount: amount,
@@ -79,6 +81,28 @@ export function LeagueCreateForm() {
           autoComplete="off"
           required
         />
+      </div>
+
+      {/* Primera palabra del encabezado (la marca de la app por liga) */}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="header-word">Primera palabra del encabezado</Label>
+        <Input
+          id="header-word"
+          className="h-12"
+          value={headerWord}
+          onChange={(e) => setHeaderWord(e.target.value)}
+          placeholder="PIJA"
+          maxLength={20}
+          autoComplete="off"
+          required
+        />
+        <p className="text-xs text-muted-foreground">
+          Se mostrará como «
+          <span className="font-semibold text-foreground">
+            {headerWord.trim() || "PIJA"}
+          </span>{" "}
+          Quiniela» en el encabezado de la liga.
+        </p>
       </div>
 
       {/* Modo de predicción */}

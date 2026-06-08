@@ -110,7 +110,7 @@ describe("roundOrdinal — ordinal de ronda", () => {
     expect(roundOrdinal(3, "group")).toBe(3);
   });
 
-  it("eliminatorias por stage: 32avos=4 … Final=8", () => {
+  it("eliminatorias por stage: 16avos=4 … Final=8", () => {
     expect(roundOrdinal(null, "round-32")).toBe(4);
     expect(roundOrdinal(null, "round-16")).toBe(5);
     expect(roundOrdinal(null, "quarter")).toBe(6);

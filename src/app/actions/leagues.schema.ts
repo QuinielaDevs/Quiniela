@@ -21,6 +21,11 @@ export const createLeagueSchema = z
     predictionMode: z.enum(["dual", "jornada", "grupos"], {
       message: "Selecciona un modo de predicción válido.",
     }),
+    headerWord: z
+      .string()
+      .trim()
+      .min(1, "Indica la primera palabra del encabezado.")
+      .max(20, "Máximo 20 caracteres."),
     requiresPayment: z.boolean(),
     paymentAmount: z.number().nonnegative().nullish(),
     paymentInstructions: z.string().trim().nullish(),

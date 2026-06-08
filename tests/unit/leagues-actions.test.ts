@@ -4,6 +4,12 @@ vi.mock("@/utils/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+// joinLeagueByInvite revalida rutas tras unirse con éxito; fuera del runtime de
+// Next, revalidatePath lanza. Lo mockeamos como no-op para aislar la lógica.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 describe("joinLeagueByInvite", () => {
   beforeEach(() => {
     vi.resetModules();

@@ -41,7 +41,7 @@ type PredictionsBoardViewProps = {
 };
 
 // Tablero táctil con navegación por fase (UX-DR-7). Agrupa los partidos por
-// Jornada 1/2/3 y por ronda de eliminatoria (32avos → Final), mostrando también
+// Jornada 1/2/3 y por ronda de eliminatoria (16avos → Final), mostrando también
 // los slots TBD aún no clasificados (MatchCard los deja en solo-lectura).
 // También integra los Premios Especiales como primera pestaña.
 export function PredictionsBoardView({

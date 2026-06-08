@@ -30,4 +30,18 @@ describe("TopNav", () => {
     expect(rules).toHaveAttribute("href", "/rules");
     expect(rules).not.toHaveAttribute("aria-current", "page");
   });
+
+  it("usa 'PIJA' como primera palabra del brand por defecto", () => {
+    render(<TopNav />);
+    expect(
+      screen.getByRole("link", { name: /pija quiniela/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("respeta la primera palabra de la liga activa vía brandWord", () => {
+    render(<TopNav brandWord="Compadres" />);
+    expect(
+      screen.getByRole("link", { name: /compadres quiniela/i }),
+    ).toBeInTheDocument();
+  });
 });

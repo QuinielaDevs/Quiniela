@@ -229,6 +229,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          header_word: string
           id: string
           invite_code: string
           name: string
@@ -240,6 +241,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          header_word?: string
           id?: string
           invite_code: string
           name: string
@@ -251,6 +253,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          header_word?: string
           id?: string
           invite_code?: string
           name?: string
@@ -838,6 +841,7 @@ export type Database = {
       fn_are_special_predictions_locked: { Args: never; Returns: boolean }
       fn_create_league: {
         Args: {
+          p_header_word?: string
           p_invite_code: string
           p_name: string
           p_payment_amount?: number
@@ -848,6 +852,7 @@ export type Database = {
         Returns: {
           created_at: string
           created_by: string
+          header_word: string
           id: string
           invite_code: string
           name: string

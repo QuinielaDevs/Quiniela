@@ -485,29 +485,36 @@ describe("MatchCard", () => {
     expect(screen.getByText("1.3x")).toBeInTheDocument();
   });
 
-  it("nextMultiplier se actualiza en vivo al avanzar el tiempo (sin prediccion guardada)", async () => {
-    const matchTime = new Date("2026-09-15T20:00:00.000Z");
-    const startTime = new Date("2026-08-06T20:00:00.000Z");
-    vi.setSystemTime(startTime);
-    renderMatchCard({
-      match: { ...MATCH_JORNADA2, match_time: matchTime.toISOString() },
-      initialPrediction: null,
-    });
+  it("nextMultiplier refleja la jornada en curso (currentRoundOrdinal), no el reloj", () => {
+    vi.setSystemTime(new Date("2026-06-01T20:00:00.000Z"));
+    // Final (ordinal 8) con equipos resueltos (no TBD) y aún programada.
+    const matchFinal = { ...MATCH, stage: "final", matchday: null };
 
-    // 40 dias de antelacion → 2.5x
+    // Pre-torneo (jornada en curso 0 → referencia 1): la Final queda a distancia
+    // 7 → tope 2.5x.
+    const { rerender } = render(
+      <MatchCard
+        leagueId={LEAGUE_ID}
+        match={matchFinal}
+        initialPrediction={null}
+        currentRoundOrdinal={0}
+      />,
+    );
     expect(screen.getByText("2.5x")).toBeInTheDocument();
 
-    // Adelantar el reloj para que el match quede a <7 dias (cruce de tier).
-    await act(async () => {
-      vi.setSystemTime(new Date("2026-09-10T20:00:00.000Z"));
-    });
-    // Disparar el setInterval(10s) que re-calcula now.
-    await act(async () => {
-      vi.advanceTimersByTime(10_000);
-    });
-
+    // Cuando la jornada en curso avanza a semis (7), la Final queda a distancia 1
+    // → 1.25x (mostrado como 1.3x por el redondeo a 1 decimal). El multiplicador
+    // lo dirige el ordinal en curso, no el tiempo.
+    rerender(
+      <MatchCard
+        leagueId={LEAGUE_ID}
+        match={matchFinal}
+        initialPrediction={null}
+        currentRoundOrdinal={7}
+      />,
+    );
     expect(screen.queryByText("2.5x")).toBeNull();
-    expect(screen.getByText("1.0x")).toBeInTheDocument();
+    expect(screen.getByText("1.3x")).toBeInTheDocument();
   });
 
   it("el texto de la advertencia muestra el saved vs next multiplier correctos", async () => {

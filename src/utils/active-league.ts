@@ -12,6 +12,7 @@ export type ActiveLeagueMembership = {
   wagerBalance: number;
   league: {
     name: string;
+    headerWord: string;
     inviteCode: string;
     requiresPayment: boolean;
     paymentAmount: number | null;
@@ -27,6 +28,7 @@ type MembershipRow = {
   wager_balance: number;
   leagues: {
     name: string;
+    header_word: string;
     invite_code: string;
     requires_payment: boolean;
     payment_amount: number | null;
@@ -48,6 +50,7 @@ function normalizeMembership(
     league: row.leagues
       ? {
           name: row.leagues.name,
+          headerWord: row.leagues.header_word,
           inviteCode: row.leagues.invite_code,
           requiresPayment: row.leagues.requires_payment,
           paymentAmount: row.leagues.payment_amount,
@@ -76,7 +79,7 @@ export async function getActiveLeagueMembership({
     const { data: activeMembership } = await supabase
       .from("league_members")
       .select(
-        "league_id, joined_at, role, payment_status, wager_balance, leagues(name, invite_code, requires_payment, payment_amount, payment_instructions)",
+        "league_id, joined_at, role, payment_status, wager_balance, leagues(name, header_word, invite_code, requires_payment, payment_amount, payment_instructions)",
       )
       .eq("user_id", userId)
       .eq("league_id", activeLeagueId)
@@ -91,7 +94,7 @@ export async function getActiveLeagueMembership({
   const { data: memberships } = await supabase
     .from("league_members")
     .select(
-      "league_id, joined_at, role, payment_status, wager_balance, leagues(name, invite_code, requires_payment, payment_amount, payment_instructions)",
+      "league_id, joined_at, role, payment_status, wager_balance, leagues(name, header_word, invite_code, requires_payment, payment_amount, payment_instructions)",
     )
     .eq("user_id", userId)
     .order("joined_at", { ascending: false })

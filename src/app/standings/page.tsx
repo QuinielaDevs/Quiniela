@@ -7,7 +7,8 @@ import { createClient } from "@/utils/supabase/server";
 import { StandingsTable } from "@/components/standings/StandingsTable";
 import { PaymentBanner } from "@/components/standings/PaymentBanner";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
-import { TopNav } from "@/components/layout/TopNav";
+import { AppTopNav } from "@/components/layout/AppTopNav";
+import { BrandEyebrow } from "@/components/layout/BrandEyebrow";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
 import { getActiveLeagueMembership } from "@/utils/active-league";
 import {
@@ -166,13 +167,11 @@ function BoardSkeleton() {
 export default function StandingsPage() {
   return (
     <>
-      <TopNav />
+      <AppTopNav />
       <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pb-10">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
           <header className="space-y-1">
-            <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent lg:hidden">
-              PIJA Quiniela
-            </p>
+            <BrandEyebrow />
             <h1 className="font-display text-2xl font-bold lg:text-4xl">Posiciones</h1>
           </header>
 

@@ -8,8 +8,13 @@ import { cn } from "@/utils/utils";
 
 // Barra de navegación superior horizontal para desktop (lg+). En móvil se oculta
 // y la navegación la provee la BottomNavbar. Brand a la izquierda + ítems a la
-// derecha con estado activo dorado.
-export function TopNav() {
+// derecha con estado activo dorado. `brandWord` es la primera palabra de la liga
+// activa («{brandWord} Quiniela»); por defecto "PIJA" cuando no hay liga.
+type TopNavProps = {
+  brandWord?: string;
+};
+
+export function TopNav({ brandWord = "PIJA" }: TopNavProps) {
   const pathname = usePathname();
 
   return (
@@ -22,7 +27,7 @@ export function TopNav() {
           href="/predictions"
           className="font-display text-lg font-bold tracking-tight text-foreground"
         >
-          PIJA <span className="text-accent">Quiniela</span>
+          {brandWord} <span className="text-accent">Quiniela</span>
         </Link>
 
         <ul className="flex items-center gap-1">

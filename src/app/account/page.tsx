@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
-import { TopNav } from "@/components/layout/TopNav";
+import { AppTopNav } from "@/components/layout/AppTopNav";
+import { BrandEyebrow } from "@/components/layout/BrandEyebrow";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
 import { LogoutButton } from "@/components/logout-button";
 import {
@@ -220,9 +221,7 @@ function PageHeader() {
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="space-y-1">
-        <p className="font-display text-xs font-semibold uppercase tracking-wide text-accent lg:hidden">
-          PIJA Quiniela
-        </p>
+        <BrandEyebrow />
         <h1 className="font-display text-2xl font-bold lg:text-4xl">
           Mi Cuenta
         </h1>
@@ -256,7 +255,7 @@ function BoardSkeleton() {
 export default function AccountPage() {
   return (
     <>
-      <TopNav />
+      <AppTopNav />
       <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pb-10">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-6xl lg:gap-6">
           <Suspense fallback={<BoardSkeleton />}>

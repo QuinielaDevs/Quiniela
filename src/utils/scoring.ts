@@ -85,7 +85,7 @@ export function calculateBasePoints(
 // de distancia, tope 2.50x. Conforme avanza el torneo la distancia se acorta y
 // el multiplicador baja (penalización por editar tarde).
 //
-// Rondas como jornadas consecutivas: J1=1, J2=2, J3=3, 32avos=4, Octavos=5,
+// Rondas como jornadas consecutivas: J1=1, J2=2, J3=3, 16avos=4, Octavos=5,
 // Cuartos=6, Semis=7, 3er puesto=8, Final=8.
 //
 // Regla de Jornada 1: la primera jornada es la línea base y SIEMPRE vale 1.0x.
@@ -140,7 +140,7 @@ function toMs(value: Date | string | number): number {
 }
 
 /**
- * Ordinal secuencial de la ronda de un partido (J1=1, J2=2, J3=3, 32avos=4 …
+ * Ordinal secuencial de la ronda de un partido (J1=1, J2=2, J3=3, 16avos=4 …
  * Final=8). Grupos → su `matchday`; eliminatorias → por `stage`. null si no se
  * puede determinar. Espeja public.fn_match_round_ordinal.
  */

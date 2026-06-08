@@ -6,6 +6,7 @@ import { createLeagueSchema } from "@/app/actions/leagues.schema";
 
 const base = {
   name: "Liga de Cris",
+  headerWord: "PIJA",
   predictionMode: "dual" as const,
   requiresPayment: false,
 };
@@ -64,6 +65,19 @@ describe("createLeagueSchema", () => {
       requiresPayment: true,
       paymentAmount: 10,
       paymentInstructions: "   ",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza una primera palabra del encabezado vacía", () => {
+    const result = createLeagueSchema.safeParse({ ...base, headerWord: "   " });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza una primera palabra del encabezado de más de 20 caracteres", () => {
+    const result = createLeagueSchema.safeParse({
+      ...base,
+      headerWord: "x".repeat(21),
     });
     expect(result.success).toBe(false);
   });

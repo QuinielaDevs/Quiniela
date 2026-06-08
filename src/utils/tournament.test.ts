@@ -12,7 +12,7 @@ import {
 
 describe("stageLabel", () => {
   it("traduce las fases de eliminatoria", () => {
-    expect(stageLabel("round-32")).toBe("32avos");
+    expect(stageLabel("round-32")).toBe("16avos");
     expect(stageLabel("round-16")).toBe("Octavos");
     expect(stageLabel("quarter")).toBe("Cuartos");
     expect(stageLabel("semi")).toBe("Semis");
@@ -57,7 +57,7 @@ describe("buildPhases", () => {
       "final",
     ]);
     expect(phases[0]?.label).toBe("Jornada 1");
-    expect(phases[2]?.label).toBe("32avos");
+    expect(phases[2]?.label).toBe("16avos");
   });
 
   it("devuelve lista vacía sin partidos", () => {

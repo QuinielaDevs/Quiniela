@@ -13,7 +13,7 @@ import type {
   SpecialPrediction,
 } from "@/types";
 import { AwardsBoard } from "@/components/awards/AwardsBoard";
-import { TopNav } from "@/components/layout/TopNav";
+import { AppTopNav } from "@/components/layout/AppTopNav";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
 
 const outfit = Outfit({ subsets: ["latin"], display: "swap" });
@@ -39,7 +39,7 @@ export default function AwardsPage(props: AwardsPageProps) {
 function AwardsFallback() {
   return (
     <>
-      <TopNav />
+      <AppTopNav />
       <main
         className={cn(
           "min-h-screen bg-[#0D1B2A] px-4 py-8 text-white lg:px-8",
@@ -107,7 +107,7 @@ async function AwardsContent({ searchParams }: AwardsPageProps) {
 
   return (
     <>
-      <TopNav />
+      <AppTopNav />
       <main
         className={cn(
           "min-h-screen bg-[#0D1B2A] px-4 py-8 text-white lg:px-8",

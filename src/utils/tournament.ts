@@ -7,13 +7,13 @@
 export type MatchPhase = {
   // Clave estable usada por el tab bar (jornada-1, round-32, …).
   key: string;
-  // Etiqueta corta para el tab (Jornada 1, 32avos, Octavos, …).
+  // Etiqueta corta para el tab (Jornada 1, 16avos, Octavos, …).
   label: string;
 };
 
 // Etiqueta legible de una fase de eliminatoria.
 const STAGE_LABELS: Record<string, string> = {
-  "round-32": "32avos",
+  "round-32": "16avos",
   "round-16": "Octavos",
   quarter: "Cuartos",
   semi: "Semis",

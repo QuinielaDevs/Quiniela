@@ -92,6 +92,7 @@ export async function createLeague(
           p_name: data.name,
           p_invite_code: generateInviteCode(),
           p_prediction_mode: data.predictionMode,
+          p_header_word: data.headerWord,
           p_requires_payment: data.requiresPayment,
           ...paymentArgs,
         })

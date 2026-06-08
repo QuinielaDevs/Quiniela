@@ -75,6 +75,8 @@ describe("fn_create_league: creación atómica", () => {
     expect(league!.invite_code).toBe(invite);
     expect(league!.requires_payment).toBe(true);
     expect(league!.rules).toEqual({ predictionMode: "dual" });
+    // Sin p_header_word → conserva el branding por defecto.
+    expect(league!.header_word).toBe("PIJA");
 
     // El creador debe existir como miembro admin de esa liga.
     const { data: member, error: mErr } = await admin
@@ -116,6 +118,24 @@ describe("fn_create_league: creación atómica", () => {
     expect(league!.requires_payment).toBe(false);
     expect(league!.payment_amount).toBeNull();
     expect(league!.payment_instructions).toBeNull();
+  });
+
+  it("persiste la primera palabra del encabezado cuando se indica", async () => {
+    const user = await createAuthedUser();
+    const client = createAuthedClient(user.token);
+
+    const { data, error } = await client
+      .rpc("fn_create_league", {
+        p_name: "Liga Compadres",
+        p_invite_code: uniqueInvite(),
+        p_prediction_mode: "dual",
+        p_header_word: "Compadres",
+      })
+      .single();
+    const league = data as League | null;
+
+    expect(error).toBeNull();
+    expect(league!.header_word).toBe("Compadres");
   });
 
   it("bloquea al cliente anónimo (sin auth.uid())", async () => {
