@@ -33,7 +33,20 @@ import {
   type MatchStatus,
 } from "../src/utils/scoring";
 import { TOURNAMENT_PHASES_2026 } from "../src/config/tournamentPhases";
-import { normalizeTeamName, isPlaceholderTeam } from "./sync-matches";
+import {
+  zafronixResponseSchema,
+  tournamentTeamsSchema,
+  rosterPlayerSchema,
+  deriveMatchStatus,
+  normalizeStage,
+  extractGroupLabel,
+  resolveMatchNo,
+  normalizeTeamName,
+  isPlaceholderTeam,
+  type ZafronixMatch,
+  type ZafronixTeam,
+  type RosterPlayer,
+} from "../src/lib/zafronix/matches";
 
 // ── Cargar variables de entorno (solo relevante en ejecución local) ──
 config({ path: ".env.local" });
@@ -46,56 +59,7 @@ const ZAFRONIX_MATCHES_URL =
 const ZAFRONIX_TOURNAMENT_URL =
   "https://api.zafronix.com/fifa/worldcup/v1/tournaments/2026";
 
-// ── Zod Schemas ─────────────────────────────────────────────────────
 
-/**
- * Schema de un partido de la respuesta de la API de Zafronix, ajustado al
- * formato real de la API (junio 2026). Los campos opcionales capturan todos
- * los datos disponibles para inserción de partidos nuevos en restauración
- * completa sobre base de datos vacía.
- *
- * Campos anulables (null): homeTeam/awayTeam son null en eliminatorias cuando
- * los equipos aún no están definidos. homeScore/awayScore/result son null en
- * partidos no jugados. La API NO tiene campo "status": se deriva de result y
- * scores más abajo.
- */
-const zafronixMatchSchema = z.object({
-  id: z.string(),
-  matchNo: z.number().int().positive(),
-  date: z.string().nullable().optional(),
-  kickoff: z.string().nullable().optional(),
-  kickoffUtc: z.string().nullable().optional(),
-  timezone: z.string().nullable().optional(),
-  stage: z.string().nullable().optional(),
-  stageNormalized: z.string().nullable().optional(),
-  homeTeam: z.string().nullable(),
-  awayTeam: z.string().nullable(),
-  homeRef: z.string().nullable().optional(),
-  awayRef: z.string().nullable().optional(),
-  homeScore: z.number().int().nonnegative().nullable(),
-  awayScore: z.number().int().nonnegative().nullable(),
-  result: z.string().nullable().optional(),
-  extraTime: z.boolean().nullable().optional(),
-  penalties: z.string().nullable().optional(),
-  stadium: z.string().nullable().optional(),
-  stadiumId: z.string().nullable().optional(),
-  city: z.string().nullable().optional(),
-  country: z.string().nullable().optional(),
-  attendance: z.number().int().nullable().optional(),
-  referee: z.string().nullable().optional(),
-  weather: z.string().nullable().optional(),
-});
-
-type ZafronixMatch = z.infer<typeof zafronixMatchSchema>;
-
-/**
- * La API retorna un objeto envoltorio con metadatos y la propiedad "data".
- */
-const zafronixResponseSchema = z.object({
-  year: z.number().int().optional(),
-  count: z.number().int().optional(),
-  data: z.array(zafronixMatchSchema),
-});
 
 // ── Tipos auxiliares ────────────────────────────────────────────────
 
@@ -111,12 +75,7 @@ export interface RestoreSummary {
   errors: number;
 }
 
-/** Datos de un equipo extraídos de GET /tournaments/2026. */
-interface ZafronixTeam {
-  name: string;
-  iso: string | null;
-  code: string;
-}
+
 
 /** Resumen del sembrado de premios. */
 export interface AwardSeedSummary {
@@ -142,154 +101,7 @@ interface LocalMatch {
 
 // ── Helpers de Normalización y Mapeo ─────────────────────────────────
 
-/**
- * Deriva el status del partido a partir de los campos disponibles en la API.
- * La API de Zafronix (junio 2026) NO incluye campo "status" explícito, pero
- * provee "result" y scores para inferirlo.
- *
- * DB acepta: 'scheduled' | 'live' | 'finished' | 'suspended' | 'canceled'.
- */
-export function deriveMatchStatus(apiMatch: ZafronixMatch): MatchStatus {
-  const result = apiMatch.result?.toLowerCase();
 
-  if (result === "home" || result === "away" || result === "draw") {
-    return "finished";
-  }
-
-  if (
-    result === "cancelled" ||
-    result === "canceled" ||
-    result === "abandoned"
-  ) {
-    return "canceled";
-  }
-
-  if (result === "postponed" || result === "suspended") {
-    return "suspended";
-  }
-
-  // Si hay scores pero no result, podría ser live o un estado raro.
-  // La API free-tier actual no parece reportar partidos en vivo;
-  // tratamos como scheduled para que el trigger de la DB actúe si cambia.
-  if (
-    (apiMatch.homeScore !== null && apiMatch.homeScore !== undefined) ||
-    (apiMatch.awayScore !== null && apiMatch.awayScore !== undefined)
-  ) {
-    return "live";
-  }
-
-  return "scheduled";
-}
-
-/**
- * Mapea el status de la API de Zafronix a los status válidos de nuestra DB.
- * La DB acepta: 'scheduled' | 'live' | 'finished' | 'suspended' | 'canceled'.
- *
- * Función conservada para compatibilidad con sync-matches.ts anterior y tests;
- * para el nuevo formato de API sin campo "status", usar deriveMatchStatus().
- */
-export function mapApiStatus(apiStatus: string): MatchStatus {
-  switch (apiStatus.toLowerCase()) {
-    case "finished":
-    case "completed":
-      return "finished";
-    case "live":
-    case "in_progress":
-    case "in-progress":
-      return "live";
-    case "suspended":
-    case "postponed":
-      return "suspended";
-    case "canceled":
-    case "cancelled":
-    case "abandoned":
-      return "canceled";
-    case "scheduled":
-      return "scheduled";
-    default:
-      console.warn(
-        `⚠️ Estado desconocido de la API: "${apiStatus}". Mapeando por defecto a "scheduled".`,
-      );
-      return "scheduled";
-  }
-}
-
-/**
- * Normaliza los nombres de las fases (stage) al vocabulario interno de la base de datos:
- * 'group', 'round-32', 'round-16', 'quarter', 'semi', 'third-place', 'final'.
- *
- * La API de Zafronix (junio 2026) usa valores como: group_a, group_b, ..., r32, r16, qf, sf, f, 3p.
- */
-export function normalizeStage(
-  stage: string | null | undefined,
-): string | null {
-  if (!stage) return null;
-  const s = stage.trim().toLowerCase();
-
-  // Fase de grupos: "group_a", "group_b", etc. → "group"
-  if (s.startsWith("group")) return "group";
-
-  switch (s) {
-    case "round-32":
-    case "round_of_32":
-    case "round-of-32":
-    case "r32":
-    case "last-32":
-      return "round-32";
-    case "round-16":
-    case "round_of_16":
-    case "round-of-16":
-    case "r16":
-    case "last-16":
-      return "round-16";
-    case "quarter-finals":
-    case "quarter-final":
-    case "quarterfinals":
-    case "quarterfinal":
-    case "quarter":
-    case "quarters":
-    case "qf":
-      return "quarter";
-    case "semi-finals":
-    case "semi-final":
-    case "semifinals":
-    case "semifinal":
-    case "semi":
-    case "semis":
-    case "sf":
-      return "semi";
-    case "third-place":
-    case "third_place":
-    case "thirdplace":
-    case "playoff-for-third-place":
-    case "3rd-place":
-    case "3p":
-      return "third-place";
-    case "final":
-    case "finals":
-    case "f":
-      return "final";
-    default:
-      return stage;
-  }
-}
-
-/**
- * Extrae el label del grupo a partir del campo stage de la API.
- * Ej: "group_a" → "A", "group_b" → "B". Retorna null si no es fase de grupos.
- */
-export function extractGroupLabel(
-  stage: string | null | undefined,
-): string | null {
-  if (!stage) return null;
-  const s = stage.trim().toLowerCase();
-  if (!s.startsWith("group")) return null;
-  const parts = s.split("_");
-  if (parts.length > 1 && parts[1]) return parts[1].toUpperCase();
-  // "groupa", "groupb"
-  const match = s.match(/group\s*([a-l])/i);
-  return match?.[1]?.toUpperCase() ?? null;
-}
 
 /**
  * Realiza una petición externa con reintentos y tiempo límite de respuesta (timeout).
@@ -360,8 +172,8 @@ function resolveLocalMatch(
   let local = localByRef.get(apiMatch.id);
   if (local) return local;
 
-  const matchNum = apiMatch.matchNo;
-  if (!Number.isFinite(matchNum)) return undefined;
+  const matchNum = resolveMatchNo(apiMatch);
+  if (matchNum === null) return undefined;
 
   if (matchNum >= 73) {
     local = localKnockoutBySlot.get(matchNum);
@@ -387,7 +199,8 @@ function buildInsertRow(
     return null;
   }
   const mappedStatus = deriveMatchStatus(apiMatch);
-  const isKnockout = apiMatch.matchNo >= 73;
+  const matchNum = resolveMatchNo(apiMatch);
+  const isKnockout = matchNum !== null && matchNum >= 73;
 
   // En eliminatorias evitamos persistir placeholders como nombres reales.
   const homeTeam = apiMatch.homeTeam ?? "";
@@ -416,7 +229,7 @@ function buildInsertRow(
     matchday,
     stage: normalizeStage(apiMatch.stage),
     group_label: isKnockout ? null : extractGroupLabel(apiMatch.stage),
-    bracket_slot: isKnockout ? apiMatch.matchNo : null,
+    bracket_slot: isKnockout ? matchNum : null,
     venue: apiMatch.stadium ?? null,
   };
 }
@@ -514,7 +327,7 @@ function computeMatchdays(
 
   const groupMatches = new Map<string, ZafronixMatch[]>();
   for (const m of matches) {
-    if (m.matchNo >= 73) continue; // eliminatorias sin matchday
+    if ((resolveMatchNo(m) ?? 0) >= 73) continue; // eliminatorias sin matchday
     const group = extractGroupLabel(m.stage);
     if (!group) {
       map.set(m.id, null);
@@ -569,17 +382,7 @@ async function fetchTournamentTeams(
     return [];
   }
 
-  const parsed = z
-    .object({
-      teams: z.array(
-        z.object({
-          name: z.string(),
-          iso: z.string().nullable().optional(),
-          code: z.string(),
-        }),
-      ),
-    })
-    .safeParse(rawBody);
+  const parsed = tournamentTeamsSchema.safeParse(rawBody);
 
   if (!parsed.success) {
     console.warn("⚠️ Formato inesperado en /tournaments/2026.");
@@ -593,14 +396,7 @@ async function fetchTournamentTeams(
   }));
 }
 
-/** Schema mínimo de un jugador del roster para awards. */
-const rosterPlayerSchema = z.object({
-  name: z.string(),
-  position: z.string().nullable().optional(),
-  jersey: z.number().int().positive().nullable().optional(),
-});
 
-type RosterPlayer = z.infer<typeof rosterPlayerSchema>;
 
 /**
  * Obtiene el plantel completo de un equipo desde

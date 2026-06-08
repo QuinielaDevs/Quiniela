@@ -1,9 +1,14 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createAnonClient,
   createAuthedClient,
   createServiceRoleClient,
 } from "./setup";
+import {
+  seedZafronixFixture,
+  cleanupZafronixFixture,
+  ZAFRONIX_FIXTURE_PREFIX,
+} from "./helpers/zafronix-fixture-seed";
 import { calculateTournamentAdvancement } from "@/utils/tournament-advancement";
 import type { TournamentMatch } from "@/utils/tournament-advancement";
 
@@ -92,7 +97,7 @@ async function resetSeedKnockout(): Promise<void> {
     })
     .gte("bracket_slot", 73)
     .lte("bracket_slot", 104)
-    .like("external_ref", "wc2026:ko:%");
+    .like("external_ref", `${ZAFRONIX_FIXTURE_PREFIX}%`);
 }
 
 async function resetSeedGroups(): Promise<void> {
@@ -103,8 +108,15 @@ async function resetSeedGroups(): Promise<void> {
       home_score: null,
       away_score: null,
     })
-    .like("external_ref", "wc2026:grp:%");
+    .is("bracket_slot", null)
+    .like("external_ref", `${ZAFRONIX_FIXTURE_PREFIX}%`);
 }
+
+beforeAll(async () => {
+  // Sembrar 104 partidos con la forma esperada por el resto del sistema
+  // (ver tests/integration/helpers/zafronix-fixture-seed.ts).
+  await seedZafronixFixture(admin);
+});
 
 afterAll(async () => {
   await resetSeedKnockout();
@@ -120,6 +132,8 @@ afterAll(async () => {
     const id = createdUserIds.pop()!;
     await admin.auth.admin.deleteUser(id);
   }
+  // Limpieza final del fixture completo.
+  await cleanupZafronixFixture(admin);
 });
 
 describe("fn_admin_apply_knockout_advancement", () => {
@@ -275,7 +289,8 @@ describe("fn_admin_apply_knockout_advancement", () => {
     const { data: before, error: beforeError } = await admin
       .from("matches")
       .select("id, home_team, away_team, home_team_code, away_team_code")
-      .like("external_ref", "wc2026:grp:%")
+      .is("bracket_slot", null)
+      .like("external_ref", `${ZAFRONIX_FIXTURE_PREFIX}%`)
       .limit(1)
       .single();
     expect(beforeError).toBeNull();
@@ -360,7 +375,8 @@ describe("fn_admin_apply_knockout_advancement", () => {
     const { error: updateGroupsError } = await admin
       .from("matches")
       .update({ status: "finished", home_score: 1, away_score: 0 })
-      .like("external_ref", "wc2026:grp:%");
+      .is("bracket_slot", null)
+      .like("external_ref", `${ZAFRONIX_FIXTURE_PREFIX}%`);
     expect(updateGroupsError).toBeNull();
 
     const { data: matches, error: matchesError } = await admin
@@ -368,7 +384,7 @@ describe("fn_admin_apply_knockout_advancement", () => {
       .select(
         "id, external_ref, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time, status, matchday, stage, group_label, bracket_slot, home_source, away_source, venue",
       )
-      .like("external_ref", "wc2026:%")
+      .like("external_ref", `${ZAFRONIX_FIXTURE_PREFIX}%`)
       .order("match_time", { ascending: true });
     expect(matchesError).toBeNull();
 
@@ -395,7 +411,7 @@ describe("fn_admin_apply_knockout_advancement", () => {
     const { data: slot73, error: slotError } = await admin
       .from("matches")
       .select("home_team_code, away_team_code")
-      .eq("external_ref", "wc2026:ko:73")
+      .eq("bracket_slot", 73)
       .single();
     expect(slotError).toBeNull();
     expect(slot73!.home_team_code).toBeTruthy();

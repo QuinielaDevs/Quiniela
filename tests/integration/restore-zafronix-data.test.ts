@@ -122,22 +122,46 @@ afterAll(async () => {
 
 // ── Helpers de mocking ──────────────────────────────────────────────
 
-/** Mock de fetch que responde 200 OK con el envoltorio { year, count, data }. */
+/** Mock de fetch que responde 200 OK con el envoltorio { year, count, data } para
+ *  /matches y un teams array vacío para /tournaments (ambos endpoints son llamados
+ *  por restoreZafronixData). */
 function createMock200(matches: object[]): typeof globalThis.fetch {
-  return vi.fn().mockResolvedValue(
-    new Response(
-      JSON.stringify({ year: 2026, count: matches.length, data: matches }),
-      {
-        status: 200,
-        statusText: "OK",
-        headers: new Headers({ "Content-Type": "application/json" }),
-      },
-    ),
-  );
+  return vi.fn().mockImplementation((url: string | URL) => {
+    const urlStr = String(url);
+    if (urlStr.includes("tournaments")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ teams: [] }), {
+          status: 200,
+          headers: new Headers({ "Content-Type": "application/json" }),
+        }),
+      );
+    }
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({ year: 2026, count: matches.length, data: matches }),
+        {
+          status: 200,
+          statusText: "OK",
+          headers: new Headers({ "Content-Type": "application/json" }),
+        },
+      ),
+    );
+  });
 }
 
 function createMockError(status: number, statusText: string): typeof globalThis.fetch {
-  return vi.fn().mockResolvedValue(new Response("oops", { status, statusText }));
+  return vi.fn().mockImplementation((url: string | URL) => {
+    const urlStr = String(url);
+    if (urlStr.includes("tournaments")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ teams: [] }), {
+          status: 200,
+          headers: new Headers({ "Content-Type": "application/json" }),
+        }),
+      );
+    }
+    return Promise.resolve(new Response("oops", { status, statusText }));
+  });
 }
 
 // ── Tests ───────────────────────────────────────────────────────────
@@ -150,8 +174,9 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
       const mockFetch = createMock200([]);
       await restoreZafronixData(admin, TEST_API_KEY, mockFetch);
 
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [url, opts] = (mockFetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      // restoreZafronixData llama a fetch dos veces: /tournaments + /matches
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      const [url, opts] = (mockFetch as ReturnType<typeof vi.fn>).mock.calls[1] as [
         string,
         { headers: Record<string, string> },
       ];
@@ -180,28 +205,26 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
       const apiMatches = [
         {
           id: INSERT_REF_1,
+          matchNo: 1,
           homeTeam: "Testlandia",
           awayTeam: "Mockovia",
           homeScore: null,
           awayScore: null,
-          status: "scheduled",
-          stage: "group",
-          groupLabel: "A",
-          matchday: 1,
-          matchTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-          venue: "Estadio de Pruebas",
+          result: null,
+          stage: "group_a",
+          kickoffUtc: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          stadium: "Estadio de Pruebas",
         },
         {
           id: INSERT_REF_2,
+          matchNo: 2,
           homeTeam: "Vitestia",
           awayTeam: "Zafronixia",
           homeScore: 3,
           awayScore: 1,
-          status: "finished",
-          stage: "group",
-          groupLabel: "B",
-          matchday: 2,
-          matchTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          result: "3-1",
+          stage: "group_b",
+          kickoffUtc: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
         },
       ];
 
@@ -242,12 +265,13 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
       const apiMatches = [
         {
           id: INSERT_REF_1,
+          matchNo: 1,
           homeTeam: "Testlandia",
           awayTeam: "Mockovia",
           homeScore: null,
           awayScore: null,
-          status: "scheduled",
-          matchTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          result: null,
+          kickoffUtc: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
         },
       ];
 
@@ -337,11 +361,13 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
       const apiMatches = [
         {
           id: UPDATE_REF,
+          matchNo: 50,
           homeTeam: "España",
           awayTeam: "Portugal",
           homeScore: 2,
           awayScore: 0,
-          status: "finished",
+          result: "2-0",
+          kickoffUtc: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         },
       ];
 
@@ -406,11 +432,12 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
       const apiMatches = [
         {
           id: UPDATE_REF,
+          matchNo: 50,
           homeTeam: "España",
           awayTeam: "Portugal",
           homeScore: 2,
           awayScore: 0,
-          status: "finished",
+          result: "2-0",
         },
       ];
 
@@ -437,11 +464,13 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
       const apiMatches = [
         {
           id: UPDATE_REF,
+          matchNo: 50,
           homeTeam: "España",
           awayTeam: "Portugal",
           homeScore: null,
           awayScore: null,
-          status: "scheduled",
+          result: null,
+          kickoffUtc: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         },
       ];
 
@@ -485,22 +514,45 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
     it("reconvierte y recalcula desafíos completados si cambia el marcador", async () => {
       // 1. Crear un partido de prueba para el desafío
       const CHALLENGE_MATCH_REF = "test-restore-chal-match";
-      const { data: match } = await admin
+      // Limpieza previa: borrar cualquier partido o desafío residual
+      // con este external_ref de corridas anteriores (la DB local puede
+      // tener datos del seed Zafronix o del SQL antiguo).
+      const { data: existing } = await admin
+        .from("matches")
+        .select("id")
+        .eq("external_ref", CHALLENGE_MATCH_REF);
+      if (existing && existing.length > 0) {
+        const ids = existing.map((m) => m.id);
+        await admin.from("challenge_participants").delete().in("challenge_id",
+          (await admin.from("challenges").select("id").in("match_id", ids)).data?.map((c) => c.id) ?? []);
+        await admin.from("challenges").delete().in("match_id", ids);
+        await admin.from("predictions").delete().in("match_id", ids);
+        await admin.from("matches").delete().in("id", ids);
+      }
+      const { data: match, error: insertError } = await admin
         .from("matches")
         .insert({
           external_ref: CHALLENGE_MATCH_REF,
           home_team: "Argentina",
           away_team: "Brasil",
+          home_team_code: "ARG",
+          away_team_code: "BRA",
           match_time: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
           status: "finished",
           home_score: 1,
           away_score: 0,
           matchday: 1,
           stage: "group",
+          group_label: "A",
         })
         .select("id")
         .single();
-      const chalMatchId = match!.id;
+      if (insertError || !match) {
+        throw new Error(
+          `No se pudo insertar el partido de prueba: ${insertError?.message ?? "single() devolvió null"}`,
+        );
+      }
+      const chalMatchId = match.id;
 
       // 2. Crear segundo usuario
       const userB = await createUser();
@@ -558,11 +610,13 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
       const apiMatches = [
         {
           id: CHALLENGE_MATCH_REF,
+          matchNo: 60,
           homeTeam: "Argentina",
           awayTeam: "Brasil",
           homeScore: 2,
           awayScore: 0,
-          status: "finished",
+          result: "2-0",
+          kickoffUtc: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         },
       ];
 
@@ -621,13 +675,24 @@ describe("restore-zafronix-data — Restauración completa (Story 8.3)", () => {
     });
 
     it("lanza error cuando el body no respeta el esquema esperado", async () => {
-      const mockFetch = vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ unexpected: true }), {
-          status: 200,
-          statusText: "OK",
-          headers: new Headers({ "Content-Type": "application/json" }),
-        }),
-      );
+      const mockFetch = vi.fn().mockImplementation((url: string | URL) => {
+        const urlStr = String(url);
+        if (urlStr.includes("tournaments")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ teams: [] }), {
+              status: 200,
+              headers: new Headers({ "Content-Type": "application/json" }),
+            }),
+          );
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ unexpected: true }), {
+            status: 200,
+            statusText: "OK",
+            headers: new Headers({ "Content-Type": "application/json" }),
+          }),
+        );
+      });
       await expect(
         restoreZafronixData(admin, TEST_API_KEY, mockFetch),
       ).rejects.toThrow(/validación/i);

@@ -35,22 +35,26 @@ const REQUEST_TIMEOUT_MS = 15000;
 
 /**
  * Forma de un partido del sandbox. Se asume el MISMO contrato que producción
- * (ver scripts/sync-matches.ts): ids con formato `${year}-${NNN}` (ej.
- * `9999-001` grupos, `9999-073` eliminatoria). Campos extra se ignoran.
+ * (ver src/lib/zafronix/matches.ts): ids con formato `${year}-${NNN}` (ej.
+ * `9999-001` grupos, `9999-073` eliminatoria). Campos extra se ignoran con
+ * `.passthrough()` para tolerar variabilidad del sandbox.
  */
 export const sandboxMatchSchema = z
   .object({
     id: z.string(),
+    matchNo: z.number().int().positive().optional(),
     // En el sandbox real los slots de eliminatoria sin resolver (final, 3er
     // puesto…) llegan con equipos en null y sin status → todo opcional/nullable.
     homeTeam: z.string().nullable().optional(),
     awayTeam: z.string().nullable().optional(),
     homeScore: z.number().int().nullable().optional(),
     awayScore: z.number().int().nullable().optional(),
+    result: z.string().nullable().optional(),
     status: z.string().nullable().optional(),
     stage: z.string().nullable().optional(),
     group: z.string().nullable().optional(),
     bracketSlot: z.number().int().nullable().optional(),
+    kickoffUtc: z.string().nullable().optional(),
   })
   .passthrough();
 

@@ -457,6 +457,76 @@ describe("MatchCard", () => {
     expect(savePrediction).toHaveBeenCalledTimes(1);
   });
 
+  it("actualiza el display al nuevo multiplier devuelto por el servidor tras guardar", async () => {
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z"));
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: { ...SAVED_PREDICTION, home_score_pred: 2, multiplier: 1.3 },
+      error: null,
+    });
+    renderMatchCard({
+      match: MATCH_JORNADA2,
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
+    });
+
+    expect(screen.getByText("2.5x")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(1500);
+    });
+    await flushPromises();
+
+    expect(screen.queryByText("2.5x")).toBeNull();
+    expect(screen.getByText("1.3x")).toBeInTheDocument();
+  });
+
+  it("nextMultiplier se actualiza en vivo al avanzar el tiempo (sin prediccion guardada)", async () => {
+    const matchTime = new Date("2026-09-15T20:00:00.000Z");
+    const startTime = new Date("2026-08-06T20:00:00.000Z");
+    vi.setSystemTime(startTime);
+    renderMatchCard({
+      match: { ...MATCH_JORNADA2, match_time: matchTime.toISOString() },
+      initialPrediction: null,
+    });
+
+    // 40 dias de antelacion → 2.5x
+    expect(screen.getByText("2.5x")).toBeInTheDocument();
+
+    // Adelantar el reloj para que el match quede a <7 dias (cruce de tier).
+    await act(async () => {
+      vi.setSystemTime(new Date("2026-09-10T20:00:00.000Z"));
+    });
+    // Disparar el setInterval(10s) que re-calcula now.
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    expect(screen.queryByText("2.5x")).toBeNull();
+    expect(screen.getByText("1.0x")).toBeInTheDocument();
+  });
+
+  it("el texto de la advertencia muestra el saved vs next multiplier correctos", async () => {
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z")); // next 1.3x
+    vi.mocked(savePrediction).mockResolvedValue({
+      success: true,
+      data: SAVED_PREDICTION,
+      error: null,
+    });
+    renderMatchCard({
+      match: MATCH_JORNADA2,
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
+    });
+
+    fireEvent.click(screen.getByLabelText("Incrementar goles de Argentina"));
+
+    expect(
+      screen.getByText(/Tu multiplicador bajara de 2\.5x a 1\.3x/),
+    ).toBeInTheDocument();
+  });
+
   it("una edicion que degrada abre advertencia; cancelar no guarda", async () => {
     vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z")); // next 1.3x < 2.5x
     vi.mocked(savePrediction).mockResolvedValue({

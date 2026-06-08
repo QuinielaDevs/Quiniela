@@ -342,7 +342,9 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
           awayTeam: "Portugal",
           homeScore: 2,
           awayScore: 1,
-          status: "finished",
+          result: "2-1",
+          matchNo: 1,
+          kickoffUtc: "2026-06-11T19:00:00.000Z",
         },
         {
           id: SYNC_UNCHANGED_REF,
@@ -350,7 +352,9 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
           awayTeam: "Alemania",
           homeScore: null,
           awayScore: null,
-          status: "scheduled", // sin cambios
+          result: null,
+          matchNo: 2,
+          kickoffUtc: "2026-06-12T19:00:00.000Z",
         },
       ];
       const mockFetch = createMock200(apiMatches);
@@ -388,8 +392,9 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
           awayTeam: "Argentina",
           homeScore: 2,
           awayScore: 3,
-          status: "finished",
-          bracketSlot: 998,
+          result: "2-3",
+          matchNo: 998,
+          kickoffUtc: "2026-07-10T20:00:00.000Z",
         },
       ];
       const mockFetch = createMock200(apiMatches);
@@ -418,7 +423,9 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
           awayTeam: "Portugal",
           homeScore: 2,
           awayScore: 1,
-          status: "finished",
+          result: "2-1",
+          matchNo: 1,
+          kickoffUtc: "2026-06-11T19:00:00.000Z",
         },
       ];
       const mockFetch = createMock200(apiMatches, TEST_ETAG_NEW);
@@ -430,7 +437,8 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
     });
 
     it("no actualiza partidos cuando los datos son idénticos", async () => {
-      // Los datos de la API coinciden exactamente con la DB local
+      // Los datos de la API coinciden exactamente con la DB local.
+      // Con scores presentes y sin result, deriveMatchStatus devuelve "live"
       const apiMatches = [
         {
           id: SYNC_GROUP_REF,
@@ -438,7 +446,9 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
           awayTeam: "Portugal",
           homeScore: 1,
           awayScore: 0,
-          status: "live",
+          result: null,
+          matchNo: 1,
+          kickoffUtc: "2026-06-11T19:00:00.000Z",
         },
       ];
       const mockFetch = createMock200(apiMatches);
@@ -457,7 +467,9 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
           awayTeam: "TeamB",
           homeScore: 1,
           awayScore: 0,
-          status: "finished",
+          result: "1-0",
+          matchNo: 999,
+          kickoffUtc: "2026-06-99T19:00:00.000Z",
         },
       ];
       const mockFetch = createMock200(apiMatches);

@@ -80,6 +80,16 @@ let user: { id: string; token: string };
 let leagueId: string;
 
 beforeAll(async () => {
+  // Limpiar predicciones residuales de corridas anteriores para que
+  // `fn_ensure_default_predictions` no se active sobre partidos de seeds
+  // viejos (que ya no se generan desde que se deshabilitó el seed SQL —
+  // ver docs/zafronix-api-unification.md §5).
+  const { data: allMatches } = await admin.from("matches").select("id");
+  if (allMatches && allMatches.length > 0) {
+    const ids = allMatches.map((m) => m.id);
+    await admin.from("predictions").delete().in("match_id", ids);
+  }
+
   user = await createAuthedUser();
 
   const { data: league, error: leagueError } = await admin

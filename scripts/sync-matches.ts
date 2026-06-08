@@ -15,6 +15,14 @@ import { config } from "dotenv";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import {
+  zafronixResponseSchema,
+  deriveMatchStatus,
+  resolveMatchNo,
+  normalizeTeamName,
+  isPlaceholderTeam,
+} from "../src/lib/zafronix/matches";
+
 // ── Cargar variables de entorno (solo relevante en ejecución local) ──
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -25,116 +33,7 @@ const ZAFRONIX_API_URL =
   "https://api.zafronix.com/fifa/worldcup/v1/matches?year=2026";
 const ETAG_CONFIG_KEY = "zafronix_matches_etag";
 
-// ── Zod Schemas ─────────────────────────────────────────────────────
 
-/**
- * Schema para un partido individual de la respuesta de la API de Zafronix.
- */
-const zafronixMatchSchema = z.object({
-  id: z.string(),
-  homeTeam: z.string(),
-  awayTeam: z.string(),
-  homeScore: z.number().int().nonnegative().nullable(),
-  awayScore: z.number().int().nonnegative().nullable(),
-  status: z.string(),
-  stage: z.string().optional(),
-  bracketSlot: z.number().int().nullable().optional(),
-});
-
-/**
- * La API retorna un objeto envoltorio con metadatos y la propiedad "data" conteniendo el array de partidos.
- */
-const zafronixResponseSchema = z.object({
-  year: z.number().int().optional(),
-  count: z.number().int().optional(),
-  data: z.array(zafronixMatchSchema),
-});
-
-// ── Helpers de Normalización y Mapeo ─────────────────────────────────
-
-/**
- * Normaliza nombres de equipos para solucionar discrepancias entre la API y el seed local.
- */
-export function normalizeTeamName(name: string): string {
-  const norm = name.trim().toLowerCase();
-  switch (norm) {
-    case "usa":
-    case "united states":
-      return "United States";
-    case "south korea":
-    case "korea republic":
-      return "Korea Republic";
-    case "czech republic":
-    case "czechia":
-      return "Czechia";
-    case "turkey":
-    case "türkiye":
-      return "Türkiye";
-    case "ivory coast":
-    case "côte d'ivoire":
-    case "cote d'ivoire":
-    case "cote d''ivoire":
-      return "Cote d'Ivoire";
-    case "iran":
-    case "ir iran":
-      return "IR Iran";
-    case "cape verde":
-    case "cabo verde":
-      return "Cabo Verde";
-    case "dr congo":
-    case "congo dr":
-      return "Congo DR";
-    case "bosnia and herzegovina":
-    case "bosnia & herzegovina":
-      return "Bosnia & Herzegovina";
-    default:
-      return name;
-  }
-}
-
-/**
- * Determina si el nombre de equipo provisto es un marcador de posición (placeholder) del bracket.
- */
-export function isPlaceholderTeam(name: string): boolean {
-  const norm = name.trim().toUpperCase();
-  if (norm === "TBD" || norm === "POR DEFINIR" || norm === "" || norm === "POR DEFINIR EQUIPO") {
-    return true;
-  }
-  // Coincide con patrones típicos como 1A, 2B, W73, L102, 3ABCDF, 3ABC, etc.
-  if (/^[123][A-L]$/.test(norm)) return true;
-  if (/^[WL]\d{2,3}$/.test(norm)) return true;
-  if (/^3[A-L]{3,6}$/.test(norm)) return true;
-  return false;
-}
-
-/**
- * Mapea el status de la API de Zafronix a los status válidos de nuestra DB.
- * La DB acepta: 'scheduled' | 'live' | 'finished' | 'suspended' | 'canceled'.
- */
-function mapApiStatus(
-  apiStatus: string,
-): "scheduled" | "live" | "finished" | "suspended" | "canceled" {
-  switch (apiStatus.toLowerCase()) {
-    case "finished":
-    case "completed":
-      return "finished";
-    case "live":
-    case "in_progress":
-    case "in-progress":
-      return "live";
-    case "suspended":
-    case "postponed":
-      return "suspended";
-    case "canceled":
-    case "cancelled":
-    case "abandoned":
-      return "canceled";
-    case "scheduled":
-    default:
-      console.warn(`⚠️ Estado desconocido de la API: "${apiStatus}". Mapeando por defecto a "scheduled".`);
-      return "scheduled";
-  }
-}
 
 /**
  * Realiza una petición externa con reintentos y tiempo límite de respuesta (timeout).
@@ -321,10 +220,9 @@ export async function syncMatches(
     let local = localByRef.get(apiMatch.id);
 
     if (!local) {
-      const parts = apiMatch.id.split("-");
-      const matchNum = parts.length > 1 && parts[1] ? parseInt(parts[1], 10) : NaN;
+      const matchNum = resolveMatchNo(apiMatch);
 
-      if (!isNaN(matchNum)) {
+      if (matchNum !== null) {
         if (matchNum >= 73) {
           local = localKnockoutBySlot.get(matchNum);
         } else if (apiMatch.homeTeam && apiMatch.awayTeam) {
@@ -339,7 +237,7 @@ export async function syncMatches(
       continue;
     }
 
-    const mappedStatus = mapApiStatus(apiMatch.status);
+    const mappedStatus = deriveMatchStatus(apiMatch);
 
     // Detectar si hay cambios relevantes
     const scoreChanged =
@@ -350,6 +248,9 @@ export async function syncMatches(
     // Solo actualizar nombres de equipos en eliminatoria si recibimos equipos reales (no placeholders)
     const canUpdateTeams =
       local.bracket_slot !== null &&
+      local.bracket_slot !== undefined &&
+      apiMatch.homeTeam !== null &&
+      apiMatch.awayTeam !== null &&
       !isPlaceholderTeam(apiMatch.homeTeam) &&
       !isPlaceholderTeam(apiMatch.awayTeam);
 

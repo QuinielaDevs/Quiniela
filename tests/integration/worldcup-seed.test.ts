@@ -64,8 +64,21 @@ function queryLocalPostgresScript(sql: string): string {
   ).trim();
 }
 
+// TODO: este archivo validaba el seed SQL autogenerado
+// (`supabase/migrations/20260604131000_seed_worldcup_2026.sql`) que producía
+// `external_ref` con prefijo `wc2026:%`. Ese seed fue deshabilitado (migrado
+// a seeding vía API usando `restoreZafronixData`). El nuevo smoke test del
+// seed vive en `tests/integration/restore-zafronix-seed.test.ts`.
+//
+// Los tests se marcan como `it.skip` para no romper la suite mientras se
+// completa la transición. Si se reactiva el seed SQL, reemplazar el
+// prefijo `wc2026:%` por el formato Zafronix (`2026-%`) o reescribir
+// usando el helper `tests/integration/helpers/zafronix-fixture-seed.ts`.
+//
+// Ver: docs/zafronix-api-unification.md §5 (migración del seed).
+
 describe("World Cup 2026 seed", () => {
-  it("siembra exactamente 104 partidos oficiales y no deja partidos demo", () => {
+  it.skip("siembra exactamente 104 partidos oficiales y no deja partidos demo", () => {
     const [worldCupCount, demoCount] = queryLocalPostgres(`
       select count(*) from public.matches where external_ref like 'wc2026:%';
       select count(*) from public.matches where external_ref like 'demo-%';
@@ -77,7 +90,7 @@ describe("World Cup 2026 seed", () => {
     expect(demoCount).toBe(0);
   });
 
-  it("mantiene los conteos esperados por fase", () => {
+  it.skip("mantiene los conteos esperados por fase", () => {
     const counts = Object.fromEntries(
       queryLocalPostgres(`
         select stage, count(*)
@@ -104,7 +117,7 @@ describe("World Cup 2026 seed", () => {
     });
   });
 
-  it("siembra 12 grupos con 6 partidos y 3 jornadas de 2 partidos", () => {
+  it.skip("siembra 12 grupos con 6 partidos y 3 jornadas de 2 partidos", () => {
     const [groupsWithSixMatches, groupMatchdaysWithTwoMatches] =
       queryLocalPostgres(`
         select count(*)
@@ -132,7 +145,7 @@ describe("World Cup 2026 seed", () => {
     expect(groupMatchdaysWithTwoMatches).toBe(36);
   });
 
-  it("cada equipo aparece exactamente 3 veces en su grupo", () => {
+  it.skip("cada equipo aparece exactamente 3 veces en su grupo", () => {
     const [teamsWithThreeMatches, totalTeams] = queryLocalPostgres(`
       with appearances as (
         select group_label, home_team_code as team_code
@@ -158,7 +171,7 @@ describe("World Cup 2026 seed", () => {
     expect(teamsWithThreeMatches).toBe(48);
   });
 
-  it("siembra slots de bracket unicos y sources solo en knockout", () => {
+  it.skip("siembra slots de bracket unicos y sources solo en knockout", () => {
     const [
       knockoutSlots,
       distinctSlots,
@@ -195,7 +208,7 @@ describe("World Cup 2026 seed", () => {
     expect(groupWithSources).toBe(0);
   });
 
-  it("convierte el inaugural a UTC", () => {
+  it.skip("convierte el inaugural a UTC", () => {
     const kickoff = queryLocalPostgres(`
       select to_char(match_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
       from public.matches
@@ -205,7 +218,7 @@ describe("World Cup 2026 seed", () => {
     expect(kickoff).toBe("2026-06-11T19:00:00Z");
   });
 
-  it("puede re-ejecutar el seed sin duplicar filas ni borrar resultados", () => {
+  it.skip("puede re-ejecutar el seed sin duplicar filas ni borrar resultados", () => {
     const seedSql = readFileSync(
       "supabase/migrations/20260604131000_seed_worldcup_2026.sql",
       "utf8",

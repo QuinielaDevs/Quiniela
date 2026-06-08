@@ -34,7 +34,10 @@ create policy "tournament_phases_select_authenticated"
   to authenticated
   using (true);
 
--- Seeding.
+-- Seeding (TEMPORARILY DISABLED).
+do $$
+begin
+  if false then
 insert into public.tournament_phases
   (phase_code, reward_points, starts_at,                ends_at,                  edits_locked, label,                                          sort_order)
 values
@@ -42,6 +45,9 @@ values
   ('B', 25, '2026-06-11T18:00:00Z',   '2026-06-28T16:00:00Z', false, 'Group stage',                                     1),
   ('C', 10, '2026-06-28T16:00:00Z',   '2026-07-14T18:00:00Z', false, 'Round of 32 + Round of 16 + Quarterfinals',       2),
   ('D', 0,  '2026-07-14T18:00:00Z',   null,                   true,  'Semifinals onward',                               3);
+  end if;
+end;
+$$;
 
 -- Agregar is_winner a award_candidates.
 alter table public.award_candidates

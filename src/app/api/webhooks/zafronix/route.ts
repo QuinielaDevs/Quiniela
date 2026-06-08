@@ -10,6 +10,7 @@ import {
   matchPostponedPayload,
   ZAFRONIX_HEADERS,
 } from "@/lib/zafronix/contract";
+import { normalizeTeamName, isPlaceholderTeam } from "@/lib/zafronix/matches";
 
 // Ver especificación de contrato y runbook de drift en docs/zafronix-webhook-contract.md
 
@@ -29,59 +30,6 @@ function mapPostponedStatus(
     default:
       return "suspended";
   }
-}
-
-/**
- * Normaliza nombres de equipos para solucionar discrepancias entre la API y el seed local.
- */
-function normalizeTeamName(name: string): string {
-  const norm = name.trim().toLowerCase();
-  switch (norm) {
-    case "usa":
-    case "united states":
-      return "United States";
-    case "south korea":
-    case "korea republic":
-      return "Korea Republic";
-    case "czech republic":
-    case "czechia":
-      return "Czechia";
-    case "turkey":
-    case "türkiye":
-      return "Türkiye";
-    case "ivory coast":
-    case "cote d'ivoire":
-    case "cote d''ivoire":
-      return "Cote d'Ivoire";
-    case "iran":
-    case "ir iran":
-      return "IR Iran";
-    case "cape verde":
-    case "cabo verde":
-      return "Cabo Verde";
-    case "dr congo":
-    case "congo dr":
-      return "Congo DR";
-    case "bosnia and herzegovina":
-    case "bosnia & herzegovina":
-      return "Bosnia & Herzegovina";
-    default:
-      return name;
-  }
-}
-
-/**
- * Determina si el nombre de equipo provisto es un marcador de posición (placeholder) del bracket.
- */
-function isPlaceholderTeam(name: string): boolean {
-  const norm = name.trim().toUpperCase();
-  if (norm === "TBD" || norm === "POR DEFINIR" || norm === "" || norm === "POR DEFINIR EQUIPO") {
-    return true;
-  }
-  if (/^[123][A-L]$/.test(norm)) return true;
-  if (/^[WL]\d{2,3}$/.test(norm)) return true;
-  if (/^3[A-L]{3,6}$/.test(norm)) return true;
-  return false;
 }
 
 /**
