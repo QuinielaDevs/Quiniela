@@ -33,6 +33,18 @@ revoke select on public.profiles from authenticated;
 grant select (id, display_name, avatar_url, created_at, active_league_id)
   on public.profiles to authenticated;
 
+-- 2b) Reaplicar el endurecimiento por COLUMNA de predictions (ver predictions_rls):
+--     `multiplier` y `points_earned` los calcula el servidor (RPC DEFINER / sync),
+--     el cliente NO debe escribirlos. El paso 1 concedió INSERT/UPDATE de tabla
+--     (todas las columnas), así que se revoca y se reconcede SOLO sobre las
+--     columnas que el cliente sí escribe directamente. Las funciones DEFINER y
+--     service_role ignoran estos grants y siguen escribiendo todo.
+revoke insert, update on public.predictions from authenticated;
+grant insert (league_id, match_id, user_id, home_score_pred, away_score_pred)
+  on public.predictions to authenticated;
+grant update (home_score_pred, away_score_pred)
+  on public.predictions to authenticated;
+
 -- 3) Mantener el comportamiento por defecto para tablas/secuencias FUTURAS, de
 --    modo que no vuelva a ocurrir que una tabla nueva nazca sin privilegios.
 alter default privileges in schema public
