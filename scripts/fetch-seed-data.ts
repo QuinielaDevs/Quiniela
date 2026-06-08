@@ -3,11 +3,8 @@ import { writeFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { z } from "zod";
 import {
   zafronixResponseSchema,
-  tournamentTeamsSchema,
-  rosterPlayerSchema,
   deriveMatchStatus,
   normalizeStage,
   extractGroupLabel,
@@ -26,7 +23,6 @@ import {
   fetchTournamentTeams,
   fetchTeamRoster,
   ZAFRONIX_MATCHES_URL,
-  ZAFRONIX_TOURNAMENT_URL,
 } from "./restore-zafronix-data";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
