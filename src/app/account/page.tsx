@@ -19,6 +19,7 @@ import {
 } from "@/components/account/BadgeHistory";
 import { materializeCurrentMemberAwards } from "@/app/account/account-awards";
 import { createClient } from "@/utils/supabase/server";
+import { getActiveLeagueMembership } from "@/utils/active-league";
 import type { LeagueRole, PaymentStatus } from "@/types";
 
 type AccountProfile = {
@@ -70,7 +71,8 @@ export async function AccountBoard() {
   }
 
   const membershipRows = (memberships ?? []) as unknown as AccountMembershipRow[];
-  const leagueId = membershipRows[0]?.league_id;
+  const activeMembership = await getActiveLeagueMembership({ supabase, userId });
+  const leagueId = activeMembership?.leagueId ?? membershipRows[0]?.league_id;
   if (!leagueId) {
     return (
       <>

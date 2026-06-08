@@ -87,6 +87,15 @@ describe("fn_create_league: creación atómica", () => {
     expect(mErr).toBeNull();
     expect(member!.role).toBe("admin");
     expect(member!.payment_status).toBe("pending");
+
+    const { data: profile, error: profileErr } = await admin
+      .from("profiles")
+      .select("active_league_id")
+      .eq("id", user.id)
+      .single();
+
+    expect(profileErr).toBeNull();
+    expect(profile!.active_league_id).toBe(league!.id);
   });
 
   it("persiste null en los campos de pago cuando se omiten", async () => {

@@ -89,6 +89,16 @@ export const removeMemberSchema = z.object({
 export type RemoveMemberInput = z.input<typeof removeMemberSchema>;
 
 /**
+ * Entrada para cambiar la liga activa del usuario. La validación de pertenencia
+ * vive en `fn_set_active_league`; aquí solo validamos forma.
+ */
+export const setActiveLeagueSchema = z.object({
+  leagueId: z.string().uuid("Liga inválida."),
+});
+
+export type SetActiveLeagueInput = z.input<typeof setActiveLeagueSchema>;
+
+/**
  * Entrada de "abandonar liga" (auto-baja). Solo identifica la liga; el usuario
  * lo resuelve el servidor (auth.uid()) y las guardas viven en `fn_leave_league`.
  */

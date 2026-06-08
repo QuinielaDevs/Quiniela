@@ -10,11 +10,13 @@ import {
   leaveLeagueSchema,
   promoteMemberToAdminSchema,
   removeMemberSchema,
+  setActiveLeagueSchema,
   setMemberPaymentStatusSchema,
   type CreateLeagueInput,
   type LeaveLeagueInput,
   type PromoteMemberToAdminInput,
   type RemoveMemberInput,
+  type SetActiveLeagueInput,
   type SetMemberPaymentStatusInput,
 } from "@/app/actions/leagues.schema";
 import {
@@ -33,6 +35,8 @@ const MAX_INVITE_RETRIES = 5;
 /** Longitud aceptada para códigos manuales o compartidos por enlace. */
 const INVITE_CODE_MIN_LENGTH = 6;
 const INVITE_CODE_MAX_LENGTH = 32;
+const ACTIVE_LEAGUE_ERROR =
+  "No pudimos cambiar la liga activa. Intenta de nuevo.";
 
 function normalizeInviteCode(inviteCode: string): string | null {
   const normalized = inviteCode.trim().toUpperCase();
@@ -94,6 +98,7 @@ export async function createLeague(
         .single();
 
       if (!error) {
+        revalidateLeagueScopedPaths();
         return { success: true, data: league as League, error: null };
       }
 
@@ -156,6 +161,7 @@ export async function joinLeagueByInvite(
       };
     }
 
+    revalidateLeagueScopedPaths();
     return {
       success: true,
       data: data as LeagueMember,
@@ -186,6 +192,55 @@ function toAdminError(error: { code?: string | null; message?: string | null } |
   }
 
   return error.message ?? ADMIN_SAVE_ERROR;
+}
+
+function revalidateLeagueScopedPaths() {
+  revalidatePath("/account");
+  revalidatePath("/predictions");
+  revalidatePath("/standings");
+  revalidatePath("/standings/manage");
+  revalidatePath("/live");
+  revalidatePath("/duels");
+  revalidatePath("/awards");
+}
+
+/**
+ * Cambia la liga activa del usuario autenticado. La RPC valida membresía para
+ * evitar que un usuario apunte su perfil a una liga ajena.
+ */
+export async function setActiveLeague(
+  input: SetActiveLeagueInput,
+): Promise<ServerActionResult<null>> {
+  try {
+    const parsed = setActiveLeagueSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+      };
+    }
+
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("fn_set_active_league", {
+      p_league_id: parsed.data.leagueId,
+    });
+
+    if (error) {
+      console.error("Error al cambiar la liga activa:", error);
+      return {
+        success: false,
+        data: null,
+        error: error.message ?? ACTIVE_LEAGUE_ERROR,
+      };
+    }
+
+    revalidateLeagueScopedPaths();
+    return { success: true, data: null, error: null };
+  } catch (e) {
+    console.error("Excepción inesperada al cambiar la liga activa:", e);
+    return { success: false, data: null, error: ACTIVE_LEAGUE_ERROR };
+  }
 }
 
 /**
@@ -352,9 +407,7 @@ export async function leaveLeague(
       return { success: false, data: null, error: toLeaveLeagueError(error) };
     }
 
-    revalidatePath("/account");
-    revalidatePath("/standings");
-    revalidatePath("/predictions");
+    revalidateLeagueScopedPaths();
     return { success: true, data: null, error: null };
   } catch (e) {
     console.error("Excepción inesperada al abandonar la liga:", e);

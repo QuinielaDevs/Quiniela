@@ -86,6 +86,59 @@ describe("fn_join_league_by_invite", () => {
       role: "member",
       payment_status: "pending",
     });
+
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("active_league_id")
+      .eq("id", invited.id)
+      .single();
+
+    expect(profileError).toBeNull();
+    expect(profile!.active_league_id).toBe(league.id);
+  });
+
+  it("permite cambiar liga activa solo a ligas donde pertenece", async () => {
+    const owner = await createAuthedUser();
+    const invited = await createAuthedUser();
+    const outsider = await createAuthedUser();
+    const firstLeague = await createLeagueFixture(owner.id);
+    const secondLeague = await createLeagueFixture(owner.id);
+    const invitedClient = createAuthedClient(invited.token);
+    const outsiderClient = createAuthedClient(outsider.token);
+
+    const joinFirst = await invitedClient.rpc("fn_join_league_by_invite", {
+      p_invite_code: firstLeague.invite_code,
+    });
+    expect(joinFirst.error).toBeNull();
+
+    const joinSecond = await invitedClient.rpc("fn_join_league_by_invite", {
+      p_invite_code: secondLeague.invite_code,
+    });
+    expect(joinSecond.error).toBeNull();
+
+    const switchBack = await invitedClient.rpc("fn_set_active_league", {
+      p_league_id: firstLeague.id,
+    });
+    expect(switchBack.error).toBeNull();
+
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("active_league_id")
+      .eq("id", invited.id)
+      .single();
+    expect(profile!.active_league_id).toBe(firstLeague.id);
+
+    const outsiderSwitch = await outsiderClient.rpc("fn_set_active_league", {
+      p_league_id: firstLeague.id,
+    });
+    expect(outsiderSwitch.error).not.toBeNull();
+    expect(outsiderSwitch.error?.code).toBe("42501");
+
+    const directUpdate = await outsiderClient
+      .from("profiles")
+      .update({ active_league_id: firstLeague.id })
+      .eq("id", outsider.id);
+    expect(directUpdate.error).not.toBeNull();
   });
 
   it("es idempotente y no duplica membresías", async () => {

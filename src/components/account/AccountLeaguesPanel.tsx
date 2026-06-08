@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowRightLeft,
   CircleDollarSign,
   Crown,
   ListChecks,
@@ -10,7 +11,7 @@ import {
   Shield,
 } from "lucide-react";
 
-import { leaveLeague } from "@/app/actions/leagues.actions";
+import { leaveLeague, setActiveLeague } from "@/app/actions/leagues.actions";
 import { LeaveLeagueDialog } from "@/components/account/LeaveLeagueDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,10 @@ export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
   const [leavingLeague, setLeavingLeague] =
     useState<AccountLeagueMembershipView | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+  const [switchingLeagueId, setSwitchingLeagueId] = useState<string | null>(null);
   const [isLeaving, startLeaving] = useTransition();
+  const [isSwitching, startSwitching] = useTransition();
 
   function openLeaveDialog(league: AccountLeagueMembershipView) {
     setLeaveError(null);
@@ -95,6 +99,21 @@ export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
       }
       setLeavingLeague(null);
       router.refresh();
+    });
+  }
+
+  function switchLeague(league: AccountLeagueMembershipView) {
+    if (league.isCurrent || isSwitching) return;
+    setSwitchError(null);
+    setSwitchingLeagueId(league.leagueId);
+    startSwitching(async () => {
+      const result = await setActiveLeague({ leagueId: league.leagueId });
+      if (!result.success) {
+        setSwitchError(result.error ?? "No pudimos cambiar la liga activa.");
+        return;
+      }
+      router.refresh();
+      setSwitchingLeagueId(null);
     });
   }
 
@@ -232,8 +251,28 @@ export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
                       : "No pudimos copiar el enlace. Intenta de nuevo."}
                   </p>
                 )}
+              {switchError && switchingLeagueId === league.leagueId && (
+                <p className="mt-2 text-xs text-destructive" role="status">
+                  {switchError}
+                </p>
+              )}
 
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex flex-wrap justify-end gap-3">
+                {!league.isCurrent && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isSwitching}
+                    onClick={() => switchLeague(league)}
+                    aria-label={`Usar ${league.leagueName} como liga actual`}
+                  >
+                    <ArrowRightLeft className="size-4" aria-hidden="true" />
+                    {isSwitching && switchingLeagueId === league.leagueId
+                      ? "Cambiando"
+                      : "Usar esta liga"}
+                  </Button>
+                )}
                 <button
                   type="button"
                   onClick={() => openLeaveDialog(league)}

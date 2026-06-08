@@ -43,6 +43,8 @@ function tableBuilder(result: { data: unknown }) {
   for (const method of ["select", "eq", "order", "limit", "in"]) {
     builder[method] = () => builder;
   }
+  builder.single = () => Promise.resolve({ error: null, ...result });
+  builder.maybeSingle = () => Promise.resolve({ error: null, ...result });
   builder.then = (resolve: (value: { data: unknown; error: null }) => unknown) =>
     resolve({ error: null, ...result });
   return builder;

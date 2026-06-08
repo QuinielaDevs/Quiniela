@@ -6,6 +6,7 @@ import { DuelsDashboard, type Challenge } from "@/components/duels/DuelsDashboar
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { TopNav } from "@/components/layout/TopNav";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
+import { getActiveLeagueMembership } from "@/utils/active-league";
 
 export async function DuelsBoard() {
   const supabase = await createClient();
@@ -14,16 +15,8 @@ export async function DuelsBoard() {
   const userId = claimsData?.claims?.sub;
   if (!userId) redirect("/auth/login");
 
-  // Obtener la membresía de liga más reciente del usuario
-  const { data: memberships } = await supabase
-    .from("league_members")
-    .select("league_id, joined_at, wager_balance")
-    .eq("user_id", userId)
-    .order("joined_at", { ascending: false })
-    .limit(1);
-
-  const membership = memberships?.[0];
-  const leagueId = membership?.league_id;
+  const membership = await getActiveLeagueMembership({ supabase, userId });
+  const leagueId = membership?.leagueId;
 
   if (!leagueId) {
     return (
@@ -84,7 +77,7 @@ export async function DuelsBoard() {
   return (
     <DuelsDashboard
       leagueId={leagueId}
-      wagerBalance={Number(membership.wager_balance)}
+      wagerBalance={membership.wagerBalance}
       initialActiveChallenges={(challenges ?? []) as unknown as Challenge[]}
       matches={matches ?? []}
       members={cleanMembers}

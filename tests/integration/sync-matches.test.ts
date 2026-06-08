@@ -384,6 +384,53 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
       expect(unchangedMatch!.status).toBe("scheduled");
     });
 
+    it("acepta partidos sin status y equipos null para eliminatorias TBD", async () => {
+      const apiMatches = [
+        {
+          id: SYNC_GROUP_REF,
+          homeTeam: "España",
+          awayTeam: "Portugal",
+          homeScore: 2,
+          awayScore: 1,
+          // La API real puede omitir status; sin result explícito se deriva live.
+        },
+        {
+          id: SYNC_KNOCKOUT_REF,
+          homeTeam: null,
+          awayTeam: null,
+          homeScore: null,
+          awayScore: null,
+          bracketSlot: 998,
+          // Bracket TBD: no debe fallar validación ni sobreescribir equipos.
+        },
+      ];
+      const mockFetch = createMock200(apiMatches);
+
+      const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
+
+      expect(result).toEqual({ status: "updated", updated: 1 });
+
+      const { data: groupMatch } = await supabase
+        .from("matches")
+        .select("home_score, away_score, status")
+        .eq("id", groupMatchId)
+        .single();
+      expect(groupMatch!.home_score).toBe(2);
+      expect(groupMatch!.away_score).toBe(1);
+      expect(groupMatch!.status).toBe("live");
+
+      const { data: knockoutMatch } = await supabase
+        .from("matches")
+        .select("home_team, away_team, home_score, away_score, status")
+        .eq("id", knockoutMatchId)
+        .single();
+      expect(knockoutMatch!.home_team).toBe("Por definir");
+      expect(knockoutMatch!.away_team).toBe("Por definir");
+      expect(knockoutMatch!.home_score).toBeNull();
+      expect(knockoutMatch!.away_score).toBeNull();
+      expect(knockoutMatch!.status).toBe("scheduled");
+    });
+
     it("actualiza equipos en partidos de eliminatoria (bracket_slot != null)", async () => {
       const apiMatches = [
         {
