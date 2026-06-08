@@ -36,10 +36,26 @@ begin
     raise exception 'No autenticado' using errcode = '42501';
   end if;
 
+  if nullif(trim(coalesce(p_name, '')), '') is null then
+    raise exception 'El nombre de la liga es obligatorio.' using errcode = '22023';
+  end if;
+
+  if p_prediction_mode is null or p_prediction_mode not in ('dual', 'jornada', 'grupos') then
+    raise exception 'Modo de predicción inválido.' using errcode = '22023';
+  end if;
+
+  if coalesce(p_payment_amount, 0) < 0 then
+    raise exception 'El monto de pago no puede ser negativo.' using errcode = '22023';
+  end if;
+
+  if coalesce(p_requires_payment, false) and p_payment_amount is null then
+    raise exception 'Una liga con pago requerido necesita un monto.' using errcode = '22023';
+  end if;
+
   insert into public.leagues
     (name, created_by, invite_code, requires_payment, payment_amount, payment_instructions, header_word, rules)
   values
-    (p_name, v_uid, p_invite_code, coalesce(p_requires_payment, false),
+    (trim(p_name), v_uid, p_invite_code, coalesce(p_requires_payment, false),
      p_payment_amount, p_payment_instructions,
      trim(coalesce(nullif(trim(p_header_word), ''), 'PIJA')),
      jsonb_build_object('predictionMode', p_prediction_mode))
