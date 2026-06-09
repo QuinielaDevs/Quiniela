@@ -66,7 +66,9 @@ describe("/join/[invite_code]", () => {
     expect(screen.getByText("Únete a La Pija Quiniela")).toBeInTheDocument();
     expect(screen.getByText("Invitación de")).toBeInTheDocument();
     expect(screen.getByText("Cris")).toBeInTheDocument();
-    expect(screen.getByText(/Tarifa de inscripción: 10/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Tarifa de inscripción: \$10 USD/),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Continuar con Google" }),
     ).toBeInTheDocument();
