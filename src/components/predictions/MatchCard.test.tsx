@@ -857,7 +857,25 @@ describe("MatchCard", () => {
         initialPrediction: {
           homeScorePred: 1,
           awayScorePred: 0,
-          multiplier: 1,
+          multiplier: 1.25,
+        },
+      });
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveAttribute("data-variant", "result");
+      expect(badge).toHaveTextContent("Acierto parcial");
+      expect(badge).toHaveTextContent("+2.50 pts"); // 2 base × 1.25
+      expect(badge).toHaveTextContent("x1.25");
+    });
+
+    it("muestra multiplicador en acierto parcial incluso con multiplier 1.0", () => {
+      // Multiplier = 1.0x (caso base, J1). Aunque el multiplicador es 1.0,
+      // el badge lo muestra para que el usuario vea cómo se calculó.
+      renderFinishedMatchCard({
+        initialPrediction: {
+          homeScorePred: 1,
+          awayScorePred: 0,
+          multiplier: 1.0,
         },
       });
 
@@ -865,6 +883,7 @@ describe("MatchCard", () => {
       expect(badge).toHaveAttribute("data-variant", "result");
       expect(badge).toHaveTextContent("Acierto parcial");
       expect(badge).toHaveTextContent("+2.00 pts");
+      expect(badge).toHaveTextContent("x1.00");
     });
 
     it("muestra badge gris con 'Sin puntos' para fallo (0 pts)", () => {
@@ -976,7 +995,10 @@ describe("MatchCard", () => {
       expect(screen.getByText("MEX")).toBeInTheDocument();
     });
 
-    it("muestra el multiplicador guardado en la cabecera", () => {
+    it("NO muestra el multiplicador en la cabecera cuando está finalizada", () => {
+      // En cards finalizadas el multiplicador vive en el PointsBadge, no en
+      // la cabecera (donde solo está el formato "Resultado 3 - 0"). La
+      // cabecera solo muestra el multiplicador en partidos scheduled.
       renderFinishedMatchCard({
         initialPrediction: {
           homeScorePred: 1,
@@ -985,7 +1007,9 @@ describe("MatchCard", () => {
         },
       });
 
-      expect(screen.getByText("1.5x")).toBeInTheDocument();
+      expect(screen.queryByText("1.5x")).toBeNull();
+      // El PointsBadge sí lo muestra
+      expect(screen.getByTestId("points-badge")).toHaveTextContent("x1.50");
     });
   });
 
@@ -1093,6 +1117,51 @@ describe("MatchCard", () => {
       });
 
       expect(screen.queryByTestId("result-summary")).toBeNull();
+    });
+
+    it("NO muestra el multiplicador en la cabecera cuando status='live'", () => {
+      // J2 con multiplicador 1.25 para verificar que se omite en cabecera
+      // aunque existiría. En cards live el multiplicador no aplica (no se
+      // puede editar) y la cabecera debe centrarse en el estado del partido.
+      renderMatchCard({
+        match: { ...MATCH_JORNADA2, status: "live" },
+        initialPrediction: {
+          homeScorePred: 1,
+          awayScorePred: 0,
+          multiplier: 1.25,
+        },
+      });
+
+      expect(screen.getByText("En vivo")).toBeVisible();
+      expect(screen.queryByText("1.3x")).toBeNull();
+    });
+
+    it("NO muestra el multiplicador en la cabecera cuando status='suspended'", () => {
+      renderMatchCard({
+        match: { ...MATCH_JORNADA2, status: "suspended" },
+        initialPrediction: {
+          homeScorePred: 1,
+          awayScorePred: 0,
+          multiplier: 1.25,
+        },
+      });
+
+      expect(screen.getByText("Suspendido")).toBeVisible();
+      expect(screen.queryByText("1.3x")).toBeNull();
+    });
+
+    it("NO muestra el multiplicador en la cabecera cuando status='canceled'", () => {
+      renderMatchCard({
+        match: { ...MATCH_JORNADA2, status: "canceled" },
+        initialPrediction: {
+          homeScorePred: 1,
+          awayScorePred: 0,
+          multiplier: 1.25,
+        },
+      });
+
+      expect(screen.getByText("Cancelado")).toBeVisible();
+      expect(screen.queryByText("1.3x")).toBeNull();
     });
   });
 

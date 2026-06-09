@@ -123,7 +123,9 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
     await expect(badge).toBeVisible();
     await expect(badge).toHaveAttribute("data-variant", "result");
     await expect(badge).toContainText("Acierto parcial");
-    await expect(badge).toContainText("+2.00 pts");
+    // El seed usa multiplier=1.25 para este caso: 2 base × 1.25 = 2.50 pts
+    await expect(badge).toContainText("+2.50 pts");
+    await expect(badge).toContainText("x1.25");
   });
 
   test("badge verde (acierto exacto) en test_brasil 1-1 (predicción 1-1)", async () => {

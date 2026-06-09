@@ -632,7 +632,12 @@ export function MatchCard({
               <span suppressHydrationWarning>{formattedTime}</span>
             </>
           )}
-          {!isTbd && (
+          {/* Multiplicador en cabecera: solo se muestra en partidos scheduled
+              (donde el usuario aún puede editar su predicción). En live,
+              finished, suspended o canceled el multiplicador se muestra en el
+              PointsBadge (finished) o directamente no aplica, por lo que
+              ocultarlo evita redundancia visual y ruido. */}
+          {match.status === "scheduled" && !isTbd && (
             <>
               <span>·</span>
               <span className="font-semibold text-accent">
@@ -877,7 +882,10 @@ function PointsBadge({ variant, points, multiplier }: PointsBadgeProps) {
     },
   }[variant];
   const { Icon, label } = config;
-  const showMultiplier = variant !== "miss" && multiplier > MIN_MULTIPLIER;
+  // Muestra el multiplicador siempre que haya puntos (no miss), incluyendo
+  // cuando es 1.0x. Así el usuario ve cómo se calculó su puntaje en todos
+  // los casos: exacto, parcial y el baseline de 1.0x.
+  const showMultiplier = variant !== "miss";
 
   return (
     <div

@@ -126,7 +126,7 @@ export async function seedPredictionsE2E(userId: string): Promise<SeedResult> {
       matchday: 1,
       stage: "group",
       group_label: "A",
-      expectedPrediction: { home: 2, away: 0, multiplier: 1.0 }, // 2 pts (parcial)
+      expectedPrediction: { home: 2, away: 0, multiplier: 1.25 }, // 2*1.25 = 2.50 pts (parcial con multiplicador)
     },
     {
       id: "",
