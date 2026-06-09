@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/utils/supabase/server";
 import { LoginForm } from "@/components/login-form";
+import { LoginBackground } from "@/components/auth/LoginBackground";
 
 /**
  * Entrada de la app. Si hay sesión activa redirige al área autenticada; si no,
@@ -23,7 +24,8 @@ async function HomeEntry() {
 
 export default function Home() {
   return (
-    <main className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+    <main className="relative flex min-h-svh w-full items-center justify-center overflow-hidden p-6 md:p-10">
+      <LoginBackground />
       <div className="w-full max-w-sm">
         <Suspense
           fallback={<div className="h-12 animate-pulse rounded-sm bg-muted" />}
