@@ -58,8 +58,11 @@ export default {
         sm: "calc(var(--radius) - 4px)", /* ≈6px inputs/controles */
       },
       fontFamily: {
-        display: ["var(--font-outfit)"], /* Outfit: títulos/headers */
-        sans: ["var(--font-inter)"], /* Inter: cuerpo/labels/botones */
+        /* "Twemoji Country Flags" va primero pero solo aplica a codepoints de
+         * bandera (unicode-range en globals.css); el resto del texto cae a
+         * Outfit/Inter. Arregla las banderas que Windows no puede renderizar. */
+        display: ['"Twemoji Country Flags"', "var(--font-outfit)"], /* Outfit: títulos/headers */
+        sans: ['"Twemoji Country Flags"', "var(--font-inter)"], /* Inter: cuerpo/labels/botones */
       },
     },
   },

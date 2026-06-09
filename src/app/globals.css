@@ -3,6 +3,23 @@
 @tailwind utilities;
 
 /*
+ * Banderas de país: Windows NO incluye los glyphs de bandera emoji en sus
+ * fuentes (regional indicators / tag sequences), así que se ven como las 2
+ * letras del país o un cuadro. Cargamos el webfont "Twemoji Country Flags"
+ * (solo contiene glyphs de bandera) y lo ponemos primero en el stack (ver
+ * tailwind.config). El `unicode-range` lo limita a los codepoints de bandera:
+ *   - U+1F1E6–1F1FF: regional indicators (banderas de país)
+ *   - U+1F3F4 + U+E0020–E007F: tag sequences (Inglaterra/Escocia)
+ * de modo que NO afecta ni el render ni la carga del texto normal.
+ */
+@font-face {
+  font-family: "Twemoji Country Flags";
+  src: url("/fonts/TwemojiCountryFlags.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0020-E007F;
+}
+
+/*
  * Sistema de diseño "Championship Gold" (Story 1.3).
  * Dark-mode-first: DESIGN.md prohíbe el layout en light-mode, por eso la misma
  * paleta se aplica a :root y a .dark (ThemeProvider fuerza la clase `dark`).
