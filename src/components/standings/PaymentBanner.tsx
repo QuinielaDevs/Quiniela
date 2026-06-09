@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
+import { formatUsd } from "@/utils/format-currency";
+
 // Banner superior persistente para deudores (UX-DR-6 / EXPERIENCE payment-banner).
 // Visible solo al usuario con payment_status='pending' en una liga que requires_payment.
 // La decisión de visibilidad la toma la página (server); este componente solo
@@ -65,7 +67,7 @@ export function PaymentBanner({
               {" "}
               abona la inscripción de{" "}
               <span className="font-semibold text-foreground">
-                {amount.toFixed(2)}
+                {formatUsd(amount)}
               </span>
               .
             </>
