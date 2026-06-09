@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, MapPin } from "lucide-react";
+import { CheckCircle2, Lock, MapPin, Target, XCircle } from "lucide-react";
 
 import {
   revertPrediction,
@@ -15,7 +15,14 @@ import {
   UNDO_WINDOW_MS,
 } from "@/app/actions/predictions.constants";
 import { GoalPicker } from "@/components/predictions/GoalPicker";
-import { calculatePredictionMultiplier, MIN_MULTIPLIER } from "@/utils/scoring";
+import {
+  calculateBasePoints,
+  calculatePredictionMultiplier,
+  MIN_MULTIPLIER,
+  POINTS_EXACT,
+  POINTS_NONE,
+  POINTS_RESULT,
+} from "@/utils/scoring";
 import { flagForTeamCode } from "@/utils/team-flags";
 import { describeMatchSource, stageLabel } from "@/utils/tournament";
 import type { Match } from "@/types";
@@ -45,6 +52,8 @@ export type MatchCardMatch = Pick<
   | "bracket_slot"
   | "venue"
   | "group_label"
+  | "home_score"
+  | "away_score"
 >;
 
 export type PersistedPrediction = {
@@ -62,6 +71,10 @@ type MatchCardProps = {
   // Ordinal de la jornada en curso (la mayor cuyo primer partido ya empezó),
   // base de la distancia para el multiplicador predictivo en la UI.
   currentRoundOrdinal?: number;
+  // Puntos ya evaluados por el servidor (fn_resolve_challenges_on_match_status_change)
+  // para partidos finalizados. Se muestran en modo resultado cuando están disponibles;
+  // si no, se calculan en cliente vía calculateBasePoints().
+  pointsEarned?: number | null;
   // Notifica al tablero el último valor PERSISTIDO (guardado o deshecho) para que
   // al cambiar de pestaña y volver (remontaje) la tarjeta lo recupere y no muestre
   // el valor del cargado inicial.
@@ -79,8 +92,29 @@ const DEBOUNCE_MS = 1500;
 const OFFLINE_COPY = "Sin conexion - Pendiente";
 const LOCKED_COPY = "Pronostico cerrado";
 const TBD_COPY = "Pendiente de clasificacion";
+const FINISHED_COPY = "Finalizado";
+const LIVE_COPY = "En vivo";
+const SUSPENDED_COPY = "Suspendido";
+const CANCELED_COPY = "Cancelado";
 const KICKOFF_LOCK_MS = 0;
 const CLOSED_STATUSES = new Set(["live", "finished", "suspended", "canceled"]);
+
+// Etiqueta del candado a mostrar arriba a la derecha según el estado del
+// partido. Refleja la situación que mantiene al usuario sin poder editar.
+function closedStatusCopy(status: string): string {
+  switch (status) {
+    case "finished":
+      return FINISHED_COPY;
+    case "live":
+      return LIVE_COPY;
+    case "suspended":
+      return SUSPENDED_COPY;
+    case "canceled":
+      return CANCELED_COPY;
+    default:
+      return LOCKED_COPY;
+  }
+}
 
 function isBrowserOnline() {
   if (typeof navigator === "undefined") return true;
@@ -116,6 +150,7 @@ export function MatchCard({
   initialPrediction,
   disabled = false,
   currentRoundOrdinal = 0,
+  pointsEarned = null,
   onPersisted,
 }: MatchCardProps) {
   const hasInitialPrediction =
@@ -178,6 +213,36 @@ export function MatchCard({
   const displayMultiplier = hasSavedPrediction
     ? savedMultiplier
     : nextMultiplier;
+
+  // Modo resultado: aplica solo a partidos 'finished' con marcador real entero
+  // (no null/NaN). En este modo la tarjeta sustituye los GoalPickers por la
+  // comparación resultado vs pronóstico y el badge de puntos.
+  const isFinishedWithResult =
+    match.status === "finished" &&
+    Number.isInteger(match.home_score) &&
+    Number.isInteger(match.away_score);
+  const basePoints = isFinishedWithResult
+    ? calculateBasePoints(
+        { home: initialHomeScore, away: initialAwayScore },
+        { home: match.home_score as number, away: match.away_score as number },
+        "finished",
+      )
+    : POINTS_NONE;
+  // Si el servidor ya evaluó y pobló points_earned, lo preferimos al cálculo
+  // cliente (es la fuente de verdad); si no, mostramos el cálculo local
+  // (base × multiplicador guardado). El badge SIEMPRE se muestra cuando hay
+  // predicción, incluso con 0 pts, para que el usuario sepa que ese partido
+  // ya fue evaluado (sin predicción, simplemente no hay qué evaluar).
+  const showPointsBadge = isFinishedWithResult && hasInitialPrediction;
+  const displayedPoints =
+    pointsEarned ??
+    Math.round(basePoints * initialMultiplier * 100) / 100;
+  const badgeVariant: "exact" | "result" | "miss" =
+    basePoints === POINTS_EXACT
+      ? "exact"
+      : basePoints === POINTS_RESULT
+        ? "result"
+        : "miss";
 
   const formattedTime = useMemo(() => {
     const date = new Date(match.match_time);
@@ -510,7 +575,12 @@ export function MatchCard({
     saveState === "offline" ||
     isLocked;
 
-  const canUndo = undoDeadline !== null && !isLocked && !isTbd && !disabled;
+  const canUndo =
+    undoDeadline !== null &&
+    !isLocked &&
+    !isTbd &&
+    !disabled &&
+    !isFinishedWithResult;
 
   const phaseLabel = match.matchday
     ? `Jornada ${match.matchday}`
@@ -601,7 +671,7 @@ export function MatchCard({
               role="status"
             >
               <Lock className="size-3.5" aria-hidden="true" />
-              {LOCKED_COPY}
+              {closedStatusCopy(match.status)}
             </div>
           ) : (
             statusCopy && (
@@ -641,16 +711,36 @@ export function MatchCard({
               {match.home_team_code}
             </span>
           )}
-          <GoalPicker
-            value={homeScore}
-            onChange={handleHomeScoreChange}
-            label={homeLabel}
-            disabled={controlsDisabled}
-            max={MAX_PREDICTION_SCORE}
-          />
+          {isFinishedWithResult ? (
+            <span
+              className="font-display text-2xl font-extrabold tabular-nums text-foreground md:text-3xl"
+              aria-label="Goles del equipo local en el resultado real"
+              data-testid="actual-home-score"
+            >
+              {match.home_score}
+            </span>
+          ) : (
+            <GoalPicker
+              value={homeScore}
+              onChange={handleHomeScoreChange}
+              label={homeLabel}
+              disabled={controlsDisabled}
+              max={MAX_PREDICTION_SCORE}
+            />
+          )}
         </div>
 
-        <div className="pt-8 font-display text-xl font-bold text-accent md:pb-2.5 md:pt-0 md:text-2xl">vs</div>
+        {isFinishedWithResult ? (
+          <div
+            className="font-display text-sm font-semibold uppercase tracking-widest text-muted-foreground md:text-base"
+            aria-hidden="true"
+            data-testid="result-divider"
+          >
+            Resultado
+          </div>
+        ) : (
+          <div className="pt-8 font-display text-xl font-bold text-accent md:pb-2.5 md:pt-0 md:text-2xl">vs</div>
+        )}
 
         <div className="flex flex-col items-end gap-2 md:items-center md:text-center">
           <span className="flex items-center gap-1.5 text-right text-sm font-semibold md:text-base">
@@ -666,15 +756,43 @@ export function MatchCard({
               {match.away_team_code}
             </span>
           )}
-          <GoalPicker
-            value={awayScore}
-            onChange={handleAwayScoreChange}
-            label={awayLabel}
-            disabled={controlsDisabled}
-            max={MAX_PREDICTION_SCORE}
-          />
+          {isFinishedWithResult ? (
+            <span
+              className="font-display text-2xl font-extrabold tabular-nums text-foreground md:text-3xl"
+              aria-label="Goles del equipo visitante en el resultado real"
+              data-testid="actual-away-score"
+            >
+              {match.away_score}
+            </span>
+          ) : (
+            <GoalPicker
+              value={awayScore}
+              onChange={handleAwayScoreChange}
+              label={awayLabel}
+              disabled={controlsDisabled}
+              max={MAX_PREDICTION_SCORE}
+            />
+          )}
         </div>
       </div>
+
+      {isFinishedWithResult && (
+        <div
+          className="mt-3 flex flex-col items-center gap-1.5 border-t border-border pt-3"
+          data-testid="result-summary"
+        >
+          <p className="text-xs text-muted-foreground" data-testid="your-prediction">
+            Tu pronóstico: {initialHomeScore} - {initialAwayScore}
+          </p>
+          {showPointsBadge && (
+            <PointsBadge
+              variant={badgeVariant}
+              points={displayedPoints}
+              multiplier={initialMultiplier}
+            />
+          )}
+        </div>
+      )}
 
       {canUndo && (
         <div className="mt-3 flex flex-col gap-2 rounded-sm border border-border bg-background p-2 pl-3 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -722,5 +840,62 @@ export function MatchCard({
         </div>
       )}
     </article>
+  );
+}
+
+// Badge de puntos para partidos finalizados. Variante:
+//   - 'exact'  → acierto exacto (5 pts base) → verde con CheckCircle2
+//   - 'result' → mismo resultado, distinto marcador (2 pts base) → ámbar con Target
+//   - 'miss'   → resultado distinto → gris con XCircle
+// Muestra los puntos finales (base × multiplicador) cuando el multiplicador es
+// > 1.00, para que el usuario vea cómo se calculó su puntaje.
+type PointsBadgeProps = {
+  variant: "exact" | "result" | "miss";
+  points: number;
+  multiplier: number;
+};
+
+function PointsBadge({ variant, points, multiplier }: PointsBadgeProps) {
+  const config = {
+    exact: {
+      bg: "bg-emerald-500/10",
+      text: "text-emerald-600 dark:text-emerald-400",
+      Icon: CheckCircle2,
+      label: "¡Exacto!",
+    },
+    result: {
+      bg: "bg-amber-500/10",
+      text: "text-amber-600 dark:text-amber-400",
+      Icon: Target,
+      label: "Acierto parcial",
+    },
+    miss: {
+      bg: "bg-zinc-500/10",
+      text: "text-zinc-600 dark:text-zinc-400",
+      Icon: XCircle,
+      label: "Sin puntos",
+    },
+  }[variant];
+  const { Icon, label } = config;
+  const showMultiplier = variant !== "miss" && multiplier > MIN_MULTIPLIER;
+
+  return (
+    <div
+      data-testid="points-badge"
+      data-variant={variant}
+      className={cn(
+        "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold",
+        config.bg,
+        config.text,
+      )}
+    >
+      <Icon className="size-3.5" aria-hidden="true" />
+      <span>+{points.toFixed(2)} pts · {label}</span>
+      {showMultiplier && (
+        <span className="opacity-70" aria-label={`Multiplicador ${multiplier.toFixed(2)}`}>
+          (x{multiplier.toFixed(2)})
+        </span>
+      )}
+    </div>
   );
 }

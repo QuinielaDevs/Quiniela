@@ -33,6 +33,8 @@ const MATCH = {
   bracket_slot: null,
   venue: "Estadio Monumental",
   group_label: "A",
+  home_score: null,
+  away_score: null,
 };
 
 // Jornada 2+: el multiplicador escala por antelación (la Jornada 1 es línea base
@@ -679,6 +681,8 @@ describe("MatchCard", () => {
       home_source: "W97",
       away_source: "W98",
       bracket_slot: 101,
+      home_score: null,
+      away_score: null,
     };
 
     render(
@@ -789,5 +793,518 @@ describe("MatchCard", () => {
       screen.queryByRole("button", { name: "Deshacer cambio" }),
     ).toBeNull();
     expect(revertPrediction).not.toHaveBeenCalled();
+  });
+
+  // ═══════════════════════════════════════════
+  // Modo resultado (partidos finalizados con marcador)
+  // ═══════════════════════════════════════════
+
+  const FINISHED_MATCH = {
+    ...MATCH,
+    status: "finished",
+    home_score: 2,
+    away_score: 1,
+  };
+
+  function renderFinishedMatchCard(
+    props: Partial<ComponentProps<typeof MatchCard>> = {},
+  ) {
+    return render(
+      <MatchCard
+        leagueId={LEAGUE_ID}
+        match={FINISHED_MATCH}
+        initialPrediction={{ homeScorePred: 1, awayScorePred: 0, multiplier: 1 }}
+        {...props}
+      />,
+    );
+  }
+
+  describe("finished match — result mode", () => {
+    it("muestra el resultado real (home_score - away_score)", () => {
+      renderFinishedMatchCard();
+
+      expect(screen.getByTestId("actual-home-score")).toHaveTextContent("2");
+      expect(screen.getByTestId("actual-away-score")).toHaveTextContent("1");
+      expect(screen.getByTestId("result-divider")).toHaveTextContent("Resultado");
+    });
+
+    it("muestra la predicción del usuario junto al resultado", () => {
+      renderFinishedMatchCard();
+
+      expect(screen.getByTestId("your-prediction")).toHaveTextContent(
+        "Tu pronóstico: 1 - 0",
+      );
+    });
+
+    it("muestra badge verde con '¡Exacto!' para acierto exacto (5 pts)", () => {
+      renderFinishedMatchCard({
+        initialPrediction: {
+          homeScorePred: 2,
+          awayScorePred: 1,
+          multiplier: 1,
+        },
+      });
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveAttribute("data-variant", "exact");
+      expect(badge).toHaveTextContent("¡Exacto!");
+      expect(badge).toHaveTextContent("+5.00 pts");
+    });
+
+    it("muestra badge amarillo con 'Acierto parcial' para mismo resultado (2 pts)", () => {
+      // Resultado 2-1, predicción 1-0 → mismo ganador (local)
+      renderFinishedMatchCard({
+        initialPrediction: {
+          homeScorePred: 1,
+          awayScorePred: 0,
+          multiplier: 1,
+        },
+      });
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveAttribute("data-variant", "result");
+      expect(badge).toHaveTextContent("Acierto parcial");
+      expect(badge).toHaveTextContent("+2.00 pts");
+    });
+
+    it("muestra badge gris con 'Sin puntos' para fallo (0 pts)", () => {
+      // Resultado 2-1, predicción 0-2 → ganador distinto
+      renderFinishedMatchCard({
+        initialPrediction: {
+          homeScorePred: 0,
+          awayScorePred: 2,
+          multiplier: 1,
+        },
+      });
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveAttribute("data-variant", "miss");
+      expect(badge).toHaveTextContent("Sin puntos");
+      expect(badge).toHaveTextContent("+0.00 pts");
+    });
+
+    it("NO renderiza GoalPickers en modo resultado", () => {
+      renderFinishedMatchCard();
+
+      expect(
+        screen.queryByLabelText("Incrementar goles de Argentina"),
+      ).toBeNull();
+      expect(
+        screen.queryByLabelText("Disminuir goles de Argentina"),
+      ).toBeNull();
+    });
+
+    it("NO muestra el botón de deshacer en modo resultado", () => {
+      renderFinishedMatchCard();
+
+      expect(
+        screen.queryByRole("button", { name: "Deshacer cambio" }),
+      ).toBeNull();
+    });
+
+    it("muestra el multiplicador aplicado en los puntos cuando > 1.00", () => {
+      // 2 pts base × 1.25 = 2.50 pts
+      renderFinishedMatchCard({
+        initialPrediction: {
+          homeScorePred: 1,
+          awayScorePred: 0,
+          multiplier: 1.25,
+        },
+      });
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveTextContent("+2.50 pts");
+      expect(badge).toHaveTextContent("x1.25");
+    });
+
+    it("usa el points_earned del servidor si está disponible", () => {
+      renderFinishedMatchCard({
+        initialPrediction: {
+          homeScorePred: 2,
+          awayScorePred: 1,
+          multiplier: 1,
+        },
+        pointsEarned: 6.25,
+      });
+
+      // points_earned=6.25 (servidor) gana sobre el cálculo local 5*1=5
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveTextContent("+6.25 pts");
+    });
+
+    it("muestra 'Finalizado' como texto de estado en el candado", () => {
+      renderFinishedMatchCard();
+
+      expect(screen.getByText("Finalizado")).toBeInTheDocument();
+    });
+
+    it("muestra el venue si está presente", () => {
+      renderFinishedMatchCard({
+        match: { ...FINISHED_MATCH, venue: "Estadio Azteca" },
+      });
+
+      expect(screen.getByText("Estadio Azteca")).toBeInTheDocument();
+    });
+
+    it("oculta el venue cuando es null", () => {
+      renderFinishedMatchCard({
+        match: { ...FINISHED_MATCH, venue: null },
+      });
+
+      expect(screen.queryByText(/Estadio/)).toBeNull();
+    });
+
+    it("muestra la fecha y hora del partido", () => {
+      renderFinishedMatchCard();
+
+      // formattedTime usa match_time, debe mostrarse independientemente del estado
+      expect(screen.getByText(/11 jun/i)).toBeInTheDocument();
+    });
+
+    it("muestra la fase (Jornada 1) en el header", () => {
+      renderFinishedMatchCard();
+
+      expect(screen.getByText("Jornada 1")).toBeInTheDocument();
+    });
+
+    it("muestra los nombres de equipos y banderas", () => {
+      renderFinishedMatchCard();
+
+      expect(screen.getByText("Argentina")).toBeInTheDocument();
+      expect(screen.getByText("Mexico")).toBeInTheDocument();
+      expect(screen.getByText("ARG")).toBeInTheDocument();
+      expect(screen.getByText("MEX")).toBeInTheDocument();
+    });
+
+    it("muestra el multiplicador guardado en la cabecera", () => {
+      renderFinishedMatchCard({
+        initialPrediction: {
+          homeScorePred: 1,
+          awayScorePred: 0,
+          multiplier: 1.5,
+        },
+      });
+
+      expect(screen.getByText("1.5x")).toBeInTheDocument();
+    });
+  });
+
+  // ═══════════════════════════════════════════
+  // Estado finished sin scores (edge case)
+  // ═══════════════════════════════════════════
+
+  describe("finished match — edge cases de datos", () => {
+    it("no muestra resultado real si home_score es null", () => {
+      renderMatchCard({
+        match: { ...MATCH, status: "finished", home_score: null, away_score: 1 },
+      });
+
+      expect(screen.queryByTestId("actual-home-score")).toBeNull();
+      expect(screen.queryByTestId("result-divider")).toBeNull();
+    });
+
+    it("no muestra resultado real si away_score es null", () => {
+      renderMatchCard({
+        match: { ...MATCH, status: "finished", home_score: 2, away_score: null },
+      });
+
+      expect(screen.queryByTestId("actual-away-score")).toBeNull();
+    });
+
+    it("muestra 'Finalizado' pero sin bloque de resultado si scores son null", () => {
+      renderMatchCard({
+        match: {
+          ...MATCH,
+          status: "finished",
+          home_score: null,
+          away_score: null,
+        },
+      });
+
+      expect(screen.getByText("Finalizado")).toBeInTheDocument();
+      expect(screen.queryByTestId("result-summary")).toBeNull();
+    });
+
+    it("muestra 'Finalizado' sin badge de puntos si no hay predicción", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={{ ...FINISHED_MATCH, status: "finished" }}
+          initialPrediction={null}
+        />,
+      );
+
+      expect(screen.getByTestId("result-summary")).toBeInTheDocument();
+      expect(screen.queryByTestId("points-badge")).toBeNull();
+    });
+  });
+
+  // ═══════════════════════════════════════════
+  // Estados cerrados con candado (live, suspended, canceled)
+  // ═══════════════════════════════════════════
+
+  describe("estados cerrados con candado", () => {
+    it("muestra 'En vivo' y GoalPickers deshabilitados para status='live'", () => {
+      renderMatchCard({
+        match: { ...MATCH, status: "live" },
+      });
+
+      expect(screen.getByText("En vivo")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Incrementar goles de Argentina"),
+      ).toBeDisabled();
+      // No entra en modo resultado (solo aplica a 'finished')
+      expect(screen.queryByTestId("actual-home-score")).toBeNull();
+    });
+
+    it("muestra 'Suspendido' para status='suspended'", () => {
+      renderMatchCard({
+        match: { ...MATCH, status: "suspended" },
+      });
+
+      expect(screen.getByText("Suspendido")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Incrementar goles de Argentina"),
+      ).toBeDisabled();
+    });
+
+    it("muestra 'Cancelado' para status='canceled'", () => {
+      renderMatchCard({
+        match: { ...MATCH, status: "canceled" },
+      });
+
+      expect(screen.getByText("Cancelado")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Incrementar goles de Argentina"),
+      ).toBeDisabled();
+    });
+
+    it("NO muestra resultado real para partidos suspended", () => {
+      renderMatchCard({
+        match: { ...MATCH, status: "suspended" },
+      });
+
+      expect(screen.queryByTestId("result-summary")).toBeNull();
+    });
+
+    it("NO muestra resultado real para partidos canceled", () => {
+      renderMatchCard({
+        match: { ...MATCH, status: "canceled" },
+      });
+
+      expect(screen.queryByTestId("result-summary")).toBeNull();
+    });
+  });
+
+  // ═══════════════════════════════════════════
+  // TBD state (knockout sin equipos)
+  // ═══════════════════════════════════════════
+
+  describe("TBD state (knockout sin equipos)", () => {
+    const tbdMatch = {
+      ...MATCH,
+      id: "77777777-7777-4777-8777-777777777777",
+      home_team: "Por definir",
+      away_team: "Por definir",
+      home_team_code: null,
+      away_team_code: null,
+      stage: "semi",
+      matchday: null,
+      home_source: "W97",
+      away_source: "W98",
+      bracket_slot: 101,
+      home_score: null,
+      away_score: null,
+    };
+
+    it("muestra 'Pendiente de clasificacion' con candado", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={tbdMatch}
+          initialPrediction={null}
+        />,
+      );
+
+      expect(screen.getByText("Pendiente de clasificacion")).toBeInTheDocument();
+    });
+
+    it("NO renderiza GoalPickers", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={tbdMatch}
+          initialPrediction={null}
+        />,
+      );
+
+      expect(
+        screen.queryByLabelText("Incrementar goles de Por definir"),
+      ).toBeNull();
+    });
+
+    it("multiplicador oculto", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={tbdMatch}
+          initialPrediction={null}
+        />,
+      );
+
+      expect(screen.queryByText(/x\d/)).toBeNull();
+    });
+
+    it("contador de tiempo restante oculto", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={tbdMatch}
+          initialPrediction={null}
+        />,
+      );
+
+      expect(screen.queryByText(/Faltan? /)).toBeNull();
+    });
+
+    it("muestra el badge de bracket slot", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={tbdMatch}
+          initialPrediction={null}
+        />,
+      );
+
+      expect(screen.getByText("Partido 101")).toBeInTheDocument();
+    });
+
+    it("NO entra en modo resultado aunque status=finished (TBD prevalece)", () => {
+      // Un slot TBD con status='finished' sigue siendo TBD (no editable), y no
+      // debería entrar en modo resultado porque faltan los scores reales.
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={{ ...tbdMatch, status: "finished" }}
+          initialPrediction={null}
+        />,
+      );
+
+      expect(screen.getByText("Pendiente de clasificacion")).toBeInTheDocument();
+      expect(screen.queryByTestId("result-summary")).toBeNull();
+    });
+  });
+
+  // ═══════════════════════════════════════════
+  // Edge case: match_time inválido
+  // ═══════════════════════════════════════════
+
+  describe("edge cases de fecha", () => {
+    it("no bloquea la edición si match_time es inválido", () => {
+      // match_time no es una fecha parseable → isMatchLocked devuelve false
+      // → GoalPickers siguen habilitados
+      renderMatchCard({
+        match: { ...MATCH, match_time: "not-a-date" },
+      });
+
+      expect(screen.queryByText("Pronostico cerrado")).toBeNull();
+      expect(
+        screen.getByLabelText("Incrementar goles de Argentina"),
+      ).not.toBeDisabled();
+    });
+  });
+
+  // ═══════════════════════════════════════════
+  // Edge case: scoring edge cases
+  // ═══════════════════════════════════════════
+
+  describe("scoring edge cases en modo resultado", () => {
+    it("predicción 0-0 con resultado 0-0 → 5 pts (exacto)", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={{ ...MATCH, status: "finished", home_score: 0, away_score: 0 }}
+          initialPrediction={{ homeScorePred: 0, awayScorePred: 0, multiplier: 1 }}
+        />,
+      );
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveAttribute("data-variant", "exact");
+    });
+
+    it("predicción 0-0 con resultado 1-1 → 2 pts (empate exacto por outcome)", () => {
+      // Math.sign(0-0) === 0, Math.sign(1-1) === 0 → mismo outcome
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={{ ...MATCH, status: "finished", home_score: 1, away_score: 1 }}
+          initialPrediction={{ homeScorePred: 0, awayScorePred: 0, multiplier: 1 }}
+        />,
+      );
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveAttribute("data-variant", "result");
+    });
+
+    it("predicción 1-0 con resultado 0-1 → 0 pts (ganador distinto)", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={{ ...MATCH, status: "finished", home_score: 0, away_score: 1 }}
+          initialPrediction={{ homeScorePred: 1, awayScorePred: 0, multiplier: 1 }}
+        />,
+      );
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveAttribute("data-variant", "miss");
+    });
+
+    it("predicción 5-3 con resultado 5-3 → 5 pts (exacto con goleada)", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={{ ...MATCH, status: "finished", home_score: 5, away_score: 3 }}
+          initialPrediction={{ homeScorePred: 5, awayScorePred: 3, multiplier: 1 }}
+        />,
+      );
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveAttribute("data-variant", "exact");
+    });
+
+    it("multiplicador máximo 2.5: 5 pts × 2.5 = 12.50 pts", () => {
+      render(
+        <MatchCard
+          leagueId={LEAGUE_ID}
+          match={{ ...MATCH, status: "finished", home_score: 2, away_score: 1 }}
+          initialPrediction={{
+            homeScorePred: 2,
+            awayScorePred: 1,
+            multiplier: 2.5,
+          }}
+        />,
+      );
+
+      const badge = screen.getByTestId("points-badge");
+      expect(badge).toHaveTextContent("+12.50 pts");
+      expect(badge).toHaveTextContent("x2.50");
+    });
+  });
+
+  // ═══════════════════════════════════════════
+  // Edge case: Undo y multiplicador degradado
+  // ═══════════════════════════════════════════
+
+  describe("undo en modo resultado", () => {
+    it("no muestra el botón deshacer aunque haya predicción guardada", () => {
+      // Aunque tengamos undoDeadline (escenario de edit y save previo), el
+      // modo resultado lo oculta porque no tiene sentido deshacer un partido
+      // ya finalizado.
+      renderFinishedMatchCard();
+
+      expect(
+        screen.queryByRole("button", { name: "Deshacer cambio" }),
+      ).toBeNull();
+    });
   });
 });

@@ -23,8 +23,53 @@ export type BoardPrediction = {
   home_score_pred: number;
   away_score_pred: number;
   multiplier: number | null;
+  points_earned: number | null;
   updated_at: string | null;
 };
+
+// Estados que cuentan como "cerrado al usuario" para el ordenamiento pending-first
+// de las tarjetas dentro de una pestaña. Los partidos 'scheduled' o 'live' van
+// primero (los que aún se pueden ver/editar); los cerrados van al final.
+const FINISHED_LIKE_STATUSES = new Set([
+  "finished",
+  "suspended",
+  "canceled",
+]);
+
+// Resuelve la fase por defecto del tablero: la jornada/ronda con partidos aún
+// no cerrados (scheduled/live) más cercana en el tiempo, o si no hay ninguna,
+// la última fase con partidos finalizados. Si la lista está vacía cae al
+// primer tab disponible.
+function resolveDefaultPhase(
+  matches: MatchCardMatch[],
+  phases: { key: string; label: string }[],
+): string {
+  if (phases.length === 0) return "";
+
+  const upcoming = matches
+    .filter((m) => m.status === "scheduled" || m.status === "live")
+    .sort(
+      (a, b) =>
+        new Date(a.match_time).getTime() - new Date(b.match_time).getTime(),
+    );
+  const firstUpcoming = upcoming[0];
+  if (firstUpcoming) {
+    return phaseKeyForMatch(firstUpcoming);
+  }
+
+  const finished = matches
+    .filter((m) => m.status === "finished")
+    .sort(
+      (a, b) =>
+        new Date(b.match_time).getTime() - new Date(a.match_time).getTime(),
+    );
+  const lastFinished = finished[0];
+  if (lastFinished) {
+    return phaseKeyForMatch(lastFinished);
+  }
+
+  return phases[0]?.key ?? "";
+}
 
 type PredictionsBoardViewProps = {
   leagueId: string;
@@ -58,13 +103,9 @@ export function PredictionsBoardView({
     return [{ key: "awards", label: "Premios Copa" }, ...matchPhases];
   }, [matches]);
 
-  const [activeKey, setActiveKey] = useState(() => {
-    // Buscar si existe jornada-1 para seleccionarla por defecto
-    const hasJornada1 = phases.some((p) => p.key === "jornada-1");
-    if (hasJornada1) return "jornada-1";
-    // Fallback al primer partido
-    return phases[1]?.key ?? phases[0]?.key ?? "";
-  });
+  const [activeKey, setActiveKey] = useState(() =>
+    resolveDefaultPhase(matches, phases),
+  );
 
   const predictionByMatch = useMemo(
     () => new Map(predictions.map((prediction) => [prediction.match_id, prediction])),
@@ -83,10 +124,21 @@ export function PredictionsBoardView({
     [],
   );
 
-  const visibleMatches = useMemo(
-    () => matches.filter((match) => phaseKeyForMatch(match) === activeKey),
-    [matches, activeKey],
-  );
+  const visibleMatches = useMemo(() => {
+    const phaseMatches = matches.filter(
+      (match) => phaseKeyForMatch(match) === activeKey,
+    );
+    // Orden pending-first: los partidos aún editables (scheduled/live) van
+    // primero; los cerrados (finished/suspended/canceled) van al final. Dentro
+    // de cada grupo de status se preserva el orden existente (por grupo o por
+    // bracket_slot, que se aplica abajo).
+    return [...phaseMatches].sort((a, b) => {
+      const aDone = FINISHED_LIKE_STATUSES.has(a.status);
+      const bDone = FINISHED_LIKE_STATUSES.has(b.status);
+      if (aDone !== bDone) return aDone ? 1 : -1;
+      return 0;
+    });
+  }, [matches, activeKey]);
 
   const isGroupPhase = activeKey.startsWith("jornada-");
 
@@ -130,6 +182,7 @@ export function PredictionsBoardView({
         match={match}
         currentRoundOrdinal={currentRoundOrdinal}
         initialPrediction={initialPrediction}
+        pointsEarned={stored?.points_earned ?? null}
         onPersisted={(prediction) => handlePersisted(match.id, prediction)}
       />
     );

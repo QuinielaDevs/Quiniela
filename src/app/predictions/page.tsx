@@ -62,11 +62,13 @@ export async function PredictionsBoard() {
     p_league_id: leagueId,
   });
 
-  // Partidos programados de todo el torneo + predicciones propias del usuario.
-  // Se incluyen los slots TBD de eliminatoria (equipos aún sin resolver) para
-  // que el usuario navegue las fases; MatchCard los deja en solo-lectura hasta
-  // que el bracket se resuelva (fn_match_editable lo bloquea en DB). La RLS deja
-  // al dueño leer sus propias predicciones siempre (no espera al kickoff).
+  // Partidos del torneo (todos los estados) + predicciones propias del usuario.
+  // Incluimos finalizados/suspended/canceled para que el usuario pueda revisar
+  // sus puntos y el resultado real; MatchCard los muestra en modo resultado.
+  // Los slots TBD de eliminatoria (equipos aún sin resolver) también aparecen
+  // para que el usuario navegue las fases; MatchCard los deja en solo-lectura
+  // hasta que el bracket se resuelva. La RLS deja al dueño leer sus propias
+  // predicciones siempre (no espera al kickoff).
   const [
     { data: matches },
     { data: predictions },
@@ -77,14 +79,14 @@ export async function PredictionsBoard() {
     supabase
       .from("matches")
       .select(
-        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday, home_source, away_source, bracket_slot, venue, group_label",
+        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday, home_source, away_source, bracket_slot, venue, group_label, home_score, away_score",
       )
-      .eq("status", "scheduled")
+      .in("status", ["scheduled", "live", "finished", "suspended", "canceled"])
       .order("match_time", { ascending: true }),
     supabase
       .from("predictions")
       .select(
-        "id, match_id, home_score_pred, away_score_pred, multiplier, updated_at",
+        "id, match_id, home_score_pred, away_score_pred, multiplier, points_earned, updated_at",
       )
       .eq("league_id", leagueId)
       .eq("user_id", userId),

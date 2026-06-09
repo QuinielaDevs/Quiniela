@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getClaims = vi.fn();
@@ -40,7 +40,7 @@ vi.mock("@/components/predictions/MatchCard", () => ({
 // builder, y await resuelve el resultado configurado para esa tabla.
 function tableBuilder(result: { data: unknown }) {
   const builder: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "not", "order", "limit"]) {
+  for (const method of ["select", "eq", "not", "order", "limit", "in"]) {
     builder[method] = () => builder;
   }
   builder.single = () => Promise.resolve({ error: null, ...result });
@@ -63,6 +63,7 @@ async function renderBoard() {
 
 describe("/predictions (PredictionsBoard)", () => {
   beforeEach(() => {
+    cleanup();
     vi.resetModules();
     vi.clearAllMocks();
     getClaims.mockResolvedValue({ data: { claims: { sub: "user-1" } } });
@@ -127,6 +128,8 @@ describe("/predictions (PredictionsBoard)", () => {
             stage: "group",
             matchday: 1,
             group_label: "A",
+            status: "scheduled",
+            match_time: "2026-06-11T20:00:00.000Z",
           },
           {
             id: "m2",
@@ -135,6 +138,8 @@ describe("/predictions (PredictionsBoard)", () => {
             stage: "group",
             matchday: 1,
             group_label: "B",
+            status: "scheduled",
+            match_time: "2026-06-12T20:00:00.000Z",
           },
         ],
       },

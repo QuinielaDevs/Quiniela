@@ -1,4 +1,10 @@
+import { config } from "dotenv";
 import { defineConfig, devices } from "@playwright/test";
+
+// Carga credenciales de Supabase local desde .env.test.local / .env
+// (CI las exporta directamente con `supabase status -o env`).
+config({ path: ".env.test.local" });
+config({ path: ".env" });
 
 // Puerto dedicado para E2E (evita el 3000, que en este entorno puede estar
 // ocupado por el backend de Docker Desktop).
@@ -8,10 +14,10 @@ const baseURL = `http://127.0.0.1:${PORT}`;
 // Playwright SÓLO ejecuta E2E (tests/e2e). Los specs Vitest viven aparte.
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,
