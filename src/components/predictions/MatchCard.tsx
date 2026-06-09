@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Lock, MapPin, Target, XCircle } from "lucide-react";
+import { CheckCircle2, Lock, MapPin, Target, TrendingDown, XCircle } from "lucide-react";
 
 import {
   revertPrediction,
@@ -213,6 +213,17 @@ export function MatchCard({
   const displayMultiplier = hasSavedPrediction
     ? savedMultiplier
     : nextMultiplier;
+
+  // Drift del multiplicador: ocurre cuando el multiplicador guardado es mayor
+  // que el que el servidor daría AHORA (porque el torneo avanzó y la distancia
+  // al partido se acortó). Mostramos un chip de "↓ X.xx" al lado del guardado
+  // para que el usuario sepa que si re-edita, obtendrá menos. Solo aplica
+  // cuando hay predicción guardada, el guardado es > 1.0x, y el nuevo es
+  // estrictamente menor.
+  const multiplierDrift =
+    hasSavedPrediction &&
+    savedMultiplier > MIN_MULTIPLIER &&
+    nextMultiplier < savedMultiplier;
 
   // Modo resultado: aplica solo a partidos 'finished' con marcador real entero
   // (no null/NaN). En este modo la tarjeta sustituye los GoalPickers por la
@@ -634,15 +645,35 @@ export function MatchCard({
           )}
           {/* Multiplicador en cabecera: solo se muestra en partidos scheduled
               (donde el usuario aún puede editar su predicción). En live,
-              finished, suspended o canceled el multiplicador se muestra en el
+              finished, suspendido o canceled el multiplicador se muestra en el
               PointsBadge (finished) o directamente no aplica, por lo que
-              ocultarlo evita redundancia visual y ruido. */}
+              ocultarlo evita redundancia visual y ruido.
+
+              Si el multiplicador guardado es mayor que el actual (el torneo
+              avanzó y la distancia se acortó), mostramos un sufijo inline
+              "· ↓ X.XXx" en muted al lado del guardado en gold, indicando
+              el valor que obtendría si re-edita. Se integra al patrón de
+              separadores "·" de la cabecera sin agregar un chip visual. */}
           {match.status === "scheduled" && !isTbd && (
             <>
               <span>·</span>
               <span className="font-semibold text-accent">
                 {formatMultiplier(displayMultiplier)}
               </span>
+              {multiplierDrift && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-accent/5 px-1.5 py-0.5 text-[10px] font-medium text-accent"
+                  title={`Si editas ahora sería ${nextMultiplier.toFixed(2)}x`}
+                  data-testid="multiplier-drift-chip"
+                  aria-label={`Si editas ahora el multiplicador bajaría a ${nextMultiplier.toFixed(2)}x`}
+                >
+                  <TrendingDown
+                    className="size-3 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span>{nextMultiplier.toFixed(2)}x</span>
+                </span>
+              )}
             </>
           )}
           {timeLeft && !isLocked && !isTbd && (

@@ -22,6 +22,10 @@ export interface SeededMatch {
   stage: string | null;
   group_label: string | null;
   expectedPrediction?: { home: number; away: number; multiplier: number };
+  // Multiplicador que tendrá la predicción por defecto del partido si está
+  // scheduled o live. Si no se especifica, default 1.0. Útil para producir
+  // drift en el chip de "would-be" multiplicador.
+  scheduledPredictionMultiplier?: number;
 }
 
 export interface SeedResult {
@@ -168,6 +172,8 @@ export async function seedPredictionsE2E(userId: string): Promise<SeedResult> {
       matchday: 1,
       stage: "group",
       group_label: "A",
+      // J1 base: nextMultiplier=1.0x. saved=1.0 → no hay drift (ya en floor)
+      scheduledPredictionMultiplier: 1.0,
     },
     {
       id: "",
@@ -181,6 +187,10 @@ export async function seedPredictionsE2E(userId: string): Promise<SeedResult> {
       matchday: 2,
       stage: "group",
       group_label: "D",
+      // J2 con saved=2.5x. Como hay 3 partidos finished de J1 en el seed,
+      // currentRoundOrdinal=1, distancia=1, nextMultiplier=1.25x → drift
+      // esperado: chip con "↓ 1.25x" en la cabecera.
+      scheduledPredictionMultiplier: 2.5,
     },
     {
       id: "",
@@ -301,7 +311,7 @@ export async function seedPredictionsE2E(userId: string): Promise<SeedResult> {
           user_id: userId,
           home_score_pred: 0,
           away_score_pred: 0,
-          multiplier: 1.0,
+          multiplier: m.scheduledPredictionMultiplier ?? 1.0,
         });
       }
     }

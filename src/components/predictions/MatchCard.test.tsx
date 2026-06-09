@@ -436,6 +436,79 @@ describe("MatchCard", () => {
     expect(screen.getByText("2.5x")).toBeInTheDocument();
   });
 
+  // ---- Chip de drift del multiplicador (would-be) ----
+  // El chip aparece cuando el multiplicador guardado es mayor que el que el
+  // servidor daría AHORA (por avance del torneo). Muestra el valor
+  // "would-be" con icono TrendingDown para que el usuario sepa que si
+  // re-edita obtendrá menos.
+
+  it("muestra chip de drift cuando saved > next", () => {
+    // J2 con saved=2.5x y currentRoundOrdinal=0 → next=1.25x → drift
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z"));
+    renderMatchCard({
+      match: MATCH_JORNADA2,
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
+    });
+
+    // El guardado sigue mostrándose en gold
+    expect(screen.getByText("2.5x")).toBeInTheDocument();
+    // El chip muestra el would-be inline con icono TrendingDown:
+    // contiene el valor "1.25x" (2 decimales para evitar confusión con
+    // el guardado que usa 1 decimal)
+    const chip = screen.getByTestId("multiplier-drift-chip");
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveTextContent("1.25x");
+  });
+
+  it("NO muestra chip de drift cuando saved === next", () => {
+    // J1 con saved=1.0x y next=1.0x → no hay drift
+    renderMatchCard({
+      match: MATCH_JORNADA2, // J2 saved=1.25 next=1.25 → no drift
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 1.25 },
+    });
+
+    expect(screen.getByText("1.3x")).toBeInTheDocument();
+    expect(screen.queryByTestId("multiplier-drift-chip")).toBeNull();
+  });
+
+  it("NO muestra chip de drift cuando saved es MIN_MULTIPLIER (1.0x)", () => {
+    // Aunque el servidor pueda degradar, si el guardado ya es 1.0x no
+    // tiene sentido mostrar drift (no se puede bajar más).
+    renderMatchCard({
+      match: MATCH_JORNADA2,
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 1.0 },
+    });
+
+    expect(screen.getByText("1.0x")).toBeInTheDocument();
+    expect(screen.queryByTestId("multiplier-drift-chip")).toBeNull();
+  });
+
+  it("NO muestra chip de drift cuando no hay predicción guardada", () => {
+    // Sin initialPrediction: no hay "guardado" contra el cual comparar
+    renderMatchCard({
+      match: MATCH_JORNADA2,
+      initialPrediction: null,
+    });
+
+    // El nextMultiplier (1.25) se muestra solo
+    expect(screen.getByText("1.3x")).toBeInTheDocument();
+    expect(screen.queryByTestId("multiplier-drift-chip")).toBeNull();
+  });
+
+  it("el chip tiene aria-label descriptivo accesible", () => {
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z"));
+    renderMatchCard({
+      match: MATCH_JORNADA2,
+      initialPrediction: { homeScorePred: 1, awayScorePred: 0, multiplier: 2.5 },
+    });
+
+    const chip = screen.getByTestId("multiplier-drift-chip");
+    expect(chip).toHaveAttribute(
+      "aria-label",
+      "Si editas ahora el multiplicador bajaría a 1.25x",
+    );
+  });
+
   it("una edicion que NO degrada el multiplicador no abre advertencia y guarda normal", async () => {
     // J2 con jornada en curso 0 (default) → nextMultiplier = 1.25; igual al
     // guardado, así que editar NO degrada y no abre advertencia.

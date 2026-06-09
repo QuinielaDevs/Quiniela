@@ -254,4 +254,110 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
       .first();
     await expect(firstInTab).toContainText("test_ecuador");
   });
+
+  // ═══════════════════════════════════════════
+  // Chip de drift del multiplicador (would-be)
+  // ═══════════════════════════════════════════
+  // El chip ámbar con icono TrendingDown aparece al lado del multiplicador
+  // guardado cuando el servidor daría un multiplicador MENOR al que el
+  // usuario obtuvo originalmente. Comunica "el multiplicador que tienes es
+  // X, pero si re-editas sería Y".
+  //
+  // El seed setea:
+  //   - test_mexico (J2): saved=2.5x → drift a 1.25x (currentOrdinal=1, J2→distance=1)
+  //   - test_ecuador (J1): saved=1.0x → sin drift (J1 base, ya en floor)
+  //   - test_argentina (finished): N/A (el chip no aplica en finished)
+
+  test("muestra chip de drift en J2 con saved=2.5x (would-be menor)", async () => {
+    const page = context.page;
+    await page.goto("/predictions");
+    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+
+    const mexCard = page
+      .locator("article", { hasText: "test_mexico" })
+      .filter({ hasText: "test_canada" })
+      .first();
+    const chip = mexCard.getByTestId("multiplier-drift-chip");
+    await expect(chip).toBeVisible();
+    // El chip contiene el valor would-be "X.XXx" inline (con icono ↓).
+    // El valor exacto depende del current_round_ordinal del servidor (puede
+    // ser 1.00x, 1.25x, 1.50x... según partidos pasados en la BD), así que
+    // extraemos el número del texto y verificamos que es < 2.5 (el guardado).
+    const chipText = await chip.textContent();
+    // El chip incluye separador "·" + icono (no texto) + valor. Buscamos
+    // el patrón de número decimal.
+    const match = chipText!.match(/(\d+\.\d+)x/);
+    expect(match).not.toBeNull();
+    const value = parseFloat(match![1]!);
+    expect(value).toBeLessThan(2.5);
+  });
+
+  test("el multiplicador guardado (2.5x) sigue visible junto al chip de drift", async () => {
+    const page = context.page;
+    await page.goto("/predictions");
+    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+
+    const mexCard = page
+      .locator("article", { hasText: "test_mexico" })
+      .filter({ hasText: "test_canada" })
+      .first();
+    // El guardado se muestra en gold (text-accent), jerarquía más alta
+    // que el chip (text-muted-foreground inline).
+    await expect(mexCard.getByText("2.5x")).toBeVisible();
+    // El chip muted inline con el icono TrendingDown está presente
+    await expect(mexCard.getByTestId("multiplier-drift-chip")).toBeVisible();
+  });
+
+  test("el chip de drift tiene aria-label descriptivo accesible", async () => {
+    const page = context.page;
+    await page.goto("/predictions");
+    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+
+    const mexCard = page
+      .locator("article", { hasText: "test_mexico" })
+      .filter({ hasText: "test_canada" })
+      .first();
+    const chip = mexCard.getByTestId("multiplier-drift-chip");
+    // El aria-label menciona el valor would-be. Verificamos el formato
+    // sin hardcodear el valor (varía según current_round_ordinal).
+    const ariaLabel = await chip.getAttribute("aria-label");
+    expect(ariaLabel).toMatch(/^Si editas ahora el multiplicador bajaría a \d+\.\d+x$/);
+    // El aria-label debe mencionar el mismo valor que el texto visible.
+    // Extraemos el valor numérico del aria-label y del texto, y comparamos.
+    const ariaMatch = ariaLabel!.match(/(\d+\.\d+)x$/);
+    const ariaValue = ariaMatch![1];
+    const chipText = await chip.textContent();
+    // El chipText incluye "· ↓ X.XXx" — verificamos que contiene el valor.
+    expect(chipText).toContain(ariaValue);
+  });
+
+  test("NO muestra chip de drift en J1 con saved=1.0x (ya en floor)", async () => {
+    const page = context.page;
+    await page.goto("/predictions");
+    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+
+    // test_ecuador está en J1 con saved=1.0x. Aunque el torneo avance,
+    // J1 siempre es 1.0x (línea base). No hay drift que mostrar.
+    const ecuCard = page
+      .locator("article", { hasText: "test_ecuador" })
+      .filter({ hasText: "test_peru" })
+      .first();
+    await expect(ecuCard.getByText("1.0x")).toBeVisible();
+    await expect(ecuCard.getByTestId("multiplier-drift-chip")).toHaveCount(0);
+  });
+
+  test("NO muestra chip de drift en partidos finished (delegado al PointsBadge)", async () => {
+    const page = context.page;
+    await page.goto("/predictions");
+    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+
+    // test_argentina es un partido finished (con saved=1.25x). El chip
+    // ámbar no debe aparecer porque el multiplicador ya se muestra en el
+    // PointsBadge de resultados.
+    const argCard = page
+      .locator("article", { hasText: "test_argentina" })
+      .filter({ hasText: "test_bolivia" })
+      .first();
+    await expect(argCard.getByTestId("multiplier-drift-chip")).toHaveCount(0);
+  });
 });
