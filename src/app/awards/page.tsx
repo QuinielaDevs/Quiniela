@@ -5,12 +5,10 @@ import { Outfit } from "next/font/google";
 
 import { createClient } from "@/utils/supabase/server";
 import { getActiveLeagueMembership } from "@/utils/active-league";
-import { groupCandidatesByCategory } from "@/utils/awards";
 import { cn } from "@/utils/utils";
 import type {
   AwardCandidate,
   AwardCategory,
-  SpecialPrediction,
 } from "@/types";
 import { AwardsBoard } from "@/components/awards/AwardsBoard";
 import { AppTopNav } from "@/components/layout/AppTopNav";
@@ -164,12 +162,7 @@ async function AwardsForLeague({
 
   const supabase = await createClient();
 
-  const [{ data: candidates }, { data: predictions }] = await Promise.all([
-    supabase
-      .from("award_candidates")
-      .select("*")
-      .order("category", { ascending: true })
-      .order("display_order", { ascending: true }),
+  const [{ data: predictions }] = await Promise.all([
     supabase
       .from("special_predictions")
       .select("category, candidate_id")
@@ -177,20 +170,45 @@ async function AwardsForLeague({
       .eq("user_id", userId),
   ]);
 
-  const candidatesByCategory = groupCandidatesByCategory(
-    (candidates ?? []) as AwardCandidate[],
-  );
+  const preds = (predictions ?? []) as Array<{
+    category: string;
+    candidate_id: string;
+  }>;
 
   const initialSelections: Record<AwardCategory, string | null> = {
     champion: null,
     top_scorer: null,
     mvp: null,
   };
-  for (const p of (predictions ?? []) as Pick<
-    SpecialPrediction,
-    "category" | "candidate_id"
-  >[]) {
-    initialSelections[p.category as AwardCategory] = p.candidate_id;
+  const selectedCandidates: Record<AwardCategory, AwardCandidate | null> = {
+    champion: null,
+    top_scorer: null,
+    mvp: null,
+  };
+
+  for (const p of preds) {
+    const cat = p.category as AwardCategory;
+    if (cat === "champion" || cat === "top_scorer" || cat === "mvp") {
+      initialSelections[cat] = p.candidate_id;
+    }
+  }
+
+  const candidateIds = preds.map((p) => p.candidate_id);
+  if (candidateIds.length > 0) {
+    const { data: candidatesData } = await supabase
+      .from("award_candidates")
+      .select("*")
+      .in("id", candidateIds);
+
+    for (const c of (candidatesData ?? []) as AwardCandidate[]) {
+      const matching = preds.find((p) => p.candidate_id === c.id);
+      if (matching) {
+        const cat = matching.category as AwardCategory;
+        if (cat === "champion" || cat === "top_scorer" || cat === "mvp") {
+          selectedCandidates[cat] = c;
+        }
+      }
+    }
   }
 
   let isLocked = false;
@@ -247,7 +265,7 @@ async function AwardsForLeague({
       <AwardsBoard
         key={activeLeague.id}
         leagueId={activeLeague.id}
-        candidatesByCategory={candidatesByCategory}
+        selectedCandidates={selectedCandidates}
         initialSelections={initialSelections}
         isLocked={isLocked}
         activePhaseLabel={activePhaseLabel}

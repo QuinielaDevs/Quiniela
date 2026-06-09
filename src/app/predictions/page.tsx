@@ -10,9 +10,8 @@ import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { AppTopNav } from "@/components/layout/AppTopNav";
 import { BrandEyebrow } from "@/components/layout/BrandEyebrow";
 
-import { groupCandidatesByCategory } from "@/utils/awards";
 import { getActiveLeagueMembership } from "@/utils/active-league";
-import type { AwardCandidate, SpecialPrediction } from "@/types";
+import type { AwardCandidate, AwardCategory } from "@/types";
 
 type PredictionsPageProps = {
   searchParams?: Promise<{ joined?: string }>;
@@ -71,7 +70,6 @@ export async function PredictionsBoard() {
   const [
     { data: matches },
     { data: predictions },
-    { data: candidates },
     { data: specialPredictions },
     activePhaseResult,
     { data: currentRoundOrdinal },
@@ -91,17 +89,11 @@ export async function PredictionsBoard() {
       .eq("league_id", leagueId)
       .eq("user_id", userId),
     supabase
-      .from("award_candidates")
-      .select("*")
-      .order("category", { ascending: true })
-      .order("display_order", { ascending: true }),
-    supabase
       .from("special_predictions")
       .select("category, candidate_id")
       .eq("league_id", leagueId)
       .eq("user_id", userId),
     supabase.rpc("fn_get_active_tournament_phase"),
-    // Jornada en curso (server-authoritative) para el multiplicador predictivo.
     supabase.rpc("fn_current_round_ordinal"),
   ]);
 
@@ -126,21 +118,47 @@ export async function PredictionsBoard() {
     activePhaseCode = activePhase.phase_code;
   }
 
-  const candidatesByCategory = groupCandidatesByCategory(
-    (candidates ?? []) as AwardCandidate[],
-  );
+  const preds = (specialPredictions ?? []) as Array<{
+    category: string;
+    candidate_id: string;
+  }>;
 
-  const initialSelections = {
-    champion: null as string | null,
-    top_scorer: null as string | null,
-    mvp: null as string | null,
+  const initialSelections: Record<AwardCategory, string | null> = {
+    champion: null,
+    top_scorer: null,
+    mvp: null,
   };
-  for (const p of (specialPredictions ?? []) as Pick<
-    SpecialPrediction,
-    "category" | "candidate_id"
-  >[]) {
-    if (p.category === "champion" || p.category === "top_scorer" || p.category === "mvp") {
-      initialSelections[p.category] = p.candidate_id;
+  const selectedCandidates: Record<AwardCategory, AwardCandidate | null> = {
+    champion: null,
+    top_scorer: null,
+    mvp: null,
+  };
+
+  for (const p of preds) {
+    const cat = p.category as AwardCategory;
+    if (cat === "champion" || cat === "top_scorer" || cat === "mvp") {
+      initialSelections[cat] = p.candidate_id;
+    }
+  }
+
+  // PostgREST no soporta resource embedding sobre FKs compuestas
+  // (special_predictions.candidate_id,category → award_candidates.id,category),
+  // así que hacemos un fetch extra con .in() por los IDs seleccionados.
+  const candidateIds = preds.map((p) => p.candidate_id);
+  if (candidateIds.length > 0) {
+    const { data: candidatesData } = await supabase
+      .from("award_candidates")
+      .select("*")
+      .in("id", candidateIds);
+
+    for (const c of (candidatesData ?? []) as AwardCandidate[]) {
+      const matching = preds.find((p) => p.candidate_id === c.id);
+      if (matching) {
+        const cat = matching.category as AwardCategory;
+        if (cat === "champion" || cat === "top_scorer" || cat === "mvp") {
+          selectedCandidates[cat] = c;
+        }
+      }
     }
   }
 
@@ -157,7 +175,7 @@ export async function PredictionsBoard() {
         leagueId={leagueId}
         matches={matches}
         predictions={predictions ?? []}
-        candidatesByCategory={candidatesByCategory}
+        selectedCandidates={selectedCandidates}
         initialSelections={initialSelections}
         isAwardsLocked={isAwardsLocked}
         activePhaseLabel={activePhaseLabel}

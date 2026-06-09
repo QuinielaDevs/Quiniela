@@ -11,8 +11,16 @@ export const AWARD_CATEGORIES: ReadonlyArray<{
   title: string;
   hint: string;
 }> = [
-  { category: "champion", title: "Campeón del Mundo", hint: "¿Quién levanta la copa?" },
-  { category: "top_scorer", title: "Máximo Goleador", hint: "¿Quién mete más goles?" },
+  {
+    category: "champion",
+    title: "Campeón del Mundo",
+    hint: "¿Quién levanta la copa?",
+  },
+  {
+    category: "top_scorer",
+    title: "Máximo Goleador",
+    hint: "¿Quién mete más goles?",
+  },
   { category: "mvp", title: "MVP del Torneo", hint: "¿El mejor de todos?" },
 ];
 

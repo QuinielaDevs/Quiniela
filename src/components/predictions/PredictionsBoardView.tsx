@@ -30,13 +30,11 @@ type PredictionsBoardViewProps = {
   leagueId: string;
   matches: MatchCardMatch[];
   predictions: BoardPrediction[];
-  candidatesByCategory: Record<AwardCategory, AwardCandidate[]>;
+  selectedCandidates: Record<AwardCategory, AwardCandidate | null>;
   initialSelections: Record<AwardCategory, string | null>;
   isAwardsLocked: boolean;
   activePhaseLabel: string;
   activePhaseCode: string;
-  // Jornada en curso (server-authoritative): base de la distancia para el
-  // multiplicador predictivo que muestra cada tarjeta.
   currentRoundOrdinal: number;
 };
 
@@ -48,7 +46,7 @@ export function PredictionsBoardView({
   leagueId,
   matches,
   predictions,
-  candidatesByCategory,
+  selectedCandidates,
   initialSelections,
   isAwardsLocked,
   activePhaseLabel,
@@ -151,7 +149,7 @@ export function PredictionsBoardView({
       {activeKey === "awards" ? (
         <AwardsBoard
           leagueId={leagueId}
-          candidatesByCategory={candidatesByCategory}
+          selectedCandidates={selectedCandidates}
           initialSelections={initialSelections}
           isLocked={isAwardsLocked}
           activePhaseLabel={activePhaseLabel}

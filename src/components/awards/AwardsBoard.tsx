@@ -13,28 +13,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CandidatePicker } from "./CandidatePicker";
+import { AwardSelector } from "./AwardSelector";
 
 type Selections = Record<AwardCategory, string | null>;
 
 interface AwardsBoardProps {
   leagueId: string;
-  candidatesByCategory: Record<AwardCategory, AwardCandidate[]>;
+  selectedCandidates: Record<AwardCategory, AwardCandidate | null>;
   initialSelections: Selections;
   isLocked?: boolean;
   activePhaseLabel?: string;
   activePhaseCode?: string;
 }
 
-/**
- * Tablero de Premios Especiales (cliente). Renderiza las tres categorías y
- * gestiona la selección de un tap con guardado optimista vía Server Action.
- * Mientras un guardado está en curso se deshabilitan los taps (useTransition);
- * si la Server Action falla, revierte la selección y muestra el error.
- */
 export function AwardsBoard({
   leagueId,
-  candidatesByCategory,
+  selectedCandidates,
   initialSelections,
   isLocked = false,
   activePhaseLabel = "Semifinales en adelante",
@@ -47,7 +41,6 @@ export function AwardsBoard({
 
   function handleSelect(category: AwardCategory, candidateId: string) {
     if (isLocked) return;
-    // Tap sobre el ya seleccionado: no-op (evita un upsert sin cambios).
     if (selections[category] === candidateId) return;
 
     const previous = selections[category];
@@ -63,7 +56,6 @@ export function AwardsBoard({
       );
 
       if (!result.success) {
-        // Revierte la selección optimista y avisa.
         setSelections((prev) => ({ ...prev, [category]: previous }));
         setError(result.error ?? "No se pudo guardar tu predicción.");
       }
@@ -95,7 +87,6 @@ export function AwardsBoard({
         </p>
       ) : null}
 
-      {/* Leyenda del sistema de puntuación decreciente */}
       <div className="rounded-lg border border-white/10 bg-[#1B263B] p-4 text-sm">
         <h3 className="font-display font-bold text-white mb-2 flex items-center gap-1.5 text-base">
           <span>🏆</span> Puntuación Especial Decreciente
@@ -185,12 +176,14 @@ export function AwardsBoard({
               <CardDescription className="text-white/60">{hint}</CardDescription>
             </CardHeader>
             <CardContent>
-              <CandidatePicker
-                candidates={candidatesByCategory[category]}
+              <AwardSelector
+                key={category}
+                selectedCandidate={selectedCandidates[category]}
                 selectedId={selections[category]}
                 pendingId={isPending ? pendingId : null}
                 disabled={isPending || isLocked}
                 onSelect={(candidateId) => handleSelect(category, candidateId)}
+                category={category}
               />
             </CardContent>
           </Card>
