@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PartyPopper } from "lucide-react";
 
+import { formatPaymentAmount } from "@/utils/format-currency";
+
 // Modal de bienvenida + recordatorio de pago para miembros con pago pendiente.
 // Se muestra en cada visita al tablero mientras el pago siga pendiente (decisión
 // de producto), es cerrable para usar la app, y enlaza a Reglas para pagar.
@@ -14,15 +16,6 @@ type WelcomePaymentModalProps = {
   amount: number | null;
   instructions: string | null;
 };
-
-function formatPaymentAmount(amount: number | null): string {
-  if (amount === null) return "Monto por confirmar";
-
-  return new Intl.NumberFormat("es-VE", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
 
 export function WelcomePaymentModal({
   leagueName,

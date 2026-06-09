@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTransition, useState } from "react";
 
 import { joinLeagueByInvite } from "@/app/actions/leagues.actions";
+import { formatPaymentAmount } from "@/utils/format-currency";
 import { GoogleSignInButton } from "@/components/google-signin-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,15 +33,6 @@ type JoinLeagueCardProps = {
   nextPath: string;
   initialError?: string | null;
 };
-
-function formatPaymentAmount(amount: number | null): string {
-  if (amount === null) return "Monto por confirmar";
-
-  return new Intl.NumberFormat("es-VE", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
 
 export function JoinLeagueCard({
   invite,
