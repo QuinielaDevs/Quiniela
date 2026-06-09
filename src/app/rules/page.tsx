@@ -193,9 +193,29 @@ export default function RulesPage() {
                   Al finalizar el partido, el sistema reparte el pozo según el
                   mejor pronóstico.
                 </p>
+                <div className="rounded-sm border border-border bg-background p-3">
+                  <p className="font-semibold text-foreground">
+                    Cómo se decide el ganador
+                  </p>
+                  <p className="mt-1">
+                    Cada marcador del duelo usa la puntuación base de la
+                    quiniela: {POINTS_EXACT} pts por marcador exacto,{" "}
+                    {POINTS_RESULT} pts por acertar ganador o empate, y{" "}
+                    {POINTS_NONE} pts si falla el resultado. No se usa el
+                    multiplicador.
+                  </p>
+                </div>
+                <p>
+                  Si varias personas empatan con el mejor puntaje, todas ganan
+                  y el pozo se reparte entre ellas. Por ejemplo, si dos jugadores
+                  apuestan 6 pts cada uno, uno juega 3-0 y el otro 2-0, y el
+                  partido queda 1-0, ambos suman {POINTS_RESULT} pts y reciben
+                  6 pts del pozo de 12.
+                </p>
                 <p>
                   Si el reto se rechaza, expira antes del kickoff o el partido
                   se suspende/cancela, los puntos retenidos se devuelven.
+                  También se devuelven si nadie suma puntos en el duelo.
                 </p>
               </div>
             </div>
