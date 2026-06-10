@@ -20,10 +20,18 @@ export interface SeededLeague {
   cleanup: () => Promise<void>;
 }
 
-// Código de invitación solo-alfanumérico (los guiones del runId se eliminan)
-// para que sea apto para /join/<code> y fn_join_league_by_invite.
+// Código de invitación restringido al ALFABETO REAL del producto
+// (INVITE_CODE_ALPHABET en src/utils/invite-code.ts, sin O/0, I/1 ni L):
+// la server action joinLeagueByInvite valida ese alfabeto, así que un código
+// sembrado con caracteres excluidos sería inutilizable desde el form manual.
 function inviteCodeFromRunId(runId: string): string {
-  return `E2E${runId.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(-12)}`;
+  const sanitized = runId
+    .replace(/[^a-z0-9]/gi, "")
+    .toUpperCase()
+    .replace(/[O0]/g, "Q")
+    .replace(/[I1]/g, "X")
+    .replace(/L/g, "Y");
+  return `E2E${sanitized.slice(-12)}`;
 }
 
 export async function seedLeague(opts: SeedLeagueOpts): Promise<SeededLeague> {

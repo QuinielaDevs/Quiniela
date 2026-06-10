@@ -56,4 +56,57 @@ Fases 1 y 2 (helpers, testids, auth E2E estable).
 - LIG-07: si el producto no protege el doble submit, registrar bug (no debilitar el assert).
 
 ## Notas de ejecución
-_(rellenar al ejecutar)_
+
+**Ejecutada**: 2026-06-10 · rama `test/e2e-full` · 18 tests nuevos (el guard
+LIG-01 migrado desde `create-league.spec.ts`, que se eliminó).
+
+### Entregables
+- `tests/e2e/league-create.spec.ts` — LIG-01..07.
+- `tests/e2e/league-join.spec.ts` — LIG-08..18.
+- `tests/e2e/helpers/seed/league.ts`: `inviteCodeFromRunId` ahora genera códigos
+  dentro del **alfabeto real del producto** (`INVITE_CODE_ALPHABET`, sin
+  O/0, I/1 ni L). Antes podía emitir `0`/`1` y la server action
+  `joinLeagueByInvite` los rechaza ("Código de invitación inválido."), aunque
+  la URL `/join/<code>` sí los acepte (la valida solo el RPC). Hallazgo clave
+  para cualquier fase que use el form manual de código.
+
+### Validaciones exactas encontradas (leagues.schema.ts + form)
+- `name`: trim, min 1 ("El nombre de la liga es obligatorio."), max 80. El
+  vacío lo bloquea el `required` nativo; "   " (solo espacios) llega al schema.
+- `headerWord`: trim, min 1, max 20 (default "PIJA"; no se ejercita aparte).
+- Con `requiresPayment`: monto e instrucciones obligatorios. El **vacío** y el
+  **negativo** los bloquea la validación nativa del input (`required`,
+  `min=0` → `rangeUnderflow`) antes de llegar al schema.
+- **Monto 0 es VÁLIDO** (`z.number().nonnegative()`, decisión deliberada
+  comentada en el schema): la liga se crea con `payment_amount = 0`.
+  Desviación del plan (asumía error); LIG-05d lo cubre como comportamiento real.
+- LIG-07: el doble click NO duplica (botón deshabilitado vía `useTransition`).
+
+### Destino real post-creación
+`router.push("/predictions")` (LeagueCreateForm). La liga se verifica en
+`/account` (`account-league-item`) y en BD (creador `role=admin`,
+`invite_code` ≥ 6 chars).
+
+### Comportamientos reales relevantes
+- **La landing `/join/<code>` AUTO-une al usuario autenticado** (server-side,
+  sin click) y redirige a `/predictions?joined=1&league=<id>`: LIG-11/12 lo
+  cubren; por eso LIG-03 verifica la landing con contexto ANÓNIMO (el creador
+  logueado nunca la ve) y el flujo deep-link (LIG-14) termina sin pasar por
+  ningún botón "Unirme".
+- LIG-14: el invite se preserva vía `?next=/join/<code>` en el link "Inicia
+  sesión o regístrate" de la tarjeta → login → vuelta a /join → auto-join.
+  El producto SÍ cumple Story 1.4 (no hubo bug que registrar).
+- Normalización del código: la página y el RPC hacen `UPPER(TRIM(...))`
+  (case-insensitive en URL); la action además valida longitud 6-32 y alfabeto.
+- Mecanismo real de **liga activa** (LIG-17): `profiles.active_league_id`
+  resuelto por `getActiveLeagueMembership` (fallback: membresía más reciente);
+  se cambia desde `/account` con el botón "Usar <liga> como liga actual"
+  (action `setActiveLeague` → RPC `fn_set_active_league`) y el badge
+  "Liga actual" se mueve tras `router.refresh()`. Verificado que los datos de
+  `/standings` no se cruzan entre ligas.
+- El modal de pago (`welcome-payment-modal`) es overlay `fixed` pero vive
+  DOM-wise dentro de `<main>` → el patrón de anclaje anti-takeover aplica igual.
+
+### Validación
+`npm run lint` ✅ · `npm run typecheck` ✅ · `npm run test:unit` ✅ (470) ·
+`npm run test:e2e` ✅ ×3 consecutivos (64 passed, 1 skipped por `fixme` BUG-001).

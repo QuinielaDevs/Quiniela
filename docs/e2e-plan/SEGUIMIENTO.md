@@ -17,7 +17,7 @@
 |---|---|---|---|---|
 | 1 — Fundación | ✅ completada | 2026-06-09 | 0 (por diseño; 22 existentes verdes ×3) | `test/e2e-full` · `9811e7f..0c36f51` |
 | 2 — Smoke + Auth | ✅ completada | 2026-06-10 | 26 (25 activos + 1 `fixme`) | `test/e2e-full` |
-| 3 — Ligas | ⬜ pendiente | — | — | — |
+| 3 — Ligas | ✅ completada | 2026-06-10 | 18 | `test/e2e-full` |
 | 4 — Predicciones | ⬜ pendiente | — | — | — |
 | 5 — Standings + Admin | ⬜ pendiente | — | — | — |
 | 6 — Duelos | ⬜ pendiente | — | — | — |
@@ -104,6 +104,26 @@ posteriores:
   prefijos públicos redirigen a login (no not-found).
 - **Forms de sign-up/forgot/update-password en inglés** (template); login en
   español.
+
+---
+
+## Hallazgos y desviaciones de la Fase 3
+
+Detalle completo en [`03-fase-3-ligas.md`](03-fase-3-ligas.md). Lo crítico:
+
+- **La landing `/join/<code>` AUTO-une al usuario autenticado** server-side y
+  redirige a `/predictions?joined=1&league=<id>`: ningún test debe visitar
+  `/join` con un usuario logueado esperando ver la tarjeta.
+- **Códigos de invitación sembrados**: usar SOLO el alfabeto del producto
+  (sin O/0, I/1, L). `inviteCodeFromRunId` (seed/league.ts) ya lo garantiza;
+  la server action del form manual rechaza códigos fuera del alfabeto aunque
+  la URL los acepte.
+- **Monto de inscripción 0 es válido** (`nonnegative` deliberado en
+  `leagues.schema.ts`): no asumir error.
+- **Liga activa** = `profiles.active_league_id` + botón "Usar <liga> como liga
+  actual" en `/account`; fallback a la membresía más reciente.
+- El `welcome-payment-modal` vive dentro de `<main>` (aunque sea overlay
+  fixed): el patrón de anclaje anti-takeover aplica.
 
 ---
 

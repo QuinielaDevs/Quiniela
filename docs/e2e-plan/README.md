@@ -71,7 +71,7 @@ Prompt plantilla para el agente ejecutor de la fase N:
 |---|---|---|---|---|
 | 1 — Fundación | ✅ completada | 2026-06-09 | 0 (por diseño; 22 existentes verdes ×3) | 64 testids nuevos (~37 componentes), 14 módulos de helpers, proyecto `desktop-chromium`, `BUGS.md`. RPC real: `create_challenge` (no `fn_…`). Flake de tablist duplicado en dev mitigado con `selectPhaseTab` (ver Notas de la fase). |
 | 2 — Smoke + Auth | ✅ completada | 2026-06-10 | 26 (25 activos + 1 `fixme` BUG-001) | `smoke.spec.ts` + `auth.spec.ts`. Allow-list 3100 + rate limit de email en `config.toml`; `NEXT_PUBLIC_*` locales en `.env.test.local`. BUG-001: `/desafio` anon redirige a login. Ver Notas de la fase. |
-| 3 — Ligas | ⬜ pendiente | — | — | |
+| 3 — Ligas | ✅ completada | 2026-06-10 | 18 (LIG-01 migrado del spec antiguo) | `league-create.spec.ts` + `league-join.spec.ts`. La landing auto-une al autenticado; monto 0 es válido por schema; códigos del seed ajustados al alfabeto real. Ver Notas de la fase. |
 | 4 — Predicciones | ⬜ pendiente | — | — | |
 | 5 — Standings + Admin | ⬜ pendiente | — | — | |
 | 6 — Duelos | ⬜ pendiente | — | — | |
