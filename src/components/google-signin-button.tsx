@@ -46,6 +46,7 @@ export function GoogleSignInButton({ next = "/predictions" }: { next?: string })
         type="button"
         variant="outline"
         size="xl"
+        data-testid="google-signin-button"
         className="w-full"
         onClick={handleGoogleSignIn}
         disabled={isLoading}

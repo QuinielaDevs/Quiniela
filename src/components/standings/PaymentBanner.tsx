@@ -54,6 +54,7 @@ export function PaymentBanner({
   return (
     <div
       role="status"
+      data-testid="payment-banner"
       className="sticky top-0 z-10 flex items-start gap-3 rounded-md border border-destructive bg-destructive/15 p-3 px-4 text-sm text-foreground"
     >
       <div className="flex-1 space-y-1">

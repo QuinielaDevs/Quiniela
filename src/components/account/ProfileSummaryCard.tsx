@@ -26,7 +26,10 @@ export function ProfileSummaryCard({
   badges,
 }: ProfileSummaryCardProps) {
   return (
-    <section className="rounded-md border border-border bg-card p-4 text-card-foreground shadow-none">
+    <section
+      className="rounded-md border border-border bg-card p-4 text-card-foreground shadow-none"
+      data-testid="profile-summary"
+    >
       <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
