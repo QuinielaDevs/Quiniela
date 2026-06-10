@@ -28,6 +28,7 @@ Plan de implementación por fases para llevar la suite E2E (Playwright) de su es
 | [`09-fase-9-journey-edge.md`](09-fase-9-journey-edge.md) | Gran tour multi-usuario (20 pasos) + cuenta/insignias/salir de liga/extremos (12 casos) | Sí |
 | [`10-fase-10-ci.md`](10-fase-10-ci.md) | CI paralelo, nightly, artefactos, política anti-flaky, presupuesto de tiempo | Sí |
 | `BUGS.md` | Registro de bugs de producto encontrados por los tests (lo crea la Fase 1) | — |
+| [`SEGUIMIENTO.md`](SEGUIMIENTO.md) | Estado por fase + decisiones de diseño que no deben revertirse + hallazgos/desviaciones + infraestructura disponible | — |
 
 ## Orden y dependencias
 
