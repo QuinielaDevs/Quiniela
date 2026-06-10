@@ -58,7 +58,9 @@ export async function updateSession(request: NextRequest) {
     // /join muestra la invitación a usuarios no logueados (la tarjeta ofrece
     // registro/login conservando el invite); no lo interceptamos hacia login.
     !request.nextUrl.pathname.startsWith("/join") &&
-    !request.nextUrl.pathname.startsWith("/api/webhooks")
+    !request.nextUrl.pathname.startsWith("/api/webhooks") &&
+    !request.nextUrl.pathname.startsWith("/api/standings") &&
+    !request.nextUrl.pathname.startsWith("/api/sync")
   ) {
     // Usuario no autenticado: lo mandamos a login PERO conservando el destino
     // original en `?next` para volver tras autenticarse (no se pierde el invite
