@@ -16,7 +16,7 @@
 | Fase | Estado | Fecha | Tests añadidos | Rama / commits |
 |---|---|---|---|---|
 | 1 — Fundación | ✅ completada | 2026-06-09 | 0 (por diseño; 22 existentes verdes ×3) | `test/e2e-full` · `9811e7f..0c36f51` |
-| 2 — Smoke + Auth | ⬜ pendiente | — | — | — |
+| 2 — Smoke + Auth | ✅ completada | 2026-06-10 | 26 (25 activos + 1 `fixme`) | `test/e2e-full` |
 | 3 — Ligas | ⬜ pendiente | — | — | — |
 | 4 — Predicciones | ⬜ pendiente | — | — | — |
 | 5 — Standings + Admin | ⬜ pendiente | — | — | — |
@@ -78,6 +78,32 @@ fases 2-10:
   Mitigación: usar `selectPhaseTab()` de `tests/e2e/helpers/ui.ts` (espera
   `toHaveCount(1)` antes del click) en vez de clicks directos a `[role="tab"]`.
   **No es bug de producto** (el DOM se asienta en un único tablist).
+
+---
+
+## Hallazgos y desviaciones de la Fase 2
+
+Detalle completo en las "Notas de ejecución" de
+[`02-fase-2-smoke-auth.md`](02-fase-2-smoke-auth.md). Lo crítico para fases
+posteriores:
+
+- **`.env.test.local` DEBE traer `NEXT_PUBLIC_SUPABASE_URL` y
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` del stack LOCAL**: dotenv las hereda de
+  `.env` (Supabase hosted) si faltan, y el webServer de Playwright autentica
+  contra otra base (todo login E2E falla con "Invalid login credentials").
+- **`supabase/config.toml` para E2E**: allow-list de redirects con el puerto
+  3100 (recuperación de contraseña) y `email_sent = 100`/h (el default 2/h
+  rompe ejecuciones consecutivas de AUTH-10). Aplicar con `supabase stop && start`.
+- **El flake del takeover de `next dev` deja la copia huérfana FUERA de
+  `<main>`**: patrón estable = anclar a `getByRole("main")` + `filter({ visible:
+  true })` + `toHaveCount(1)` (ver `expectSettledVisible` en `smoke.spec.ts`).
+- **BUG-001**: `/desafio/[id]` anónimo redirige a login (el middleware no lo
+  excluye); afecta a la Fase 6 (landing pública de duelos) — sus casos anon
+  deberán ser `fixme` hasta que se corrija el middleware.
+- **El middleware enmascara el 404 anónimo**: rutas inexistentes fuera de
+  prefijos públicos redirigen a login (no not-found).
+- **Forms de sign-up/forgot/update-password en inglés** (template); login en
+  español.
 
 ---
 

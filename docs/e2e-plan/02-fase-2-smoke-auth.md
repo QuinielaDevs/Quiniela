@@ -64,4 +64,64 @@ Un `describe` anon y otro autenticado (un solo usuario+liga sembrados en `before
 - SMK-11 puede destapar ruido legítimo (hydration warnings, etc.): documentar la lista blanca, no silenciar el caso entero.
 
 ## Notas de ejecución
-_(rellenar al ejecutar)_
+
+**Ejecutada**: 2026-06-10 · rama `test/e2e-full` · 26 tests nuevos (25 activos + 1 `fixme`).
+
+### Entregables
+- `tests/e2e/smoke.spec.ts` — SMK-01..11 + SMK-09b (`fixme`, BUG-001).
+- `tests/e2e/auth.spec.ts` — AUTH-01..14.
+
+### Cambios de infraestructura de test (no son lógica de producción)
+- `supabase/config.toml`:
+  - `additional_redirect_urls` ahora incluye el puerto **3100** (dev server E2E).
+    Sin esto, el `redirect_to` del email de recuperación no pasa la allow-list de
+    GoTrue y el link del email redirige a `site_url` (3000), donde en E2E no hay
+    servidor → AUTH-10 imposible.
+  - `auth.rate_limit.email_sent`: 2 → **100**/hora. El default rompe la tercera
+    ejecución consecutiva de AUTH-10 (1 email de recovery por run). Solo afecta
+    al stack local (Mailpit captura todo).
+  - Ambos cambios requieren `npx supabase stop && npx supabase start` para aplicar.
+- `.env.test.local` (trackeado): añadidas `NEXT_PUBLIC_SUPABASE_URL` y
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` apuntando al stack **local**, y
+  `ZAFRONIX_WEBHOOK_SECRET`. Sin las `NEXT_PUBLIC_*`, dotenv las hereda de
+  `.env` (Supabase **hosted**) y el webServer de Playwright autentica contra
+  otra base: TODO login E2E falla con "Invalid login credentials". (Así estaba
+  la línea base al arrancar esta fase; fue lo primero que hubo que arreglar.)
+
+### Desviaciones del plan (comportamiento real del producto)
+- **SMK-09 corre autenticado** y existe **SMK-09b (`fixme`)** anon: el middleware
+  redirige `/desafio/*` anónimo a login → **BUG-001** en `BUGS.md`. Además, el
+  `notFound()` de `/desafio/<uuid inexistente>` se lanza dentro de un `<Suspense>`
+  en streaming, así que el HTTP status es **200**; lo verificable es la UI
+  not-found de Next.
+- **SMK-10 usa `/auth/ruta-inexistente`**: para rutas anónimas fuera de los
+  prefijos públicos, el middleware redirige a login ANTES de que el router
+  resuelva not-found; el 404 puro solo se observa bajo `/auth/*` (o autenticado).
+- **AUTH-06**: el sign-up navega SIEMPRE a `/auth/sign-up-success` ("Thank you
+  for signing up!"), aunque en local `enable_confirmations=false` cree sesión
+  directa. El perfil lo crea el trigger con display_name "Jugador Anónimo".
+- **AUTH-11**: `/auth/update-password` sin sesión de recovery NO tiene guard:
+  renderiza el formulario y el submit falla controlado con "Auth session
+  missing!" en el testid `auth-error`.
+- **AUTH-14**: el usuario del describe no tiene liga → tras recargar se asserta
+  `no-league-state` (contenido autenticado real), no `predictions-board`.
+- Los formularios de sign-up/forgot/update-password están **en inglés** (los
+  componentes del template); login en español. Asserts copiados literal.
+
+### Estabilización (flake conocido del takeover de `next dev`)
+La duplicación transitoria de DOM documentada en Fase 1 (tablist) afecta a
+cualquier elemento tras un `goto`: aparece una **copia huérfana del árbol fuera
+de `<main>`** durante unos ms (a veces tras pasar un `toHaveCount(1)`). Patrón
+adoptado (smoke + auth): anclar el locator a `getByRole("main")` y assertear
+`filter({ visible: true })` con `toHaveCount(1)`. NO debilita asserts: si la
+duplicación fuera permanente, fallaría.
+
+### Lista blanca de consola (SMK-11)
+- `/Failed to load resource.*404/i` (recursos 404 de next dev, p. ej. favicon).
+- `/Warning: Extra attributes from the server/i` (hidratación en dev).
+Con esa lista blanca, el array de errores recogido quedó vacío en las
+ejecuciones locales.
+
+### Validación
+`npm run lint` ✅ · `npm run typecheck` ✅ · `npm run test:unit` ✅ (470) ·
+`npm run test:e2e` ✅ ×3 consecutivos (47 passed, 1 skipped por `fixme`).
