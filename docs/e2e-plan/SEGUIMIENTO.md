@@ -18,7 +18,7 @@
 | 1 — Fundación | ✅ completada | 2026-06-09 | 0 (por diseño; 22 existentes verdes ×3) | `test/e2e-full` · `9811e7f..0c36f51` |
 | 2 — Smoke + Auth | ✅ completada | 2026-06-10 | 26 (25 activos + 1 `fixme`) | `test/e2e-full` |
 | 3 — Ligas | ✅ completada | 2026-06-10 | 18 | `test/e2e-full` |
-| 4 — Predicciones | ⬜ pendiente | — | — | — |
+| 4 — Predicciones | ✅ completada | 2026-06-10 | 19 | `test/e2e-full` |
 | 5 — Standings + Admin | ⬜ pendiente | — | — | — |
 | 6 — Duelos | ⬜ pendiente | — | — | — |
 | 7 — Premios | ⬜ pendiente | — | — | — |
@@ -124,6 +124,29 @@ Detalle completo en [`03-fase-3-ligas.md`](03-fase-3-ligas.md). Lo crítico:
   actual" en `/account`; fallback a la membresía más reciente.
 - El `welcome-payment-modal` vive dentro de `<main>` (aunque sea overlay
   fixed): el patrón de anclaje anti-takeover aplica.
+
+---
+
+## Hallazgos y desviaciones de la Fase 4
+
+Detalle completo en [`04-fase-4-predicciones.md`](04-fase-4-predicciones.md).
+Lo crítico para fases posteriores:
+
+- **El candado de ESCRITURA es el kickoff EXACTO** (`fn_match_editable`:
+  `now() < match_time`, migración `20260605150000…`; la UI espeja con
+  `KICKOFF_LOCK_MS = 0`). El §4.3 del contexto y el comentario del preset
+  `lockedMatch()` (+30 s) están desactualizados: para sembrar un partido
+  bloqueado usa kickoff EN EL PASADO (p. ej. `kickoffOffsetMs: -30_000`).
+  La ventana de 1 min solo sobrevive en la LECTURA (`fn_match_unlocked`).
+- **Debounce real del autosave: 1500 ms** (no 500 ms).
+- Editar con multiplicador degradado abre un **alertdialog de confirmación**
+  (Cancelar/Continuar) antes de aplicar la edición.
+- El undo restaura el último estado persistido previo (servidor, ventana
+  2 min) y solo aparece si el guardado cambió el marcador.
+- Offline tiene **reintento automático** al evento `online` del navegador.
+- No hay UI que liste predicciones ajenas pre-kickoff: la invariante de
+  time-gating se verifica vía cliente autenticado con anon key (patrón de
+  PRED-19 en `predictions-lock.spec.ts`).
 
 ---
 

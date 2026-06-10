@@ -146,14 +146,16 @@ export function editableMatch(overrides: Partial<MatchSpec> = {}): MatchSpec {
   };
 }
 
-/** Partido bloqueado: kickoff en +30 s (ya dentro de la ventana de 1 min de
- *  fn_match_editable, sigue `scheduled`). */
+/** Partido bloqueado para ESCRITURA: kickoff hace 30 s, sigue `scheduled`.
+ *  El candado vigente es el kickoff EXACTO (fn_match_editable:
+ *  `now() < match_time`, migración 20260605150000): un kickoff futuro, aunque
+ *  sea +30 s, sigue siendo editable (Fase 4, SEGUIMIENTO.md). */
 export function lockedMatch(overrides: Partial<MatchSpec> = {}): MatchSpec {
   const tag = nextTag();
   return {
     home: `test_locked_h${tag}`,
     away: `test_locked_a${tag}`,
-    kickoffOffsetMs: 30 * 1000,
+    kickoffOffsetMs: -30 * 1000,
     status: "scheduled",
     matchday: 1,
     stage: "group",

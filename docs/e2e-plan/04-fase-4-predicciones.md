@@ -58,4 +58,56 @@ Seed: usuario+liga+partido editable J2/J3 (kickoff +2 días) con predicción def
 - El debounce de 500 ms obliga a un `waitForTimeout(~700)` puntual — permitido aquí por estar documentado (convención §8 del contexto).
 
 ## Notas de ejecución
-_(rellenar al ejecutar)_
+
+**Ejecutada**: 2026-06-10 · rama `test/e2e-full` · 19 tests nuevos
+(`predictions-edit.spec.ts` PRED-01..13, `predictions-lock.spec.ts`
+PRED-14..19). Los 21 existentes siguen verdes.
+
+### Desviaciones del plan/contexto (comportamiento real del producto)
+- **El candado es el kickoff EXACTO, sin ventana de 1 minuto**: la migración
+  vigente (`20260605150000_fix_tbd_knockout_predictions_lock.sql`) define
+  `fn_match_editable` como `now() < match_time`, y la UI lo espeja
+  (`KICKOFF_LOCK_MS = 0` en MatchCard). El §4.3 de `00-contexto.md` y el
+  preset `lockedMatch()` (+30 s) están desactualizados: un partido a +30 s
+  HOY sigue siendo editable. PRED-14 siembra el bloqueado con
+  `kickoffOffsetMs: -30_000` (scheduled con kickoff pasado).
+  `fn_match_unlocked` (lectura) sí conserva `match_time - 1 min`.
+- **El debounce real es 1500 ms** (`DEBOUNCE_MS` en MatchCard), no 500 ms.
+- **PRED-09 tiene confirmación explícita**: editar con multiplicador degradado
+  abre un `alertdialog` ("Advertencia de multiplicador" → "Tu multiplicador
+  bajara de X a Y.") con Cancelar/Continuar ANTES de aplicar la edición; una
+  confirmación cubre el resto de la sesión de la card (degradeAck).
+
+### Semánticas reales documentadas (DoD #4)
+- **Undo (`revertPrediction`)**: el servidor restaura el ÚLTIMO estado
+  persistido previo al cambio (marcador + multiplicador, stash de
+  `fn_save_prediction`), con ventana de gracia de 2 min (`UNDO_WINDOW_MS`,
+  espejo de `fn_revert_prediction` que rechaza con P0003 al expirar). El botón
+  solo aparece si el guardado CAMBIÓ el marcador respecto al guardado anterior.
+- **Offline**: `navigator.onLine === false` (o un error transitorio de red)
+  deja el guardado pendiente en memoria con estado "Sin conexion - Pendiente"
+  (borde destructivo) y SÍ hay reintento automático: un listener del evento
+  `window 'online'` relanza el guardado pendiente al volver la conexión.
+- **Predicciones ajenas pre-kickoff**: NO existe superficie de UI que las
+  liste (las queries de `/standings` filtran `finished` y las de `/live`
+  `live/finished`); la invariante la garantiza la policy SELECT con
+  `fn_match_unlocked` (visible desde `match_time - 1 min`). PRED-19 la
+  verifica por la vía real del cliente (sesión `signInWithPassword` con la
+  anon key) pre y post kickoff, y comprueba la superficie agregada que la
+  consume (`/live` con 2 `live-row`).
+- Los **defaults 0-0** (`fn_ensure_default_predictions`) se crean en cada
+  carga de `/predictions` para TODOS los partidos editables del catálogo
+  (no solo los `test_`), son idempotentes, y respetan J1=1.00 / resto
+  dinámico. Los TBD/locked no reciben default.
+
+### Estabilidad
+- Sin multiplicadores hardcodeados: expectativas vía
+  `expectedMultiplierForMatch()` (el único `2.5` de los specs es un seed
+  explícito por service role, permitido por el DoD).
+- PRED-17 etiquetado `@slow` con `test.setTimeout(150_000)` (espera real de
+  80 s); es el único de su tipo en la suite.
+- Mismo patrón anti-takeover de Fases 2-3 (locators anclados a `<main>`).
+
+### Validación
+`npm run lint` ✅ · `npm run typecheck` ✅ · `npm run test:unit` ✅ (470) ·
+`npm run test:e2e` ✅ ×3 consecutivos (83 passed, 1 skipped por `fixme` BUG-001).
