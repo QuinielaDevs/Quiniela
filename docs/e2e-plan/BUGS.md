@@ -37,3 +37,14 @@
   `src/app/desafio/[id]/page.tsx` (la página y su RPC `fn_get_challenge_landing`
   sí soportan anon; es el middleware quien bloquea).
 - **Estado**: abierto
+
+## BUG-002 — La expulsión de miembro no cancela duelos ni devuelve escrow
+
+- **Fecha**: 2026-06-10
+- **Fase / caso de prueba**: Fase 5 · ADM-08 (`tests/e2e/standings-admin.spec.ts`, `test.fixme`)
+- **Severidad**: alta
+- **Esperado**: Al expulsar a un miembro (`fn_remove_member`), los duelos activos en los que participaba deben cancelarse (`status = 'canceled'`) y el depósito en garantía (escrow) debe devolverse a las contrapartes (`refund_challenge_escrow`), manteniendo la invariante del ledger.
+- **Real**: El trigger `tr_cleanup_on_member_removed` (que ejecuta `fn_cleanup_on_member_removed`) no cancela los duelos del expulsado ni reembolsa el depósito en garantía a la contraparte.
+- **Archivos implicados**: `supabase/migrations/20260608120000_active_league_selection.sql` (redefine `fn_cleanup_on_member_removed`), `supabase/migrations/20260604120000_member_admin_management.sql` (definición inicial de la cascada de expulsión).
+- **Estado**: abierto
+

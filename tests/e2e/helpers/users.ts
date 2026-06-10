@@ -23,6 +23,7 @@ export interface E2EUser {
   userId: string;
   email: string;
   password: string;
+  displayName?: string;
 }
 
 export interface E2EAuth extends E2EUser {
@@ -64,7 +65,7 @@ export async function createUser(opts: CreateUserOpts = {}): Promise<E2EUser> {
       .upsert({ id: userId, display_name: opts.displayName }, { onConflict: "id" });
   }
 
-  return { userId, email, password: TEST_PASSWORD };
+  return { userId, email, password: TEST_PASSWORD, displayName: opts.displayName };
 }
 
 // Login por el formulario real. Labels y botón copiados de login-form.tsx.

@@ -60,4 +60,28 @@ Seed: liga con admin + 2 miembros; partidos `test_` en varios estados; un duelo 
 - `joined_at` para STD-04: setearlo explícitamente via service role (no depender del orden de inserción).
 
 ## Notas de ejecución
-_(rellenar al ejecutar)_
+
+### Matriz de Transiciones de Estado Real (Story 7.2 / Migración `20260604140000_admin_match_results_rpc.sql`)
+- **`scheduled`** → `scheduled`, `live`, `finished`, `suspended`, `canceled` (todas)
+- **`live`** → `scheduled`, `live`, `finished`, `suspended`, `canceled` (todas)
+- **`finished`** → `finished`, `live`
+- **`suspended`** → `scheduled`, `live`, `finished`, `suspended`, `canceled` (todas)
+- **`canceled`** → `scheduled`, `canceled`
+
+### Resultados Obtenidos (10 de junio, 2026)
+- **`tests/e2e/standings.spec.ts`**: 9 pruebas ejecutadas y aprobadas (cobertura total de STD-01 a STD-09).
+  - *Desempates (STD-01 a STD-04)*: Verificados con éxito (puntos totales desc -> exactos desc -> wager_balance desc -> joined_at asc).
+  - *Badge/Banner de Pago (STD-08)*: Corregido formateo de expectativas para ajustarse a `$100 USD` (según `formatUsd` de la app).
+  - *Predicciones Ajenas (STD-09)*: Verificada la visibilidad post-kickoff mediante cliente anon-key directo.
+- **`tests/e2e/standings-admin.spec.ts`**: 10 pruebas aprobadas, 1 saltada (`@fixme` por BUG-002).
+  - *Guard de Admin (ADM-01)*: Bloqueo server-side y UI comprobados.
+  - *Transiciones Inválidas (ADM-04)*: Comprobadas invocando el RPC directamente desde un usuario admin para verificar el control de base de datos.
+  - *Último Admin (ADM-09)*: Auto-expulsión e intento de expulsión bloqueados en RPC.
+  - *Expulsión y Cascada (ADM-08)*: Marcado con `test.fixme` debido al **BUG-002** (trigger ausente para liquidar/devolver escrow de duelos activos al expulsar un miembro).
+
+### Estabilidad y Validación Completa
+1. **Linting**: `npm run lint` -> Verde.
+2. **Typecheck**: `npm run typecheck` -> Verde (resolviendo tipos en fixture array indexing y assertions de `displayName`).
+3. **Unit Tests**: `npm run test:unit` -> Verde (470/470 pasados).
+4. **E2E Runs**: 3 ejecuciones consecutivas completas de Playwright (`npx playwright test --project=mobile-chromium`) -> Verde (102 pasados, 2 skipped/fixme en cada run).
+
