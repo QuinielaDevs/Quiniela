@@ -48,3 +48,24 @@
 - **Archivos implicados**: `supabase/migrations/20260608120000_active_league_selection.sql` (redefine `fn_cleanup_on_member_removed`), `supabase/migrations/20260604120000_member_admin_management.sql` (definición inicial de la cascada de expulsión).
 - **Estado**: abierto
 
+## BUG-003 — La página `/awards` no pasa el prop `activePhaseCode` a `AwardsBoard`
+
+- **Fecha**: 2026-06-10
+- **Fase / caso de prueba**: Fase 7 · AWD-05 (`tests/e2e/awards.spec.ts`, `test.fixme`)
+- **Severidad**: baja
+- **Esperado**: La página `/awards` (`src/app/awards/page.tsx`) debería pasar el prop `activePhaseCode` al componente `AwardsBoard` con el código de la fase activa actual en el torneo (A, B, C o D).
+- **Real**: `/awards` no pasa dicho prop, por lo que toma el valor por defecto `"D"`. En consecuencia, la tabla de puntos decrecientes en la UI resalta permanentemente la fase D como la activa, incluso si el torneo se encuentra en la fase A, B o C.
+- **Archivos implicados**: `src/app/awards/page.tsx`
+- **Estado**: abierto
+
+## BUG-004 — Los puntos de premios especiales no se muestran en la UI
+
+- **Fecha**: 2026-06-10
+- **Fase / caso de prueba**: Fase 7 · AWD-06/08 (`tests/e2e/awards.spec.ts`)
+- **Severidad**: media
+- **Esperado**: Los puntos acumulados al acertar los premios especiales (campeón, goleador, MVP) según la fase de su predicción deberían sumarse al total general del usuario en `/standings` y/o mostrarse explícitamente en `/account` (insignias, perfil).
+- **Real**: Ninguna vista de la UI consulta ni expone los puntos obtenidos por predicciones especiales. La lógica matemática e invariante de cálculo de puntos por predicción especial existe en la vista `special_predictions_with_points` de Postgres, pero está desconectada del front-end.
+- **Archivos implicados**: `src/app/standings/page.tsx`, `src/app/account/page.tsx`
+- **Estado**: abierto
+
+

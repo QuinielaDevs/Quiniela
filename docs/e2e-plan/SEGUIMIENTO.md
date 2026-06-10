@@ -19,9 +19,9 @@
 | 2 — Smoke + Auth | ✅ completada | 2026-06-10 | 26 (25 activos + 1 `fixme`) | `test/e2e-full` |
 | 3 — Ligas | ✅ completada | 2026-06-10 | 18 | `test/e2e-full` |
 | 4 — Predicciones | ✅ completada | 2026-06-10 | 19 | `test/e2e-full` |
-| 5 — Standings + Admin | ⬜ pendiente | — | — | — |
-| 6 — Duelos | ⬜ pendiente | — | — | — |
-| 7 — Premios | ⬜ pendiente | — | — | — |
+| 5 — Standings + Admin | ✅ completada | 2026-06-10 | 20 (19 activos + 1 `fixme` BUG-002) | `test/e2e-full` |
+| 6 — Duelos | ✅ completada | 2026-06-10 | 21 (18 activos + 3 `fixme` BUG-001) | `test/e2e-full` |
+| 7 — Premios | ✅ completada | 2026-06-10 | 13 (12 activos + 1 `fixme` BUG-003) | `test/e2e-full` |
 | 8 — Live + Webhooks | ⬜ pendiente | — | — | — |
 | 9 — Journey + Extremos | ⬜ pendiente | — | — | — |
 | 10 — CI | ⬜ pendiente | — | — | — |

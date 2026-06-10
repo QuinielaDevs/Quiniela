@@ -43,4 +43,11 @@ Snapshot de `tournament_phases` en `beforeAll`, restauración en `afterAll` (pas
 - Si la UI no muestra los puntos de premios en ningún sitio aún (posible gap de producto), AWD-08 se verifica contra la vista `special_predictions_with_points` en BD y se registra el gap de UI en `BUGS.md` como observación.
 
 ## Notas de ejecución
-_(rellenar al ejecutar)_
+- **Fecha de ejecución**: 2026-06-10
+- **Resultado de la suite**: 12 tests en verde (1 skipped `BUG-003`).
+- **Gaps y Desviaciones de Producto**:
+  1. **BUG-003**: En la ruta standalone `/awards`, el componente `AwardsBoard` no recibe el prop `activePhaseCode` desde `src/app/awards/page.tsx`, lo que provoca que se renderice siempre en la fase por defecto `"D"` y se resalte dicha fase en la tabla de puntos decrecientes, incluso cuando la fase activa en base de datos es A, B o C. La ruta de `/predictions` tab `"Premios Copa"` sí pasa el prop correctamente y ha sido utilizada para verificar el comportamiento de AWD-05 de forma reactiva.
+  2. **BUG-004**: Los puntos acumulados por los premios especiales no se muestran en ninguna parte de la UI (ni en standings, ni en account). Por esta razón, AWD-06 y AWD-08 han sido verificados consultando directamente la base de datos a través de la vista `special_predictions_with_points` con el cliente `service_role`.
+- **Estrategia E2E de tiempo decreciente (AWD-06)**: Para probar de manera determinista y veloz (sin esperar horas reales) que la recompensa se congela al momento de hacer la predicción según la fase activa, se sembraron 3 predicciones en 3 ligas con esperas de 2 segundos. Posteriormente, se actualizaron las fechas de `tournament_phases` en la base de datos para que los límites temporales dividieran exactamente estos timestamps.
+- **Takover del Dev Server de Next.js**: Se implementó la selección de elementos `data-testid="awards-board"` anclada al `<main>` (`page.getByRole("main").getByTestId("awards-board")`) para evitar duplicidad de elementos del DOM por la hidratación retrasada.
+
