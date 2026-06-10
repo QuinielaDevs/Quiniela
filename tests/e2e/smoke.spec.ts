@@ -188,8 +188,8 @@ test.describe("Smoke — rutas autenticadas", () => {
     await page.goto("/standings/manage");
     // El panel lista miembros y partidos gestionables (MemberAdminList /
     // MatchAdminList); con el seed hay al menos el propio admin.
-    await expect(page.getByTestId("member-admin-row").first()).toBeVisible();
-    await expect(page.getByTestId("match-admin-row").first()).toBeVisible();
+    await expect(page.getByRole("main").getByTestId("member-admin-row").first()).toBeVisible();
+    await expect(page.getByRole("main").getByTestId("match-admin-row").first()).toBeVisible();
   });
 
   test("SMK-07: /leagues/new carga autenticado con el formulario", async () => {
@@ -197,10 +197,10 @@ test.describe("Smoke — rutas autenticadas", () => {
 
     await page.goto("/leagues/new");
     await expect(
-      page.getByRole("heading", { name: "Crear nueva liga" }),
+      page.getByRole("main").getByRole("heading", { name: "Crear nueva liga" }),
     ).toBeVisible();
-    await expect(page.getByTestId("league-name-input")).toBeVisible();
-    await expect(page.getByTestId("create-league-submit")).toBeVisible();
+    await expect(page.getByRole("main").getByTestId("league-name-input")).toBeVisible();
+    await expect(page.getByRole("main").getByTestId("create-league-submit")).toBeVisible();
   });
 
   test("SMK-08: /join/<código válido> carga anónimo con el nombre de la liga", async ({

@@ -335,10 +335,10 @@ test.describe("Invitación y unión a ligas", () => {
     stack.add(() => session.context.close());
     const page = session.page;
 
-    // Con la liga A activa, /standings lista al rival de A y NO al de B.
+     // Con la liga A activa, /standings lista al rival de A y NO al de B.
     await page.goto("/standings");
-    await expect(page.getByText("E2E Rival Alfa")).toBeVisible();
-    await expect(page.getByText("E2E Rival Beta")).toHaveCount(0);
+    await expect(page.getByRole("main").getByText("E2E Rival Alfa")).toBeVisible();
+    await expect(page.getByRole("main").getByText("E2E Rival Beta")).toHaveCount(0);
 
     // Cambio de liga activa por la UI real (/account → "Usar esta liga").
     await page.goto("/account");
@@ -356,8 +356,8 @@ test.describe("Invitación y unión a ligas", () => {
 
     // Los datos ya no se cruzan: ahora /standings es de la liga B.
     await page.goto("/standings");
-    await expect(page.getByText("E2E Rival Beta")).toBeVisible();
-    await expect(page.getByText("E2E Rival Alfa")).toHaveCount(0);
+    await expect(page.getByRole("main").getByText("E2E Rival Beta")).toBeVisible();
+    await expect(page.getByRole("main").getByText("E2E Rival Alfa")).toHaveCount(0);
   });
 
   test("LIG-18: la landing trae metadata OG correcta para compartir", async ({

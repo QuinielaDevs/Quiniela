@@ -69,4 +69,33 @@ Cada test termina con `assertLedgerInvariant(leagueId)` (en `afterEach` del desc
 - Si la UI no expone alguna acción (p. ej. rechazar), verificar dónde vive realmente (¿landing? ¿dashboard?) antes de declarar bug.
 
 ## Notas de ejecución
-_(rellenar al ejecutar)_
+
+### 1. Semántica del Split del Pozo (DUE-15)
+Copiado de `20260604195000_resolve_challenges.sql`:
+- **Cálculo del Pozo Total:** `v_total_pot` se obtiene sumando los montos de escrow reales retenidos en el ledger:
+  ```sql
+  select coalesce(-sum(amount), 0) into v_total_pot
+  from public.point_transactions
+  where reference_id = v_challenge.id;
+  ```
+- **Reparto y Truncamiento:**
+  ```sql
+  v_base      numeric(12,2) := trunc(v_total_pot / v_winner_count::numeric, 2);
+  v_remainder numeric(12,2) := v_total_pot - (trunc(v_total_pot / v_winner_count::numeric, 2) * v_winner_count);
+  ```
+- **Asignación del Residuo:** Se asigna el sobrante determinista al primer ganador en orden alfabético de `user_id`:
+  ```sql
+  v_payout := v_base + case when v_i = 0 then v_remainder else 0 end;
+  ```
+
+### 2. Mensajes de Error Reales Mapeados (RPC a UI)
+- `P0001`: "La apuesta debe ser mayor que cero." / "Apuesta inválida."
+- `P0002`: "No puedes retarte a ti mismo."
+- `P0003`: "Saldo de puntos insuficiente para crear el desafío."
+- `P0004`: "El partido ya comenzó o no está disponible para apuestas."
+- `42501`: "No autorizado"
+
+### 3. Estado de la ejecución
+- **Resultado:** 18 tests implementados y pasando. 3 tests anónimos (`DUE-19`, `DUE-20`, `DUE-21`) marcados como `fixme` referenciando `BUG-001` (ya registrado en `docs/e2e-plan/BUGS.md`).
+- **Verificación:** Invariante del ledger de duelos (`assertLedgerInvariant`) ejecutada después de cada test de forma secuencial y determinista.
+- **Webhook payloads:** Se corrigieron los payloads enviados a `sendZafronixEvent` en `DUE-14` a `DUE-18` incluyendo la propiedad `teams` requerida por el contrato Zod para evitar el fallo `validation_failed` del handler de webhooks.

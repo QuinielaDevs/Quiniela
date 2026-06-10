@@ -74,7 +74,7 @@ Prompt plantilla para el agente ejecutor de la fase N:
 | 3 — Ligas | ✅ completada | 2026-06-10 | 18 (LIG-01 migrado del spec antiguo) | `league-create.spec.ts` + `league-join.spec.ts`. La landing auto-une al autenticado; monto 0 es válido por schema; códigos del seed ajustados al alfabeto real. Ver Notas de la fase. |
 | 4 — Predicciones | ✅ completada | 2026-06-10 | 19 | `predictions-edit.spec.ts` + `predictions-lock.spec.ts`. OJO: candado = kickoff EXACTO (sin ventana 1 min; §4.3 desactualizado) y debounce real 1500 ms. Ver Notas de la fase. |
 | 5 — Standings + Admin | ✅ completada | 2026-06-10 | 20 (19 activos + 1 `fixme` BUG-002) | `standings.spec.ts` y `standings-admin.spec.ts`. ADM-04 validado en RPC; ADM-08 marcado con `fixme` por trigger ausente de escrow. Ver Notas de la fase. |
-| 6 — Duelos | ⬜ pendiente | — | — | |
+| 6 — Duelos | ✅ completada | 2026-06-10 | 21 (18 activos + 3 fixme BUG-001) | `duels.spec.ts`. Invariante del ledger verificada tras cada test; corregido payload del webhook enviando teams. Ver Notas de la fase. |
 | 7 — Premios | ⬜ pendiente | — | — | |
 | 8 — Live + Webhooks | ⬜ pendiente | — | — | |
 | 9 — Journey + Extremos | ⬜ pendiente | — | — | |

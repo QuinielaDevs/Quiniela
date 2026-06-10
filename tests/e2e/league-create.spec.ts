@@ -135,10 +135,10 @@ test.describe("Creación de ligas (autenticado)", () => {
     try {
       const anonPage = await anon.newPage();
       await anonPage.goto(`/join/${leagues[0]!.invite_code}`);
-      await expect(anonPage.getByTestId("join-payment-info")).toContainText(
+      await expect(anonPage.getByRole("main").getByTestId("join-payment-info")).toContainText(
         "Tarifa de inscripción: $10 USD",
       );
-      await expect(anonPage.getByTestId("join-payment-info")).toContainText(
+      await expect(anonPage.getByRole("main").getByTestId("join-payment-info")).toContainText(
         instructions,
       );
     } finally {
