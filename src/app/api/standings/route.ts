@@ -158,7 +158,7 @@ export async function GET(req: NextRequest) {
         }
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("Unhandled error in standings API:", error);
     return NextResponse.json(
       { success: false, error: "Internal Server Error" },
