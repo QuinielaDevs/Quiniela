@@ -33,7 +33,9 @@ import {
 //   - El AFTER DELETE trigger fn_cleanup_on_member_removed borra, SOLO en esa
 //     liga: predictions, member_badges, member_game_profiles del usuario, y
 //     reasigna profiles.active_league_id a la membresía restante más reciente
-//     (o null). NO cancela duelos ni reembolsa escrow (mismo gap que BUG-002).
+//     (o null). Desde la migración 20260611120000_member_removal_duel_cascade
+//     (fix BUG-002) además cancela los duelos pending/active del saliente y
+//     reembolsa el escrow a los participantes (refund_challenge_escrow).
 
 test.describe("Cuenta y casos extremos transversales (e2e)", () => {
   const admin = createAdminClient();
@@ -260,14 +262,18 @@ test.describe("Cuenta y casos extremos transversales (e2e)", () => {
     expect(await before("member_badges")).toBe(0);
     expect(await before("member_game_profiles")).toBe(0);
 
-    // El duelo NO se cancela al salir (mismo gap documentado en BUG-002): el
-    // trigger de cleanup no toca challenges. Aserción del comportamiento REAL.
+    // Fix BUG-002 (20260611120000_member_removal_duel_cascade): al salir, el
+    // duelo pendiente donde el leaver era el retado se cancela y el escrow del
+    // creador (10 pts retenidos por create_challenge) se reembolsa.
     const { data: chal } = await admin
       .from("challenges")
       .select("status")
       .eq("id", challengeId)
       .single();
-    expect(chal!.status).toBe("pending");
+    expect(chal!.status).toBe("canceled");
+
+    // `other` recupera su saldo inicial: 50 (seed) − 10 (escrow) + 10 (refund).
+    expect(await getWagerBalance(league.id, other.userId)).toBe(50);
   });
 
   test("EDG-04: el único admin no puede salir (mensaje claro; sigue siendo miembro)", async () => {

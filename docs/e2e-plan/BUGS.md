@@ -46,7 +46,20 @@
 - **Esperado**: Al expulsar a un miembro (`fn_remove_member`), los duelos activos en los que participaba deben cancelarse (`status = 'canceled'`) y el depósito en garantía (escrow) debe devolverse a las contrapartes (`refund_challenge_escrow`), manteniendo la invariante del ledger.
 - **Real**: El trigger `tr_cleanup_on_member_removed` (que ejecuta `fn_cleanup_on_member_removed`) no cancela los duelos del expulsado ni reembolsa el depósito en garantía a la contraparte.
 - **Archivos implicados**: `supabase/migrations/20260608120000_active_league_selection.sql` (redefine `fn_cleanup_on_member_removed`), `supabase/migrations/20260604120000_member_admin_management.sql` (definición inicial de la cascada de expulsión).
-- **Estado**: abierto
+- **Estado**: **corregido** (migración `20260611120000_member_removal_duel_cascade.sql`).
+  - Alcance real del fix: el gap afectaba a **ambos** caminos de baja — expulsión
+    (`fn_remove_member`) y auto-baja (`fn_leave_league`) — porque comparten el
+    trigger `tr_cleanup_on_member_removed` (hallazgo de la Fase 9).
+  - La nueva versión de `fn_cleanup_on_member_removed` cancela los retos
+    `pending`/`active` del saliente en esa liga (creador, retado directo o
+    participante de pozo abierto) y reembolsa el escrow con el helper idempotente
+    `refund_challenge_escrow`. Incluye guarda anti-cascada: si el trigger se
+    dispara porque la LIGA o el PERFIL caen por cascada de FK, no inserta
+    reembolsos (violarían FK y abortarían el borrado padre).
+  - Tests: reactivado ADM-08 (`tests/e2e/standings-admin.spec.ts`, sin `fixme`),
+    invertido EDG-03 (`tests/e2e/account-edge.spec.ts`, que assertaba el
+    comportamiento buggy) y nuevo caso de integración en
+    `tests/integration/leave-league.test.ts`.
 
 ## BUG-003 — La página `/awards` no pasa el prop `activePhaseCode` a `AwardsBoard`
 

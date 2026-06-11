@@ -190,10 +190,13 @@ Detalle completo en las "Notas de ejecución" de
 
 - **Semántica REAL de `fn_leave_league` + `fn_cleanup_on_member_removed`**: al
   abandonar (o ser expulsado) se borran SOLO predicciones, medallas y perfil de
-  juego del usuario en esa liga, y se reasigna `active_league_id`. Los duelos
+  juego del usuario en esa liga, y se reasigna `active_league_id`. ~~Los duelos
   **NO** se cancelan ni se reembolsa escrow (mismo gap que **BUG-002**, también
-  en la auto-baja). El único admin no puede salir (`42501`, mensaje propagado a
-  la UI).
+  en la auto-baja).~~ **Corregido el 2026-06-11** (migración
+  `20260611120000_member_removal_duel_cascade.sql`): ahora ambos caminos cancelan
+  los duelos `pending`/`active` del saliente y reembolsan el escrow; EDG-03 y
+  ADM-08 assertan el comportamiento corregido. El único admin no puede salir
+  (`42501`, mensaje propagado a la UI).
 - **No existe evento Zafronix "go live"**: la transición a `live` se hace por
   service role (igual que Fase 8). El webhook FIRMADO se ejercita en el gol
   (`match.patched`, conserva status) y el finalized.

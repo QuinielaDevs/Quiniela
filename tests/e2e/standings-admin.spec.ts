@@ -318,12 +318,10 @@ test.describe("Panel de administración (e2e)", () => {
     await expect(row.getByTestId("payment-toggle")).toHaveText("Pagado");
   });
 
-  test("ADM-08: Expulsión con cascada de duelos @fixme", async () => {
-    // Marcamos este test como fixme debido al BUG-002 documentado en docs/e2e-plan/BUGS.md:
-    // El trigger tr_cleanup_on_member_removed de league_members no cancela los duelos activos del miembro expulsado
-    // ni reembolsa el depósito en garantía (escrow) a la contraparte.
-    test.fixme(true, "BUG-002: La expulsión de miembro no cancela duelos ni devuelve escrow");
-
+  test("ADM-08: Expulsión con cascada de duelos", async () => {
+    // BUG-002 corregido (migración 20260611120000_member_removal_duel_cascade.sql):
+    // tr_cleanup_on_member_removed cancela los duelos pending/active del expulsado
+    // y reembolsa el escrow vía refund_challenge_escrow.
     const page = fixture.users[0]!.page!;
     const duelMatch = await seedMatches([editableMatch({ matchday: 1, homeTeamCode: "ECU", awayTeamCode: "PER" })]);
     const dm = duelMatch[0]!;
@@ -344,6 +342,11 @@ test.describe("Panel de administración (e2e)", () => {
       ],
     });
 
+    // Saldos REALES previos al escrow (tests anteriores pueden haber acumulado
+    // accruals — p. ej. ADM-03 — así que NO se hardcodean: invariante del ledger).
+    const wbBefore1 = await getWagerBalance(fixture.league.id, fixture.users[1]!.userId);
+    const wbBefore2 = await getWagerBalance(fixture.league.id, fixture.users[2]!.userId);
+
     // Registrar transacciones de retención de escrow (-10) en point_transactions
     await admin.from("point_transactions").insert([
       {
@@ -362,16 +365,16 @@ test.describe("Panel de administración (e2e)", () => {
       },
     ]);
 
-    // Actualizar balance wager_balance a 10 (empezaron con 20)
+    // Descontar el escrow del saldo real (manteniendo balance == SUM(ledger))
     await admin
       .from("league_members")
-      .update({ wager_balance: 10.0 })
+      .update({ wager_balance: wbBefore1 - 10.0 })
       .eq("league_id", fixture.league.id)
       .eq("user_id", fixture.users[1]!.userId);
 
     await admin
       .from("league_members")
-      .update({ wager_balance: 10.0 })
+      .update({ wager_balance: wbBefore2 - 10.0 })
       .eq("league_id", fixture.league.id)
       .eq("user_id", fixture.users[2]!.userId);
 
@@ -393,9 +396,9 @@ test.describe("Panel de administración (e2e)", () => {
       .single();
     expect(dbChallenge.data!.status).toBe("canceled");
 
-    // Escrow devuelto a User 1 (contraparte). Saldo debe ser 20.0 otra vez (10.0 + 10.0 devueltos)
+    // Escrow devuelto a User 1 (contraparte): recupera su saldo previo al duelo.
     const wb1 = await getWagerBalance(fixture.league.id, fixture.users[1]!.userId);
-    expect(wb1).toBe(20.0);
+    expect(wb1).toBe(wbBefore1);
 
     // assertLedgerInvariant pasa para los miembros restantes
     await assertLedgerInvariant(fixture.league.id);
