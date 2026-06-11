@@ -78,7 +78,49 @@ Prompt plantilla para el agente ejecutor de la fase N:
 | 7 — Premios | ✅ completada | 2026-06-10 | 13 (12 activos + 1 `fixme` BUG-003) | `awards.spec.ts`. Gaps en UI de puntos (BUG-004) y prop de phase code (BUG-003) registrados. Ver Notas de la fase. |
 | 8 — Live + Webhooks | ✅ completada | 2026-06-10 (rev. 2026-06-11) | 18 `test()` (17 activos + 1 `fixme` BUG-005) | `live.spec.ts` y `webhooks.spec.ts`. Cobertura LIVE-01→07 y WHK-01→12. HMAC/replay/out-of-order/malformados validados E2E. **Desviación §9.1**: BUG-006 — `/live` no recibía Realtime para usuarios autenticados; se corrigió producción (`LiveStandingsBoard` ahora hace `realtime.setAuth` + migración `REPLICA IDENTITY FULL`). Mantenido y documentado por decisión del mantenedor. Ver Notas de la fase y BUGS.md. |
 | 9 — Journey + Extremos | ✅ completada | 2026-06-11 | 13 (gran tour `@slow` de 20 pasos + EDG-01..12) | `full-journey.spec.ts` y `account-edge.spec.ts`. Gran tour verde ×3. Semántica real de `leave_league`/cleanup copiada a notas (borra predicciones/medallas/perfil; NO cancela duelos → mismo gap de BUG-002). Steppers/nav vía `dispatchEvent` por el orphan del takeover de next dev. Sin bugs nuevos. Ver Notas de la fase. |
-| 10 — CI | ⬜ pendiente | — | — | |
+| 10 — CI | ✅ completada | 2026-06-11 | 0 (infra; no añade tests) | `ci.yml` en 4 jobs paralelos (quality/unit/integration/e2e) + `e2e-nightly.yml` (suite completa diaria + manual). Cache de browsers Playwright; artefactos `test-results/` en fallo; screenshot/vídeo CI-only. Script `test:e2e:ci` (mobile sin `@slow`). Política anti-flaky y runbook (`docs/testing.md`) publicados. DoD 1-2 (PR/nightly en verde) pendientes de ejecutar en GitHub. Ver Notas de la fase. |
+
+## CI y política anti-flaky (Fase 10)
+
+Runbook operativo completo (cómo correr cada nivel, requisitos, estructura) en
+[`docs/testing.md`](../testing.md). Resumen del pipeline:
+
+- **`ci.yml` (PR/push a `main`)**: 4 jobs **paralelos** — `quality` (lint+typecheck),
+  `unit`, `integration` (Supabase, 20 min) y `e2e` (Supabase + `test:e2e:ci`:
+  proyecto mobile sin `@slow`, 25 min). El tiempo del PR es el del job más lento,
+  no la suma. `integration` y `e2e` levantan **cada uno su propio** stack de
+  Supabase (la BD de test no puede compartirse — trampa §7.1). Cache de npm +
+  browsers de Playwright. Artefactos: HTML report siempre, `test-results/`
+  (traces/vídeos/capturas) solo en fallo.
+- **`e2e-nightly.yml` (diario 03:00 UTC + `workflow_dispatch`)**: suite E2E
+  **completa** (`test:e2e`) — ambos proyectos y todos los tags, incluidos `@slow`
+  y `@desktop`. Reportes/traces 14 días.
+
+### Política anti-flaky (vinculante)
+
+1. **`retries: 2` SOLO en CI** (local `retries: 0`: el fallo se ve al instante).
+2. Un test con retry en **>20% de los runs** → entra en lista de vigilancia de
+   [`BUGS.md`](BUGS.md) y **se investiga**, no se ignora.
+3. **Prohibido subir timeouts globales** para arreglar un caso puntual: ajustar
+   el `expect({ timeout })` de ESE test (patrón `@realtime`).
+4. **Prohibido `test.skip`/`test.fixme` sin entrada enlazada en `BUGS.md`**.
+   Nunca debilitar un assert para estabilizar (regla de oro §9.5).
+5. Determinismo: cero red externa, `runId` único, restaurar SIEMPRE el estado
+   global mutado (fases de torneo, ganadores de premios).
+
+### Presupuesto de tiempo
+
+Objetivo: PR ≤ ~20 min. Como la suite E2E corre con `workers: 1` (trampa §7.1),
+su duración es **lineal** (suma de los tests). Palancas, en orden:
+
+1. Recortar el solapamiento con `integration` (casos E2E que solo re-verifican BD
+   sin UI nueva).
+2. **Última** palanca (alta complejidad): split por `--shard` de Playwright
+   **manteniendo `workers:1` y una BD por shard** — cada shard su propio
+   `supabase start` en un job distinto (los shards NO pueden compartir BD).
+
+La medición real se documenta en las Notas de ejecución de
+[`10-fase-10-ci.md`](10-fase-10-ci.md).
 
 ## Fuera de alcance (deliberado, con justificación)
 

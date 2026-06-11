@@ -24,7 +24,7 @@
 | 7 — Premios | ✅ completada | 2026-06-10 | 13 (12 activos + 1 `fixme` BUG-003) | `test/e2e-full` |
 | 8 — Live + Webhooks | ✅ completada | 2026-06-10 (rev. 2026-06-11) | 18 `test()` (17 activos + 1 `fixme` BUG-005) | `test/e2e-full` · `4b29678` |
 | 9 — Journey + Extremos | ✅ completada | 2026-06-11 | 13 (gran tour `@slow` + EDG-01..12) | `test/e2e-full` |
-| 10 — CI | ⬜ pendiente | — | — | — |
+| 10 — CI | ✅ completada | 2026-06-11 | 0 (infra) | `test/e2e-full` |
 
 ---
 

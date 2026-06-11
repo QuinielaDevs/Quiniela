@@ -6,18 +6,19 @@ on:
   pull_request:
     branches: [main]
 
+# Cuatro jobs PARALELOS. Antes era un único job lineal (lint → typecheck →
+# playwright → supabase → test:ci): el feedback de un PR tardaba la SUMA de
+# todo. Separados, el PR tarda lo que el job más lento (e2e/integration).
+#
+# Solo `integration` y `e2e` levantan Supabase (cada uno su propio stack: la BD
+# de test NO puede compartirse entre jobs paralelos — `matches` es un catálogo
+# GLOBAL sin league_id, 00-contexto.md §7.1). `quality` y `unit` son 100%
+# offline y terminan en ~1-2 min.
+
 jobs:
-  test:
-    name: Lint, typecheck & test suite
+  quality:
+    name: Lint & typecheck
     runs-on: ubuntu-latest
-
-    # Placeholders para que `supabase start` sustituya env() en config.toml
-    # (proveedor Google). El flujo OAuth real NO se ejercita en CI; estos
-    # valores no son secretos.
-    env:
-      GOOGLE_CLIENT_ID: ci-placeholder-client-id
-      GOOGLE_CLIENT_SECRET: ci-placeholder-secret
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -37,6 +38,112 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm run test:unit
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Secreto de webhook determinista (NO es secreto real): el handler
+    # responde 500 sin él. `setup-env.ts` cae al mismo fallback, pero lo
+    # exportamos explícito para que cualquier proceso del job vea el mismo
+    # valor que firma `tests/integration/helpers/hmac.ts`.
+    env:
+      ZAFRONIX_WEBHOOK_SECRET: whsec_test_secret_for_integration_tests_only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local stack
+        run: supabase start
+
+      - name: Export Supabase local credentials
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          : "${API_URL:?supabase status no devolvió API_URL}"
+          : "${ANON_KEY:?supabase status no devolvió ANON_KEY}"
+          : "${SERVICE_ROLE_KEY:?supabase status no devolvió SERVICE_ROLE_KEY}"
+          PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-$ANON_KEY}"
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Stop Supabase local stack
+        if: always()
+        run: supabase stop || true
+
+  e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Placeholders para que `supabase start` sustituya env() en config.toml
+    # (proveedor Google). El flujo OAuth real NO se ejercita en CI.
+    env:
+      GOOGLE_CLIENT_ID: ci-placeholder-client-id
+      GOOGLE_CLIENT_SECRET: ci-placeholder-secret
+      # El webServer (`next dev`) hereda este env: el handler del webhook lo
+      # lee y los tests de `webhooks.spec.ts` re-firman con el MISMO valor.
+      ZAFRONIX_WEBHOOK_SECRET: whsec_test_secret_for_integration_tests_only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright browsers (chromium)
         run: npx playwright install --with-deps chromium
 
@@ -52,13 +159,9 @@ jobs:
         run: |
           set -euo pipefail
           eval "$(supabase status -o env)"
-          # Falla rápido si el CLI no devolvió alguna credencial obligatoria,
-          # en lugar de escribir variables vacías que romperían los tests más tarde.
           : "${API_URL:?supabase status no devolvió API_URL}"
           : "${ANON_KEY:?supabase status no devolvió ANON_KEY}"
           : "${SERVICE_ROLE_KEY:?supabase status no devolvió SERVICE_ROLE_KEY}"
-          # PUBLISHABLE_KEY solo lo emiten versiones recientes del CLI; para el
-          # stack local la clave publishable equivale a la anon → usar como fallback.
           PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-$ANON_KEY}"
           {
             echo "SUPABASE_URL=$API_URL"
@@ -67,14 +170,12 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
           } >> "$GITHUB_ENV"
-          # NOTA: ZAFRONIX_SANDBOX_KEY (zwc_skt_…) NO se inyecta en CI a
-          # propósito. Sin ella, la suite del ciclo live contra el sandbox real
-          # (tests/integration/zafronix-sandbox-e2e.test.ts) se OMITE (skip),
-          # manteniendo el CI 100% offline y sin consumir el cap de reset (10/h)
-          # ni la cuota diaria de Zafronix.
 
-      - name: Run full test suite (unit + integration + e2e)
-        run: npm run test:ci
+      # PR rápido: subset móvil sin @slow (las esperas reales >30 s y el proyecto
+      # desktop quedan para el nightly, ver e2e-nightly.yml). workers:1 por la
+      # trampa §7.1 — NO paralelizar dentro del job.
+      - name: Run E2E suite (mobile, sin @slow)
+        run: npm run test:e2e:ci
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -82,6 +183,14 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+          retention-days: 7
+
+      - name: Upload test-results (traces/vídeos/capturas)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results/
           retention-days: 7
 
       - name: Stop Supabase local stack

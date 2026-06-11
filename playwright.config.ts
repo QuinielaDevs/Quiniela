@@ -29,6 +29,11 @@ export default defineConfig({
   use: {
     baseURL,
     trace: "on-first-retry",
+    // Artefactos de depuración SOLO en CI (en local pesan y ralentizan sin
+    // aportar — el dev ya ve el navegador). En CI son la única ventana al
+    // fallo: captura al fallar y vídeo retenido solo si el test no pasó.
+    screenshot: process.env.CI ? "only-on-failure" : "off",
+    video: process.env.CI ? "retain-on-failure" : "off",
   },
   // App mobile-first: la suite corre sobre viewport móvil con motor Chromium
   // (único navegador instalado, en línea con el pipeline de CI). Los tests

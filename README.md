@@ -98,7 +98,13 @@ If you wish to just develop locally and not deploy to Vercel, [follow the steps 
 
 > Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
 
-## Testing y Pruebas de Contrato (Vitest)
+## Testing
+
+> **Runbook completo en [docs/testing.md](docs/testing.md)**: los tres niveles
+> (unit / integration / E2E Playwright), requisitos, estructura de `tests/e2e`,
+> tags, pipeline de CI (4 jobs paralelos + nightly) y política anti-flaky.
+
+### Pruebas de Contrato (Vitest)
 
 El proyecto cuenta con dos suites de pruebas principales:
 
