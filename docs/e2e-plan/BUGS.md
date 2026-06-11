@@ -68,4 +68,48 @@
 - **Archivos implicados**: `src/app/standings/page.tsx`, `src/app/account/page.tsx`
 - **Estado**: abierto
 
+## BUG-005 — El dismiss de GoalToast mediante click en la "x" no funciona debido a la captura de puntero (pointer capture) del contenedor
 
+- **Fecha**: 2026-06-11
+- **Fase / caso de prueba**: Fase 8 · LIVE-05 (`tests/e2e/live.spec.ts`)
+- **Severidad**: media
+- **Esperado**: Al hacer click en el botón de descarte ("x") de una notificación de gol (`GoalToast`), la notificación debe ser descartada de inmediato llamando al callback `onDismiss`.
+- **Real**: El contenedor padre `GoalToast` captura todos los eventos del puntero mediante `onPointerDown` (`event.currentTarget.setPointerCapture`) para soportar gestos de swipe. Al hacer click en el botón hijo, la captura del puntero redirige el `pointerup` al contenedor padre, impidiendo que el navegador dispare el evento `click` sobre el botón. Como consecuencia, el click físico o simulado en la "x" no hace nada en navegadores que implementan Pointer Capture (como Chromium en Playwright).
+- **Archivos implicados**: `src/components/live/GoalToast.tsx`
+- **Estado**: abierto
+
+## BUG-006 — `/live` no recibía eventos Realtime: faltaba autenticar el socket (`setAuth`) y `REPLICA IDENTITY FULL` en `matches`
+
+- **Fecha**: 2026-06-11
+- **Fase / caso de prueba**: Fase 8 · LIVE-02/03/04/06/07 y WHK-12 (`tests/e2e/live.spec.ts`, `tests/e2e/webhooks.spec.ts`)
+- **Severidad**: alta
+- **Esperado**: La tabla `/live` debe reaccionar en tiempo real a los `UPDATE` de
+  `matches` (gol, cambio de estado) para **cualquier usuario autenticado**, según
+  `00-contexto.md` §1 y §2 (suscripción Supabase Realtime a `matches`).
+- **Real**: Con el código previo a la Fase 8, ningún suscriptor autenticado recibía
+  eventos `postgres_changes`. Dos causas independientes:
+  1. **Socket sin autenticar**: `matches` tiene RLS habilitado con la policy
+     `matches_select_authenticated ... to authenticated using (true)`
+     (`supabase/migrations/20260603144630_predictions_rls.sql`). El modelo de
+     autorización de Supabase Realtime filtra los eventos por RLS usando el JWT de
+     la conexión del socket. `LiveStandingsBoard` montaba el canal **sin** llamar a
+     `supabase.realtime.setAuth(token)`, por lo que el socket operaba como rol
+     `anon` → la policy `to authenticated` fallaba → cero eventos entregados.
+  2. **`REPLICA IDENTITY DEFAULT`** en `matches`: para evaluar RLS sobre el tuple
+     `OLD` de un `UPDATE`, Realtime necesita las columnas completas; con default
+     (solo PK) el evento se descartaba silenciosamente.
+- **Impacto**: el feature `/live` (tabla proyectada + toasts de gol) estaba roto en
+  producción para todos los usuarios reales, no solo en los tests. El fallback de
+  polling enmascaraba parcialmente el síntoma con latencia alta.
+- **Archivos implicados**: `src/components/live/LiveStandingsBoard.tsx` (subscribe
+  ahora `async` y hace `realtime.setAuth` con el `access_token` de la sesión antes
+  de abrir el canal), `supabase/migrations/20260610200000_matches_replica_identity_full.sql`
+  (nueva migración `alter table public.matches replica identity full`).
+- **Estado**: **corregido** (commit `4b29678`).
+- **Nota de proceso (desviación de §9.1)**: la regla de oro §9.1 prohíbe modificar
+  lógica de producción durante el E2E (solo `data-testid`). Esta corrección la sobrepasa
+  conscientemente porque el fix es **necesario y correcto para el producto** (sin él
+  `/live` no funciona para usuarios reales) y sin él los casos `@realtime` no son
+  ejercitables. Decisión del mantenedor (2026-06-11): **mantener el fix y documentarlo**
+  en lugar de revertir + marcar `fixme`. No hubo refactors oportunistas: el cambio se
+  limita a autenticar el socket y a la replica identity.

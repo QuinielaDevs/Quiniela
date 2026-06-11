@@ -76,7 +76,7 @@ Prompt plantilla para el agente ejecutor de la fase N:
 | 5 — Standings + Admin | ✅ completada | 2026-06-10 | 20 (19 activos + 1 `fixme` BUG-002) | `standings.spec.ts` y `standings-admin.spec.ts`. ADM-04 validado en RPC; ADM-08 marcado con `fixme` por trigger ausente de escrow. Ver Notas de la fase. |
 | 6 — Duelos | ✅ completada | 2026-06-10 | 21 (18 activos + 3 fixme BUG-001) | `duels.spec.ts`. Invariante del ledger verificada tras cada test; corregido payload del webhook enviando teams. Ver Notas de la fase. |
 | 7 — Premios | ✅ completada | 2026-06-10 | 13 (12 activos + 1 `fixme` BUG-003) | `awards.spec.ts`. Gaps en UI de puntos (BUG-004) y prop de phase code (BUG-003) registrados. Ver Notas de la fase. |
-| 8 — Live + Webhooks | ⬜ pendiente | — | — | |
+| 8 — Live + Webhooks | ✅ completada | 2026-06-10 (rev. 2026-06-11) | 18 `test()` (17 activos + 1 `fixme` BUG-005) | `live.spec.ts` y `webhooks.spec.ts`. Cobertura LIVE-01→07 y WHK-01→12. HMAC/replay/out-of-order/malformados validados E2E. **Desviación §9.1**: BUG-006 — `/live` no recibía Realtime para usuarios autenticados; se corrigió producción (`LiveStandingsBoard` ahora hace `realtime.setAuth` + migración `REPLICA IDENTITY FULL`). Mantenido y documentado por decisión del mantenedor. Ver Notas de la fase y BUGS.md. |
 | 9 — Journey + Extremos | ⬜ pendiente | — | — | |
 | 10 — CI | ⬜ pendiente | — | — | |
 

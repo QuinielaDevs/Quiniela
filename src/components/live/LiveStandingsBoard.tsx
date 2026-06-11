@@ -420,7 +420,7 @@ export function LiveStandingsBoard({
           void supabase.removeChannel(channel);
           channel = null;
         }
-        subscribe();
+        void subscribe();
       }, POLLING_INTERVAL_MS);
     };
 
@@ -443,7 +443,19 @@ export function LiveStandingsBoard({
       }
     };
 
-    function subscribe() {
+    async function subscribe() {
+      if (disposed) return;
+
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          supabase.realtime.setAuth(token);
+        }
+      } catch (e) {
+        console.warn("[LiveStandingsBoard Client] Error loading session:", e);
+      }
+
       if (disposed) return;
 
       channel = supabase
@@ -456,7 +468,7 @@ export function LiveStandingsBoard({
         .subscribe(handleStatus);
     }
 
-    subscribe();
+    void subscribe();
 
     return () => {
       disposed = true;
