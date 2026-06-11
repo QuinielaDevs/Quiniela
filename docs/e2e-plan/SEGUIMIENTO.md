@@ -22,7 +22,7 @@
 | 5 — Standings + Admin | ✅ completada | 2026-06-10 | 20 (19 activos + 1 `fixme` BUG-002) | `test/e2e-full` |
 | 6 — Duelos | ✅ completada | 2026-06-10 | 21 (18 activos + 3 `fixme` BUG-001) | `test/e2e-full` |
 | 7 — Premios | ✅ completada | 2026-06-10 | 13 (12 activos + 1 `fixme` BUG-003) | `test/e2e-full` |
-| 8 — Live + Webhooks | ⬜ pendiente | — | — | — |
+| 8 — Live + Webhooks | ✅ completada | 2026-06-10 (rev. 2026-06-11) | 18 `test()` (17 activos + 1 `fixme` BUG-005) | `test/e2e-full` · `4b29678` |
 | 9 — Journey + Extremos | ⬜ pendiente | — | — | — |
 | 10 — CI | ⬜ pendiente | — | — | — |
 
@@ -147,6 +147,39 @@ Lo crítico para fases posteriores:
 - No hay UI que liste predicciones ajenas pre-kickoff: la invariante de
   time-gating se verifica vía cliente autenticado con anon key (patrón de
   PRED-19 en `predictions-lock.spec.ts`).
+
+---
+
+## Hallazgos y desviaciones de la Fase 8
+
+Detalle completo en [`08-fase-8-live-webhooks.md`](08-fase-8-live-webhooks.md) y
+`BUGS.md`. Lo crítico para fases posteriores:
+
+- **DESVIACIÓN DE §9.1 (cambio de producción, decisión a NO revertir)** —
+  **BUG-006**: `/live` no entregaba **ningún** evento Realtime a usuarios
+  autenticados. Causa doble: (1) `LiveStandingsBoard` montaba el canal sin
+  `supabase.realtime.setAuth(token)`, y como `matches` tiene RLS
+  `matches_select_authenticated (to authenticated using true)`, el socket anónimo
+  era rechazado por la autorización de Realtime; (2) `matches` estaba en
+  `REPLICA IDENTITY DEFAULT`, insuficiente para evaluar RLS sobre el `OLD` de un
+  `UPDATE`. **Se corrigió producción** (`subscribe()` ahora es `async` y autentica
+  el socket; nueva migración `20260610200000_matches_replica_identity_full.sql`).
+  Decisión del mantenedor (2026-06-11): **mantener el fix y documentarlo** porque es
+  necesario y correcto para que el feature funcione con usuarios reales (no solo en
+  tests). **No revertir** en fases posteriores.
+- **Tests `@realtime` server-authoritative**: los eventos de gol se siembran vía
+  service role (`admin.from("matches").update(...)`) o vía el endpoint webhook real;
+  el navegador queda abierto en `/live` ANTES de disparar. Tras abrir el canal hace
+  falta un pequeño asentamiento (`waitForTimeout(3000)`) antes del primer `UPDATE`
+  para evitar flake en frío (handshake del websocket).
+- **WHK-01 y WHK-12 comparten un único `test()`** (el caso que cierra el circuito
+  webhook firmado → BD → Realtime → UI): por eso la suite reporta 18 `test()` aunque
+  el plan enumera 19 casos.
+- **Claves exactas de respuesta del handler** (`route.ts`): éxito
+  `{ ok:true, event }`, out-of-order `{ ok:true, ignored:true, reason:"out_of_order" }`,
+  `401 signature_mismatch`, `401 replay_rejected`, `400 invalid_json`, `404 not_found`.
+- **BUG-005** (abierto): el dismiss por click en la "x" de `GoalToast` no funciona
+  por la captura de puntero del contenedor (swipe). LIVE-05 queda `fixme`.
 
 ---
 
