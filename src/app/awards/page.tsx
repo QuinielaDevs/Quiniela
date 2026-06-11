@@ -213,6 +213,7 @@ async function AwardsForLeague({
 
   let isLocked = false;
   let activePhaseLabel = "Semifinales en adelante";
+  let activePhaseCode = "D";
   try {
     const { data: activePhaseList, error: rpcError } = await supabase.rpc(
       "fn_get_active_tournament_phase",
@@ -224,6 +225,7 @@ async function AwardsForLeague({
     if (activePhase) {
       isLocked = activePhase.edits_locked;
       activePhaseLabel = activePhase.label;
+      activePhaseCode = activePhase.phase_code;
     }
   } catch (err) {
     console.error("Error resolving tournament phase on server:", err);
@@ -269,6 +271,7 @@ async function AwardsForLeague({
         initialSelections={initialSelections}
         isLocked={isLocked}
         activePhaseLabel={activePhaseLabel}
+        activePhaseCode={activePhaseCode}
       />
     </>
   );

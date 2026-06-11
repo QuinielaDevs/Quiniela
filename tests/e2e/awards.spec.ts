@@ -165,9 +165,9 @@ test.describe("/awards — Premios Especiales", () => {
   });
 
   test("AWD-05: Puntos potenciales según fase activa", async () => {
-    // BUG-003: La página /awards no pasa el prop activePhaseCode, por lo que
-    // siempre resalta la fase D por defecto. Vamos a usar la tab "Premios Copa" en /predictions
-    // donde sí funciona el prop activePhaseCode.
+    // Se verifica la reactividad del prop activePhaseCode en la tab "Premios
+    // Copa" de /predictions; el caso standalone de /awards (ex BUG-003, ya
+    // corregido) se cubre en el test "BUG-003" de más abajo.
     await page.goto("/predictions");
     await selectPhaseTab(page, "Premios Copa");
 
@@ -194,8 +194,8 @@ test.describe("/awards — Premios Especiales", () => {
   });
 
   test("BUG-003: La página /awards resalta la fase de puntos correcta", async () => {
-    // Este test fallará porque /awards no pasa activePhaseCode y cae por defecto a 'D'.
-    test.fixme();
+    // BUG-003 corregido: /awards ya resuelve phase_code del RPC
+    // fn_get_active_tournament_phase y lo pasa a AwardsBoard.
     await page.goto("/awards");
     await setActivePhase("A");
     await page.reload();

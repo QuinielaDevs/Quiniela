@@ -80,7 +80,11 @@
 - **Esperado**: La página `/awards` (`src/app/awards/page.tsx`) debería pasar el prop `activePhaseCode` al componente `AwardsBoard` con el código de la fase activa actual en el torneo (A, B, C o D).
 - **Real**: `/awards` no pasa dicho prop, por lo que toma el valor por defecto `"D"`. En consecuencia, la tabla de puntos decrecientes en la UI resalta permanentemente la fase D como la activa, incluso si el torneo se encuentra en la fase A, B o C.
 - **Archivos implicados**: `src/app/awards/page.tsx`
-- **Estado**: abierto
+- **Estado**: **corregido** (2026-06-11): `AwardsForLeague` ahora extrae
+  `phase_code` del RPC `fn_get_active_tournament_phase` (que ya consultaba para
+  `edits_locked`/`label`) y lo pasa como `activePhaseCode` a `AwardsBoard`,
+  espejo exacto de lo que ya hacía `/predictions`. Test "BUG-003" de
+  `awards.spec.ts` reactivado (sin `fixme`).
 
 ## BUG-004 — Los puntos de premios especiales no se muestran en la UI
 
