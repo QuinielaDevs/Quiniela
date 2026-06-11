@@ -666,7 +666,7 @@ export function MatchCard({
           {match.status === "scheduled" && !isTbd && (
             <>
               <span>·</span>
-              <span className="font-semibold text-accent">
+              <span className="font-semibold text-accent" data-testid="multiplier-badge">
                 {formatMultiplier(displayMultiplier)}
               </span>
               {multiplierDrift && (
@@ -729,6 +729,8 @@ export function MatchCard({
                   saveState === "saving" && "text-muted-foreground",
                 )}
                 role={saveState === "error" ? "alert" : "status"}
+                data-testid="save-status"
+                data-state={saveState}
               >
                 {statusCopy}
               </div>

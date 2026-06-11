@@ -112,12 +112,13 @@ export const MULTIPLIER_TIERS: ReadonlyArray<{
   distance: number;
   value: number;
 }> = [
-  { distance: 1, value: 1.25 },
-  { distance: 2, value: 1.5 },
-  { distance: 3, value: 1.75 },
-  { distance: 4, value: 2.0 },
-  { distance: 5, value: 2.25 },
-  { distance: 6, value: 2.5 },
+  { distance: 1, value: 1.0 },
+  { distance: 2, value: 1.25 },
+  { distance: 3, value: 1.5 },
+  { distance: 4, value: 1.75 },
+  { distance: 5, value: 2.0 },
+  { distance: 6, value: 2.25 },
+  { distance: 7, value: 2.5 },
 ];
 
 /**
@@ -178,10 +179,10 @@ export function currentRoundOrdinal(
   return current;
 }
 
-/** Multiplicador para una distancia (en jornadas). Distancia <= 0 → 1.0x. */
+/** Multiplicador para una distancia (en jornadas). Distancia <= 1 → 1.00x. */
 export function multiplierForDistance(distance: number): number {
-  if (!Number.isFinite(distance) || distance <= 0) return MIN_MULTIPLIER;
-  return Math.min(MAX_MULTIPLIER, MIN_MULTIPLIER + MULTIPLIER_STEP * distance);
+  if (!Number.isFinite(distance) || distance <= 1) return MIN_MULTIPLIER;
+  return Math.min(MAX_MULTIPLIER, MIN_MULTIPLIER + MULTIPLIER_STEP * (distance - 1));
 }
 
 /**
@@ -200,10 +201,7 @@ export function calculatePredictionMultiplier(
   if (target == null || target <= BASELINE_MATCHDAY) {
     return MIN_MULTIPLIER;
   }
-  // Referencia con piso en la jornada 1: pre-torneo (current 0) la J2 queda a
-  // distancia 1 (1.25x), no 2. Espeja greatest(fn_current_round_ordinal(), 1).
-  const reference = Math.max(currentOrdinal, BASELINE_MATCHDAY);
-  const distance = Math.max(0, target - reference);
+  const distance = Math.max(0, target - currentOrdinal);
   return multiplierForDistance(distance);
 }
 

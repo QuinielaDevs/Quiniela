@@ -1,3 +1,4 @@
+import type { ComponentPropsWithoutRef } from "react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +12,19 @@ const redirect = vi.fn((url: string) => {
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   redirect,
+}));
+
+vi.mock("next/image", () => ({
+  default: ({ src, alt, ...props }: ComponentPropsWithoutRef<"img">) => {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={alt ?? ""} {...props} />;
+  },
+}));
+
+vi.mock("@/components/google-signin-button", () => ({
+  GoogleSignInButton: () => (
+    <button type="button">Continuar con Google</button>
+  ),
 }));
 
 vi.mock("@/utils/supabase/server", () => ({
