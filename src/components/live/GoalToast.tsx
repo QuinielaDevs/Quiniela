@@ -42,6 +42,10 @@ function GoalToast({ toast, onDismiss }: GoalToastProps) {
   }, [toast.id, onDismiss]);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    // BUG-005: si el gesto empieza sobre el botón de descarte, no iniciar el
+    // swipe ni capturar el puntero — la captura redirige el pointerup al
+    // contenedor y el navegador nunca dispara el click del botón.
+    if ((event.target as HTMLElement).closest("button")) return;
     // Multi-touch: si ya hay un swipe en curso, ignorar punteros adicionales
     // para no sobreescribir el origen del gesto.
     if (startXRef.current !== null) return;

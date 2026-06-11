@@ -181,8 +181,10 @@ Detalle completo en [`08-fase-8-live-webhooks.md`](08-fase-8-live-webhooks.md) y
 - **Claves exactas de respuesta del handler** (`route.ts`): éxito
   `{ ok:true, event }`, out-of-order `{ ok:true, ignored:true, reason:"out_of_order" }`,
   `401 signature_mismatch`, `401 replay_rejected`, `400 invalid_json`, `404 not_found`.
-- **BUG-005** (abierto): el dismiss por click en la "x" de `GoalToast` no funciona
+- **BUG-005**: el dismiss por click en la "x" de `GoalToast` no funciona
   por la captura de puntero del contenedor (swipe). LIVE-05 queda `fixme`.
+  **Corregido el 2026-06-11**: el pointerdown sobre el botón ya no inicia el
+  swipe ni captura el puntero; LIVE-05 reactivado (detalle en `BUGS.md`).
 
 ---
 

@@ -100,7 +100,11 @@
 - **Esperado**: Al hacer click en el botón de descarte ("x") de una notificación de gol (`GoalToast`), la notificación debe ser descartada de inmediato llamando al callback `onDismiss`.
 - **Real**: El contenedor padre `GoalToast` captura todos los eventos del puntero mediante `onPointerDown` (`event.currentTarget.setPointerCapture`) para soportar gestos de swipe. Al hacer click en el botón hijo, la captura del puntero redirige el `pointerup` al contenedor padre, impidiendo que el navegador dispare el evento `click` sobre el botón. Como consecuencia, el click físico o simulado en la "x" no hace nada en navegadores que implementan Pointer Capture (como Chromium en Playwright).
 - **Archivos implicados**: `src/components/live/GoalToast.tsx`
-- **Estado**: abierto
+- **Estado**: **corregido** (2026-06-11): `handlePointerDown` ahora ignora los
+  gestos que empiezan sobre el botón de descarte
+  (`event.target.closest("button")` → return temprano, sin `setPointerCapture`),
+  de modo que el navegador sí dispara el `click` del botón. El swipe sobre el
+  cuerpo del toast no cambia. Test `LIVE-05` reactivado (sin `fixme`).
 
 ## BUG-006 — `/live` no recibía eventos Realtime: faltaba autenticar el socket (`setAuth`) y `REPLICA IDENTITY FULL` en `matches`
 

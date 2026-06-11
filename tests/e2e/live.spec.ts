@@ -202,7 +202,8 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
   // ── LIVE-05 ────────────────────────────────────────────────────────
 
   test("LIVE-05: Dismiss del toast", async () => {
-    test.fixme(true, "BUG-005: El dismiss de GoalToast mediante click en la x no funciona debido a la captura de puntero");
+    // BUG-005 corregido: el pointerdown sobre el botón de descarte ya no inicia
+    // el swipe ni captura el puntero, así que el click del botón llega.
     const page = fixture.users[0]!.page!;
 
     // Gol 4: 2-1 → 3-1 (genera toast fresco en caso de que los anteriores
