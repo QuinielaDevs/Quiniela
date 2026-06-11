@@ -99,7 +99,10 @@ posteriores:
   true })` + `toHaveCount(1)` (ver `expectSettledVisible` en `smoke.spec.ts`).
 - **BUG-001**: `/desafio/[id]` anónimo redirige a login (el middleware no lo
   excluye); afecta a la Fase 6 (landing pública de duelos) — sus casos anon
-  deberán ser `fixme` hasta que se corrija el middleware.
+  deberán ser `fixme` hasta que se corrija el middleware. **Corregido el
+  2026-06-11**: `/desafio` excluido del guard en `middleware.ts`;
+  `SMK-09b`/`DUE-19`/`DUE-20`/`DUE-21` reactivados (detalle en
+  `06-fase-6-duelos.md` §3-§4 y `BUGS.md`).
 - **El middleware enmascara el 404 anónimo**: rutas inexistentes fuera de
   prefijos públicos redirigen a login (no not-found).
 - **Forms de sign-up/forgot/update-password en inglés** (template); login en

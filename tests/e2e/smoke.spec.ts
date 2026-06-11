@@ -236,10 +236,9 @@ test.describe("Smoke — rutas autenticadas", () => {
     await expect(page.getByText("Sorry, something went wrong.")).toHaveCount(0);
   });
 
-  // BUG-001 (docs/e2e-plan/BUGS.md): /desafio/[id] está documentada como
-  // landing PÚBLICA (00-contexto §2: anon/auth, OG para WhatsApp), pero el
-  // middleware redirige a /auth/login a los visitantes anónimos.
-  test.fixme(
+  // BUG-001 corregido: /desafio/[id] es landing PÚBLICA (00-contexto §2:
+  // anon/auth, OG para WhatsApp); el middleware ya excluye /desafio del guard.
+  test(
     "SMK-09b: /desafio/<id> es accesible para anónimos (BUG-001)",
     async ({ page }) => {
       await page.goto(`/desafio/${randomUUID()}`);

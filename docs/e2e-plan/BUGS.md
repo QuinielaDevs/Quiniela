@@ -36,7 +36,18 @@
 - **Archivos implicados**: `src/utils/supabase/middleware.ts`,
   `src/app/desafio/[id]/page.tsx` (la página y su RPC `fn_get_challenge_landing`
   sí soportan anon; es el middleware quien bloquea).
-- **Estado**: abierto
+- **Estado**: **corregido** (2026-06-11): el middleware excluye `/desafio` del
+  guard de sesión (mismo patrón que `/join`). Decisión de producto confirmada
+  por el mantenedor: la landing es pública por diseño — el `id` es un UUID no
+  adivinable, el RPC ya tenía `GRANT` a `anon` con predicciones time-gated
+  (🔒 pre-kickoff) y todas las acciones siguen exigiendo sesión.
+  - Tests reactivados: `SMK-09b`, `DUE-19`, `DUE-20`, `DUE-21` (con asserts
+    adaptados al DOM real de `DesafioClient`; nunca habían corrido).
+  - Gap documentado y aplazado: cobertura del botón "Compartir en WhatsApp"
+    (ver `06-fase-6-duelos.md` §4 "Cobertura pendiente").
+  - Nota: el middleware sigue enmascarando el 404 anónimo de rutas inexistentes
+    fuera de prefijos públicos (redirige a login). Se decidió NO tocarlo en este
+    fix (comportamiento aceptable y separado de BUG-001).
 
 ## BUG-002 — La expulsión de miembro no cancela duelos ni devuelve escrow
 

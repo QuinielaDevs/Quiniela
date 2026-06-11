@@ -97,5 +97,25 @@ Copiado de `20260604195000_resolve_challenges.sql`:
 
 ### 3. Estado de la ejecución
 - **Resultado:** 18 tests implementados y pasando. 3 tests anónimos (`DUE-19`, `DUE-20`, `DUE-21`) marcados como `fixme` referenciando `BUG-001` (ya registrado en `docs/e2e-plan/BUGS.md`).
+  - **Actualización 2026-06-11**: BUG-001 corregido (el middleware excluye
+    `/desafio` del guard de sesión); `DUE-19/20/21` y `SMK-09b` reactivados con
+    los asserts adaptados al DOM real de `DesafioClient`: equipos como códigos
+    separados + "VS" central (no existe el literal "USA vs MEX"), OG description
+    con `home_team`/`away_team` completos, `next` URL-encodeado para conservar
+    `?accept=true` tras el login, y dialog de aceptación FUERA de `<main>`.
 - **Verificación:** Invariante del ledger de duelos (`assertLedgerInvariant`) ejecutada después de cada test de forma secuencial y determinista.
 - **Webhook payloads:** Se corrigieron los payloads enviados a `sendZafronixEvent` en `DUE-14` a `DUE-18` incluyendo la propiedad `teams` requerida por el contrato Zod para evitar el fallo `validation_failed` del handler de webhooks.
+
+### 4. Cobertura pendiente (gap conocido, decidido NO implementar por ahora — 2026-06-11)
+- **El botón "Compartir en WhatsApp" no tiene cobertura E2E** en ninguno de sus
+  3 puntos de montaje (`DuelsDashboard`, `CreateDuelDialog`, `DesafioClient`):
+  nadie verifica que la URL `https://api.whatsapp.com/send?text=...` que abre
+  `window.open` contenga el enlace correcto a `/desafio/<id>`. El mismo gap
+  existe en el lado de ligas (compartir invitación). El circuito inverso SÍ está
+  cubierto y espejado entre ambos flujos (landing anónima DUE-19/LIG-08,
+  metadata OG DUE-20/LIG-18, deep-link DUE-21/LIG-14, smoke SMK-09b/SMK-08).
+- Receta si se implementa (DUE-22/LIG-19): escuchar el evento `popup` de
+  Playwright, abortar la red externa con
+  `context.route("https://api.whatsapp.com/**", route => route.abort())`
+  (regla §8: cero dependencia de red externa) y assertar que el parámetro
+  `?text=` decodificado contiene `/desafio/<id>` (o `/join/<code>`).

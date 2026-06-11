@@ -789,9 +789,7 @@ test.describe("Duelos y Apuestas (e2e)", () => {
   // ──────────────────────────────────────────────────────────────────────
 
   test("DUE-19: /desafio/[id] anónima oculta predicciones", async ({ browser }) => {
-    // Marcado fixme por BUG-001: el middleware redirige a /auth/login a los anónimos
-    test.fixme(true, "BUG-001: /desafio/[id] no es accesible de forma anónima");
-
+    // BUG-001 corregido: el middleware excluye /desafio del guard de sesión.
     const matches = await seedMatches([
       editableMatch({ homeTeamCode: "USA", awayTeamCode: "MEX" }),
     ]);
@@ -814,9 +812,12 @@ test.describe("Duelos y Apuestas (e2e)", () => {
     const page = await context.newPage();
     await page.goto(`/desafio/${challengeId}`);
 
-    // Verify creator display name and match info
+    // Verify creator display name and match info. DesafioClient renderiza los
+    // equipos como códigos separados ("USA" / "MEX") con un "VS" central, no
+    // como un literal "USA vs MEX".
     await expect(page.getByRole("main").getByText(fixture.users[0]!.displayName!)).toBeVisible();
-    await expect(page.getByRole("main").getByText("USA vs MEX")).toBeVisible();
+    await expect(page.getByRole("main").getByText("USA", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("MEX", { exact: true })).toBeVisible();
     await expect(page.getByRole("main").getByText("Apuesta: 10 pts")).toBeVisible();
 
     // Verify predictions are hidden/masked with padlocks 🔒
@@ -826,9 +827,7 @@ test.describe("Duelos y Apuestas (e2e)", () => {
   });
 
   test("DUE-20: Metadata OG del desafío", async ({ browser }) => {
-    // Marcado fixme por BUG-001: el middleware redirige a /auth/login a los anónimos
-    test.fixme(true, "BUG-001: /desafio/[id] no es accesible de forma anónima");
-
+    // BUG-001 corregido: los crawlers (sin cookies) ya alcanzan generateMetadata.
     const matches = await seedMatches([
       editableMatch({ homeTeamCode: "USA", awayTeamCode: "MEX" }),
     ]);
@@ -852,16 +851,18 @@ test.describe("Duelos y Apuestas (e2e)", () => {
     const title = await page.locator('meta[property="og:title"]').getAttribute("content");
     const description = await page.locator('meta[property="og:description"]').getAttribute("content");
 
+    // generateMetadata usa home_team/away_team (nombres completos sembrados),
+    // no los códigos de equipo.
     expect(title).toContain(`Desafío 1v1: ${fixture.users[0]!.displayName}`);
-    expect(description).toContain("Apuesta tus puntos en el partido USA vs MEX");
+    expect(description).toContain(
+      `Apuesta tus puntos en el partido ${m.home_team} vs ${m.away_team}`,
+    );
 
     await context.close();
   });
 
   test("DUE-21: Deep-link: landing -> login -> aceptar", async ({ browser }) => {
-    // Marcado fixme por BUG-001: requiere abrir la landing anónimamente primero
-    test.fixme(true, "BUG-001: /desafio/[id] no es accesible de forma anónima");
-
+    // BUG-001 corregido: la landing anónima carga y ofrece iniciar sesión.
     const matches = await seedMatches([
       editableMatch({ homeTeamCode: "USA", awayTeamCode: "MEX" }),
     ]);
@@ -885,17 +886,21 @@ test.describe("Duelos y Apuestas (e2e)", () => {
     await page.goto(`/desafio/${challengeId}`);
     await expect(page.getByRole("main").getByText("Debes iniciar sesión con Google")).toBeVisible();
 
-    // Simulating redirect to password login with auto-accept parameter
-    await page.goto(`/auth/login?next=/desafio/${challengeId}?accept=true`);
+    // Login por password con next que conserva ?accept=true (getSafeNextPath
+    // preserva el query del destino; hay que URL-encodear el next completo).
+    const next = encodeURIComponent(`/desafio/${challengeId}?accept=true`);
+    await page.goto(`/auth/login?next=${next}`);
     await page.getByLabel("Correo electrónico").fill(fixture.users[1]!.email);
     await page.getByLabel("Contraseña").fill(fixture.users[1]!.password);
-    await page.getByRole("button", { name: "Iniciar sesión" }).click();
+    await page.getByRole("button", { name: /iniciar sesi/i }).click();
 
     // Login redirects B to the challenge page, which opens AcceptDuelDialog modal
     await page.waitForURL(new RegExp(`/desafio/${challengeId}`), { timeout: 15_000 });
-    
-    const dialog = page.getByRole("main").locator("form");
-    await expect(dialog.getByTestId("accept-duel-submit")).toBeVisible();
+
+    // El dialog se renderiza FUERA de <main> en DesafioClient (overlay tras
+    // </main>); no anclar a main. Solo existe un <form> con el dialog abierto.
+    const dialog = page.locator("form");
+    await expect(dialog.getByTestId("accept-duel-submit")).toBeVisible({ timeout: 15_000 });
 
     // Fill prediction and accept duel
     const homePicker = dialog.getByTestId("accept-home-pred");
@@ -903,6 +908,13 @@ test.describe("Duelos y Apuestas (e2e)", () => {
     const awayPicker = dialog.getByTestId("accept-away-pred");
     await awayPicker.getByTestId("goal-increment").click(); // 1
     await dialog.getByTestId("accept-duel-submit").click();
+
+    // Esperar el éxito del server action: el dialog se cierra y, tras el
+    // router.refresh, la landing muestra el estado activo del duelo.
+    await expect(page.getByTestId("accept-duel-submit")).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByRole("main").getByText("Duelo en Juego")).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Check challenge is now active
     const chal = await getChallenge(challengeId);
