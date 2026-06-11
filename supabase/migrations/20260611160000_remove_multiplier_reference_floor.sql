@@ -57,3 +57,6 @@ where p.match_id = m.id
   and public.fn_match_editable(m.id)
   and p.multiplier
       is distinct from public.fn_prediction_multiplier(m.matchday, m.stage);
+
+-- Permitir SELECT a anon sobre predictions para que RLS filtre las filas (retorne 0 filas sin error 42501)
+grant select on public.predictions to anon;

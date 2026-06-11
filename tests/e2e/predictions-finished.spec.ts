@@ -380,7 +380,6 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
       .like("home_team", "test_%");
 
     const matchIds = testMatches!.map(m => m.id);
-    const j1MatchIds = testMatches!.filter(m => m.matchday === 1).map(m => m.id);
     const j2Match = testMatches!.find(m => m.home_team === "test_mexico")!;
 
     // 1) Estado Pre-Torneo: Todo programado en el futuro
