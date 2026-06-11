@@ -23,7 +23,7 @@
 | 6 — Duelos | ✅ completada | 2026-06-10 | 21 (18 activos + 3 `fixme` BUG-001) | `test/e2e-full` |
 | 7 — Premios | ✅ completada | 2026-06-10 | 13 (12 activos + 1 `fixme` BUG-003) | `test/e2e-full` |
 | 8 — Live + Webhooks | ✅ completada | 2026-06-10 (rev. 2026-06-11) | 18 `test()` (17 activos + 1 `fixme` BUG-005) | `test/e2e-full` · `4b29678` |
-| 9 — Journey + Extremos | ⬜ pendiente | — | — | — |
+| 9 — Journey + Extremos | ✅ completada | 2026-06-11 | 13 (gran tour `@slow` + EDG-01..12) | `test/e2e-full` |
 | 10 — CI | ⬜ pendiente | — | — | — |
 
 ---
@@ -182,6 +182,35 @@ Detalle completo en [`08-fase-8-live-webhooks.md`](08-fase-8-live-webhooks.md) y
   por la captura de puntero del contenedor (swipe). LIVE-05 queda `fixme`.
 
 ---
+
+## Hallazgos y desviaciones de la Fase 9
+
+Detalle completo en las "Notas de ejecución" de
+[`09-fase-9-journey-edge.md`](09-fase-9-journey-edge.md). Lo crítico:
+
+- **Semántica REAL de `fn_leave_league` + `fn_cleanup_on_member_removed`**: al
+  abandonar (o ser expulsado) se borran SOLO predicciones, medallas y perfil de
+  juego del usuario en esa liga, y se reasigna `active_league_id`. Los duelos
+  **NO** se cancelan ni se reembolsa escrow (mismo gap que **BUG-002**, también
+  en la auto-baja). El único admin no puede salir (`42501`, mensaje propagado a
+  la UI).
+- **No existe evento Zafronix "go live"**: la transición a `live` se hace por
+  service role (igual que Fase 8). El webhook FIRMADO se ejercita en el gol
+  (`match.patched`, conserva status) y el finalized.
+- **`dispatchEvent("click")` para sortear el orphan del takeover de next dev**:
+  la copia huérfana del DOM queda FUERA de `<main>` y solapa/intercepta el click
+  físico aunque el locator anclado a `<main>` resuelva a 1. Donde el click caía
+  sobre el orphan (steppers de predicción, ítems de BottomNavbar) se usa
+  `dispatchEvent("click")` (dispara el `onClick` real sin hit-test). El indicador
+  de dev `<nextjs-portal>` (solo en `next dev`) se sortea igual.
+- **`GoalPicker` sin tope superior** (`max` indefinido): la UI permite
+  marcadores arbitrariamente altos por diseño; la BD solo exige `>= 0`. No es bug.
+- **Materialización de medallas**: corre en el render server-side de `/account`.
+  Para cerrar una jornada de prueba sin tocar el calendario real se usa una
+  jornada ALTA y única con kickoff FUTURO (finished pero `match_time > now`) para
+  no alterar la "jornada en curso" (trampa §7.2).
+- **welcome-payment-modal**: cualquier miembro `pending` de liga CON pago (incl.
+  admin/creador) lo ve sobre `/predictions`; hay que cerrarlo antes de interactuar.
 
 ## Contrato de testids e infraestructura disponible (Fase 1)
 

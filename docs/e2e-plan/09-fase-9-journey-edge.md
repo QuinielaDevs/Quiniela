@@ -68,4 +68,79 @@ Tres usuarios: Ana (creadora/admin), Beto y Carla. Partidos `test_`: 2 de J1 (fi
 - EDG-10: si el producto permite 99-99 sin límite superior, no es bug salvo que el schema diga lo contrario — assertear contra el schema real.
 
 ## Notas de ejecución
-_(rellenar al ejecutar)_
+
+**Fecha**: 2026-06-11 · **Specs**: `tests/e2e/full-journey.spec.ts` (1 test `@slow`, 20 pasos
+con `test.step`) y `tests/e2e/account-edge.spec.ts` (12 tests: EDG-01..12). **Resultado**:
+13 tests verdes (12 móvil + EDG-11 desktop). Gran tour **verde en 3 ejecuciones seguidas**
+(34 s c/u). `npm run lint` ✓, `npm run typecheck` ✓, `npm run test:unit` ✓ (470 tests).
+
+### Semántica REAL de leave_league / cleanup (copiada de las migraciones)
+Fuente: `supabase/migrations/20260607140000_leave_league.sql` (RPC `fn_leave_league`) y el
+trigger `fn_cleanup_on_member_removed` redefinido en `20260608120000_active_league_selection.sql`.
+- `fn_leave_league(p_league_id)`: el usuario actual (auth.uid()) se da de baja. Guardas:
+  no-miembro → `P0002`; **único admin → `42501`** con mensaje *"Eres el único admin de la
+  liga: transfiere la administración antes de salir"* (se propaga tal cual a la UI vía
+  `toLeaveLeagueError`). La server action lo mapea y `LeaveLeagueDialog` lo muestra en
+  `role="alert"`.
+- El AFTER DELETE trigger `fn_cleanup_on_member_removed` borra **solo en esa liga** y solo del
+  usuario que sale: `predictions`, `member_badges`, `member_game_profiles`. Además reasigna
+  `profiles.active_league_id` a la membresía restante más reciente (o `null`).
+- **NO toca `challenges` ni `point_transactions`**: los duelos del que sale NO se cancelan ni
+  se reembolsa el escrow (mismo gap que **BUG-002**, allí para la expulsión admin). EDG-03
+  asevera el comportamiento REAL (duelo sigue `pending`), no el ideal.
+
+### Desviaciones e decisiones de diseño (no son bugs de producto)
+- **Registro de usuarios**: los 3 usuarios del tour se crean por admin API + login por
+  formulario real (estrategia estándar de la suite, `helpers/users.ts`). El sign-up por
+  formulario ya está cubierto en Fase 2; reproducir 3 confirmaciones de email por Mailpit en
+  UN test `@slow` sería frágil sin aportar cobertura nueva.
+- **Transición a "live" (paso 11)**: el contrato Zafronix **no tiene evento "go live"**
+  (`route.ts` solo maneja finalized/patched/postponed). La transición a `live` se hace por
+  service role (idéntico a la Fase 8 / `webhooks.spec.ts`). El circuito **firmado** sí se
+  ejercita en el gol (`match.patched`, paso 12) y en el finalized (`match.finalized`, paso 13).
+- **partido 1 es de Jornada 1** → multiplicador SIEMPRE 1.0x: los puntos quedan deterministas
+  (Ana exacto 5.0, Beto resultado 2.0, Carla 0.0) sin depender de la "jornada en curso" del
+  seed real (trampa §7.2). La expectativa del paso 14 se reconstruye importando
+  `buildStandings` de `src/utils/standings.ts` con los datos reales de BD (cero números mágicos).
+- **welcome-payment-modal**: en una liga CON pago, TODO miembro `pending` (incluido el
+  admin/creador) ve el modal de bienvenida sobre `/predictions`; tapa el tablero. `setPrediction`
+  lo cierra (`welcome-payment-close`) antes de interactuar (igual que LIG-13).
+- **Takeover de `next dev` (orphan card/nav FUERA de `<main>`)**: el flake documentado en
+  SEGUIMIENTO (Fase 1/2) deja una copia huérfana del DOM que **solapa e intercepta el click
+  físico** aunque el locator anclado a `<main>` resuelva a 1 elemento. Donde el click físico
+  caía sobre esa copia (steppers de predicción del tour; ítems de la BottomNavbar en EDG-08)
+  se activa el handler con `dispatchEvent("click")`, que dispara el `onClick` real (React por
+  delegación) sin depender del hit-test. No debilita asserts: el estado/autosave igual cambia.
+- **Indicador de dev de Next (`<nextjs-portal>`)**: artefacto solo de `next dev` (inexistente
+  en producción) anclado abajo-izquierda; solapa el ítem más a la izquierda de la barra fija.
+  EDG-08 lo sortea con `dispatchEvent("click")` (no requiere ocultarlo).
+
+### Números del gran tour (verificados UI + BD)
+- Saldo de duelos sembrado: 50 pts por jugador (con su transacción `seed_initial_balance`).
+- Duelo Ana↔Beto (apuesta 10) sobre partido 1 (final 2-0): Ana pred. duelo 2-0 (base 5) gana a
+  Beto 0-0 (base 0). Liquidación + accrual de predicciones normales (J1, ×1.0):
+  - Ana: 50 − 10 escrow + 20 pozo + 5.0 accrual = **65.0**
+  - Beto: 50 − 10 escrow + 0 + 2.0 accrual = **42.0**
+  - Carla: 50 + 0 = **50.0**
+  - `assertLedgerInvariant` pasa para los tres (paso 16).
+- Standings oficiales (solo finished): Ana 5.0 > Beto 2.0 > Carla 0.0 (orden verificado contra
+  `buildStandings`). Tras salir Carla (paso 18): 2 filas.
+
+### EDG — notas por caso
+- **EDG-02**: la materialización de medallas corre en el render server-side de `/account`
+  (`materializeCurrentMemberAwards`). Para que `closedMatchdays` incluya la jornada, TODOS sus
+  partidos deben ser terminales → se usa una **jornada alta y única** (sin partidos del seed
+  real) con un partido `finished` 3-0 y **kickoff futuro** (para no alterar la "jornada en
+  curso"; trampa §7.2). Predicción exacta 3-0 (marcador difícil, `max>=3`) → insignia
+  `nostradamus`. Se limpia la medalla materializada en el `finally` para no contaminar reruns.
+- **EDG-05**: re-unirse tras salir no deja restos del valor anterior; `/predictions` regenera
+  defaults 0-0 para los editables, por lo que el caso asevera que la predicción de `m` es
+  default (0-0) o nula (no el 1-1 previo) y que `wager_balance` vuelve a 0.
+- **EDG-10**: el `GoalPicker` **no tiene tope superior** (`max` indefinido en `GoalPicker.tsx`):
+  la UI permite marcadores arbitrariamente altos por diseño (la BD solo exige `>= 0`). No es
+  bug. El límite del nombre de liga es 80 chars (`leagues.schema.ts`); con 80 la liga se crea.
+- **EDG-11** corre SOLO en el proyecto `desktop-chromium` (`@desktop`, 1280×800), en su propio
+  `describe` con fixture mínima para que el proyecto móvil no levante ese setup.
+
+No se registraron bugs nuevos de producto en esta fase (BUG-002 ya estaba documentado y EDG-03
+solo confirma su alcance también en la auto-baja).
