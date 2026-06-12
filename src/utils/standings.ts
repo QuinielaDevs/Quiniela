@@ -23,8 +23,9 @@ export type StandingMember = {
   avatarUrl: string;
   paymentStatus: PaymentStatus;
   joinedAt: string; // ISO 8601 UTC (league_members.joined_at)
-  /** Saldo de puntos de duelos (league_members.wager_balance). Toda la liga,
-   *  no por jornada. 2º criterio de desempato. Opcional → 0 si no se provee. */
+  /** Neto de puntos ganados/perdidos en duelos (RPC league_duel_points; excluye
+   *  acreditaciones de jornada). Toda la liga, no por jornada. Puede ser
+   *  negativo. 2º criterio de desempate. Opcional → 0 si no se provee. */
   duelPoints?: number;
 };
 
@@ -56,7 +57,8 @@ export type StandingRow = {
   exactCount: number;
   /** Aciertos solo de resultado/ganador o empate (2 pts), sin el marcador exacto. */
   resultCount: number;
-  /** Saldo de puntos de duelos usado en el desempate y mostrado en General. */
+  /** Neto de duelos (ganado − perdido) usado en el desempate y mostrado en
+   *  General. Puede ser negativo. */
   duelPoints: number;
 };
 
@@ -75,8 +77,8 @@ function round2(value: number): number {
  * @param phaseKeyOrMatchday  undefined = acumulado (General); string/número = fase/jornada específica.
  *
  * Desempate (Story 3.1 AC #5): puntos desc → marcadores exactos desc →
- * saldo de duelos (wager_balance) desc → joined_at asc. El saldo de duelos
- * llega vía `member.duelPoints` (0 si no se provee).
+ * neto de duelos desc → joined_at asc. El neto de duelos llega vía
+ * `member.duelPoints` (0 si no se provee).
  */
 export function buildStandings(
   members: StandingMember[],
@@ -128,7 +130,7 @@ export function buildStandings(
       totalPoints: round2(totalPoints),
       exactCount,
       resultCount,
-      // Saldo de duelos (wager_balance) de toda la liga. 2º criterio de desempate.
+      // Neto de duelos de toda la liga. 2º criterio de desempate.
       duelPoints: member.duelPoints ?? 0,
     };
   });

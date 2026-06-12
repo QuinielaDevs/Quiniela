@@ -1,12 +1,7 @@
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 
 import { LiveStandingsBoard } from "@/components/live/LiveStandingsBoard";
 import type { LiveMatch } from "@/components/live/goalImpact";
-import { BottomNavbar } from "@/components/layout/BottomNavbar";
-import { AppTopNav } from "@/components/layout/AppTopNav";
-import { BrandEyebrow } from "@/components/layout/BrandEyebrow";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
 import { createClient } from "@/utils/supabase/server";
 import { getActiveLeagueMembership } from "@/utils/active-league";
@@ -100,45 +95,10 @@ export async function LiveBoard() {
   );
 }
 
-function BoardSkeleton() {
-  return (
-    <div className="flex flex-col gap-2">
-      {[0, 1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="h-16 animate-pulse rounded-md border border-border bg-card"
-        />
-      ))}
-    </div>
-  );
-}
-
+// La tabla "En vivo" está deshabilitada temporalmente: la API de partidos no
+// entrega marcadores en directo, así que la ruta redirige a /standings. Todo el
+// andamiaje (LiveBoard, LiveStandingsBoard, polling/realtime) se conserva para
+// reactivarlo sin reescribir cuando la fuente de datos lo soporte.
 export default function LivePage() {
-  return (
-    <>
-      <AppTopNav />
-      <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pb-10">
-        <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
-          <header className="flex items-center justify-between">
-            <div className="space-y-1">
-              <BrandEyebrow />
-              <h1 className="font-display text-2xl font-bold lg:text-4xl">Tabla en Vivo</h1>
-            </div>
-            <Link
-              href="/standings"
-              className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Volver
-            </Link>
-          </header>
-
-          <Suspense fallback={<BoardSkeleton />}>
-            <LiveBoard />
-          </Suspense>
-        </div>
-
-        <BottomNavbar />
-      </main>
-    </>
-  );
+  redirect("/standings");
 }

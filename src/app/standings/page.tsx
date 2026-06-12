@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Radio, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 
 import { createClient } from "@/utils/supabase/server";
 import { StandingsTable } from "@/components/standings/StandingsTable";
@@ -24,7 +24,6 @@ type MemberRow = {
   role: LeagueRole;
   payment_status: PaymentStatus;
   joined_at: string;
-  wager_balance: number;
   profiles: { display_name: string; avatar_url: string } | null;
 };
 
@@ -49,22 +48,36 @@ export async function StandingsBoard() {
   // La RLS ya autoriza estas lecturas a un miembro: league_members/profiles de
   // su liga, los matches (catálogo común) y las predicciones de rivales para
   // partidos desbloqueados (finished → siempre visibles). NO usar service_role.
-  const [{ data: memberRows }, { data: finished }, { data: league }] =
-    await Promise.all([
-      supabase
-        .from("league_members")
-        .select("user_id, role, payment_status, joined_at, wager_balance, profiles(display_name, avatar_url)")
-        .eq("league_id", leagueId),
-      supabase
-        .from("matches")
-        .select("id, status, matchday, stage, home_score, away_score")
-        .eq("status", "finished"),
-      supabase
-        .from("leagues")
-        .select("name, requires_payment, payment_amount, payment_instructions")
-        .eq("id", leagueId)
-        .single(),
-    ]);
+  const [
+    { data: memberRows },
+    { data: finished },
+    { data: league },
+    { data: duelPointRows },
+  ] = await Promise.all([
+    supabase
+      .from("league_members")
+      .select("user_id, role, payment_status, joined_at, profiles(display_name, avatar_url)")
+      .eq("league_id", leagueId),
+    supabase
+      .from("matches")
+      .select("id, status, matchday, stage, home_score, away_score")
+      .eq("status", "finished"),
+    supabase
+      .from("leagues")
+      .select("name, requires_payment, payment_amount, payment_instructions")
+      .eq("id", leagueId)
+      .single(),
+    // Neto de duelos por miembro (no el saldo apostable). RPC security definer:
+    // point_transactions tiene RLS por-dueño y no podríamos agregar el resto.
+    supabase.rpc("league_duel_points", { p_league_id: leagueId }),
+  ]);
+
+  // userId → neto de duelos. Ausente ⇒ 0 (nunca participó en un duelo).
+  const duelPointsByUser = new Map<string, number>(
+    ((duelPointRows ?? []) as { user_id: string; duel_points: number }[]).map(
+      (row) => [row.user_id, Number(row.duel_points ?? 0)],
+    ),
+  );
 
   const finishedMatches: StandingMatch[] = (finished ?? []).map((m) => ({
     id: m.id,
@@ -101,7 +114,7 @@ export async function StandingsBoard() {
     avatarUrl: m.profiles?.avatar_url ?? "/assets/avatars/default-player.svg",
     paymentStatus: m.payment_status,
     joinedAt: m.joined_at,
-    duelPoints: Number(m.wager_balance ?? 0),
+    duelPoints: duelPointsByUser.get(m.user_id) ?? 0,
   }));
 
   const currentMember = rows.find((m) => m.user_id === userId);
@@ -120,17 +133,11 @@ export async function StandingsBoard() {
         />
       )}
 
-      <div className="flex justify-end gap-2">
-        <Link
-          href="/live"
-          aria-label="Ver tabla en vivo"
-          className="inline-flex h-12 items-center gap-2 rounded-full border border-accent bg-accent/15 px-4 text-sm font-semibold text-accent"
-        >
-          <Radio className="size-5" aria-hidden="true" />
-          En vivo
-        </Link>
-
-        {isAdmin && (
+      {/* La tabla "En vivo" está deshabilitada temporalmente: la API de partidos
+          no entrega marcadores en directo, así que el acceso se oculta (la ruta
+          /live redirige a /standings). Restaurar cuando la fuente lo soporte. */}
+      {isAdmin && (
+        <div className="flex justify-end gap-2">
           <Link
             href="/standings/manage"
             aria-label="Gestionar liga"
@@ -139,8 +146,8 @@ export async function StandingsBoard() {
             <Settings className="size-5" aria-hidden="true" />
             Gestionar
           </Link>
-        )}
-      </div>
+        </div>
+      )}
 
       <StandingsTable
         members={members}

@@ -46,7 +46,7 @@ export function StandingsTable({
     [members, matches, predictions, activeKey],
   );
 
-  // El saldo de duelos es de toda la liga (no por jornada): solo se muestra en
+  // El neto de duelos es de toda la liga (no por jornada): solo se muestra en
   // la pestaña General para no confundir con un valor por-jornada.
   const showDuels = activeKey === "general";
 
@@ -75,7 +75,8 @@ export function StandingsTable({
       <p className="text-xs text-muted-foreground">
         Desempate: puntos → <strong className="font-semibold">exactos</strong>{" "}
         (marcador exacto, 5 pts) →{" "}
-        <strong className="font-semibold">duelos</strong> (saldo). También se
+        <strong className="font-semibold">duelos</strong> (neto ganado/perdido).
+        También se
         muestran los aciertos de <strong className="font-semibold">resultado</strong>{" "}
         (solo ganador o empate, 2 pts).
       </p>

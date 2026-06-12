@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getClaims = vi.fn();
 const from = vi.fn();
+const rpc = vi.fn();
 const redirect = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
 });
@@ -14,7 +15,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/utils/supabase/server", () => ({
-  createClient: vi.fn(async () => ({ auth: { getClaims }, from })),
+  createClient: vi.fn(async () => ({ auth: { getClaims }, from, rpc })),
 }));
 
 // Componentes cliente stubbeados: el test enfoca el plumbing de datos de la página.
@@ -86,6 +87,8 @@ describe("/standings (StandingsBoard)", () => {
     vi.resetModules();
     vi.clearAllMocks();
     getClaims.mockResolvedValue({ data: { claims: { sub: "user-1" } } });
+    // RPC league_duel_points: sin duelos jugados por defecto.
+    rpc.mockResolvedValue({ data: [], error: null });
   });
 
   afterEach(() => {
@@ -166,7 +169,7 @@ describe("/standings (StandingsBoard)", () => {
     expect(gear).toHaveAttribute("href", "/standings/manage");
   });
 
-  it("muestra enlace a la tabla en vivo", async () => {
+  it("no muestra enlace a la tabla en vivo (funcionalidad deshabilitada)", async () => {
     mockTables({
       league_members: { data: MEMBERS },
       matches: { data: [] },
@@ -182,9 +185,28 @@ describe("/standings (StandingsBoard)", () => {
 
     await renderBoard();
 
-    const liveLink = screen.getByLabelText("Ver tabla en vivo");
-    expect(liveLink).toBeInTheDocument();
-    expect(liveLink).toHaveAttribute("href", "/live");
+    expect(screen.queryByLabelText("Ver tabla en vivo")).not.toBeInTheDocument();
+  });
+
+  it("consulta el neto de duelos vía RPC league_duel_points para la liga activa", async () => {
+    mockTables({
+      league_members: { data: MEMBERS },
+      matches: { data: [] },
+      leagues: {
+        data: {
+          name: "La Pija",
+          requires_payment: false,
+          payment_amount: null,
+          payment_instructions: null,
+        },
+      },
+    });
+
+    await renderBoard();
+
+    expect(rpc).toHaveBeenCalledWith("league_duel_points", {
+      p_league_id: "L1",
+    });
   });
 
   it("no muestra el engranaje si el usuario actual no es admin", async () => {
