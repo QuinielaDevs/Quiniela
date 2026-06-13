@@ -625,6 +625,45 @@ test.describe("Cuenta y casos extremos transversales (e2e)", () => {
       await expect(page.getByRole("main")).toBeVisible();
     }
   });
+
+  test("EDG-13: Compartir perfil abre WhatsApp fallback si navigator.share no está soportado", async () => {
+    const page = fixture.users[0]!.page!;
+
+    await page.goto("/account");
+
+    // Deshabilitar navigator.share en la página para forzar el fallback
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "share", {
+        value: undefined,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "canShare", {
+        value: undefined,
+        configurable: true,
+      });
+    });
+
+    // Mock window.open to capture the WhatsApp share URL
+    await page.evaluate(() => {
+      (window as unknown as { openedUrls: string[] }).openedUrls = [];
+      window.open = (url) => {
+        (window as unknown as { openedUrls: string[] }).openedUrls.push(String(url));
+        return null;
+      };
+    });
+
+    // Click on "Compartir Perfil" button using dispatchEvent to bypass dev overlay click interception
+    const shareBtn = page.getByRole("button", { name: "Compartir perfil" });
+    await expect(shareBtn).toBeVisible();
+    await shareBtn.dispatchEvent("click");
+
+    // Retrieve and verify the URL
+    const openedUrls = await page.evaluate(() => (window as unknown as { openedUrls: string[] }).openedUrls);
+    expect(openedUrls.length).toBe(1);
+    const url = openedUrls[0];
+    expect(url).toContain("wa.me/?text=");
+    expect(url).toContain(encodeURIComponent(fixture.users[0]!.displayName!));
+  });
 });
 
 // EDG-11 corre SOLO en el proyecto desktop-chromium (@desktop). Describe propio

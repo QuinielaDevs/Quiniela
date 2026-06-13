@@ -922,4 +922,163 @@ test.describe("Duelos y Apuestas (e2e)", () => {
 
     await context.close();
   });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // COMPARTIR EN WHATSAPP (Cobertura de brecha conocida)
+  // ──────────────────────────────────────────────────────────────────────
+
+  test("DUE-22: Compartir en WhatsApp desde CreateDuelDialog (pantalla de éxito)", async () => {
+    const pageA = fixture.users[0]!.page!;
+    const userB = fixture.users[1]!;
+
+    const matches = await seedMatches([
+      editableMatch({ homeTeamCode: "USA", awayTeamCode: "MEX" }),
+    ]);
+    const m = matches[0]!;
+    localMatchIds.push(m.id);
+
+    await pageA.goto("/duels");
+    await pageA.getByRole("main").getByTestId("create-duel-button").click();
+
+    await pageA.getByRole("main").getByTestId("duel-match-select").selectOption(m.id);
+    await pageA.getByRole("main").getByTestId("duel-type-direct").click();
+    await pageA.getByRole("main").getByTestId("duel-rival-select").selectOption(userB.userId);
+    await pageA.getByRole("main").getByTestId("duel-bet-input").fill("10");
+
+    const homePicker = pageA.getByRole("main").getByTestId("duel-home-pred");
+    await homePicker.getByTestId("goal-increment").click(); // 1
+
+    const awayPicker = pageA.getByRole("main").getByTestId("duel-away-pred");
+    await awayPicker.getByTestId("goal-increment").click(); // 1
+
+    await pageA.getByRole("main").getByTestId("create-duel-submit").click();
+
+    await expect(pageA.getByRole("main").getByTestId("create-duel-success")).toBeVisible();
+
+    // Mock window.open to capture the WhatsApp share URL
+    await pageA.evaluate(() => {
+      (window as unknown as { openedUrls: string[] }).openedUrls = [];
+      window.open = (url) => {
+        (window as unknown as { openedUrls: string[] }).openedUrls.push(String(url));
+        return null;
+      };
+    });
+
+    // Click "Compartir en WhatsApp" button using dispatchEvent to bypass dev overlay click interception
+    const shareBtn = pageA.getByRole("button", { name: "Compartir en WhatsApp" });
+    await expect(shareBtn).toBeVisible();
+    await shareBtn.dispatchEvent("click");
+
+    // Retrieve and verify the URL
+    const openedUrls = await pageA.evaluate(() => (window as unknown as { openedUrls: string[] }).openedUrls);
+    expect(openedUrls.length).toBe(1);
+    const url = openedUrls[0]!;
+    const decodedUrl = decodeURIComponent(url);
+    expect(decodedUrl).toContain("api.whatsapp.com/send?text=");
+    expect(decodedUrl).toContain("/desafio/");
+
+    // Extraer el challengeId de la URL
+    const match = decodedUrl.match(/\/desafio\/([a-fA-F0-9-]+)/);
+    expect(match).toBeTruthy();
+    const challengeId = match![1]!;
+
+    // Verificar en la BD que el reto existe
+    const chal = await getChallenge(challengeId);
+    expect(chal).toBeTruthy();
+    expect(chal!.points_bet).toBe(10);
+  });
+
+  test("DUE-23: Compartir en WhatsApp desde DuelsDashboard", async () => {
+    const pageA = fixture.users[0]!.page!;
+    const userB = fixture.users[1]!;
+
+    const matches = await seedMatches([
+      editableMatch({ homeTeamCode: "USA", awayTeamCode: "MEX" }),
+    ]);
+    const m = matches[0]!;
+    localMatchIds.push(m.id);
+
+    const challengeId = await seedChallenge({
+      leagueId: fixture.league.id,
+      matchId: m.id,
+      creator: fixture.users[0]!,
+      pointsBet: 15,
+      type: "direct",
+      challengedId: userB.userId,
+      creatorPred: { home: 2, away: 0 },
+    });
+
+    await pageA.goto("/duels");
+
+    const card = pageA.getByTestId("duel-card").filter({ hasText: m.home_team }).filter({ hasText: m.away_team });
+    await expect(card).toBeVisible();
+
+    // Mock window.open to capture the WhatsApp share URL
+    await pageA.evaluate(() => {
+      (window as unknown as { openedUrls: string[] }).openedUrls = [];
+      window.open = (url) => {
+        (window as unknown as { openedUrls: string[] }).openedUrls.push(String(url));
+        return null;
+      };
+    });
+
+    // Click "Compartir en WhatsApp" using dispatchEvent to bypass dev overlay click interception
+    const shareBtn = card.getByRole("button", { name: "Compartir en WhatsApp" });
+    await expect(shareBtn).toBeVisible();
+    await shareBtn.dispatchEvent("click");
+
+    // Retrieve and verify the URL
+    const openedUrls = await pageA.evaluate(() => (window as unknown as { openedUrls: string[] }).openedUrls);
+    expect(openedUrls.length).toBe(1);
+    const url = openedUrls[0]!;
+    const decodedUrl = decodeURIComponent(url);
+    expect(decodedUrl).toContain("api.whatsapp.com/send?text=");
+    expect(decodedUrl).toContain(`/desafio/${challengeId}`);
+  });
+
+  test("DUE-24: Compartir en WhatsApp desde la landing DesafioClient", async () => {
+    const pageA = fixture.users[0]!.page!;
+    const userB = fixture.users[1]!;
+
+    const matches = await seedMatches([
+      editableMatch({ homeTeamCode: "USA", awayTeamCode: "MEX" }),
+    ]);
+    const m = matches[0]!;
+    localMatchIds.push(m.id);
+
+    const challengeId = await seedChallenge({
+      leagueId: fixture.league.id,
+      matchId: m.id,
+      creator: fixture.users[0]!,
+      pointsBet: 20,
+      type: "direct",
+      challengedId: userB.userId,
+      creatorPred: { home: 1, away: 3 },
+    });
+
+    await pageA.goto(`/desafio/${challengeId}`);
+
+    const shareBtn = pageA.getByRole("main").getByRole("button", { name: "Compartir en WhatsApp" });
+    await expect(shareBtn).toBeVisible();
+
+    // Mock window.open to capture the WhatsApp share URL
+    await pageA.evaluate(() => {
+      (window as unknown as { openedUrls: string[] }).openedUrls = [];
+      window.open = (url) => {
+        (window as unknown as { openedUrls: string[] }).openedUrls.push(String(url));
+        return null;
+      };
+    });
+
+    // Click "Compartir en WhatsApp" using dispatchEvent to bypass dev overlay click interception
+    await shareBtn.dispatchEvent("click");
+
+    // Retrieve and verify the URL
+    const openedUrls = await pageA.evaluate(() => (window as unknown as { openedUrls: string[] }).openedUrls);
+    expect(openedUrls.length).toBe(1);
+    const url = openedUrls[0]!;
+    const decodedUrl = decodeURIComponent(url);
+    expect(decodedUrl).toContain("api.whatsapp.com/send?text=");
+    expect(decodedUrl).toContain(`/desafio/${challengeId}`);
+  });
 });

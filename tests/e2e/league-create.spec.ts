@@ -69,6 +69,16 @@ test.describe("Creación de ligas (autenticado)", () => {
     await stack.run();
   });
 
+  async function ensureLeagueCreated(p: Page) {
+    if (!createdLeagueName) {
+      createdLeagueName = `${NAME_PREFIX} Sin Pago`;
+      await p.goto("/leagues/new");
+      await p.getByTestId("league-name-input").fill(createdLeagueName);
+      await p.getByTestId("create-league-submit").click();
+      await p.waitForURL(/\/predictions/, { timeout: 15_000 });
+    }
+  }
+
   test("LIG-02: crear liga sin pago redirige a /predictions y aparece en /account", async () => {
     createdLeagueName = `${NAME_PREFIX} Sin Pago`;
 
@@ -92,6 +102,7 @@ test.describe("Creación de ligas (autenticado)", () => {
 
   test("LIG-06: el creador queda admin y el invite_code se genera (BD)", async () => {
     // Depende del estado creado por LIG-02 (orden serial del spec).
+    await ensureLeagueCreated(page);
     const leagues = await getLeaguesByName(createdLeagueName);
     expect(leagues).toHaveLength(1);
     const league = leagues[0]!;
@@ -107,6 +118,68 @@ test.describe("Creación de ligas (autenticado)", () => {
       .eq("user_id", user.userId)
       .single();
     expect(member?.role).toBe("admin");
+  });
+
+  test("LIG-19: Copiar código y enlace de invitación al portapapeles", async () => {
+    await ensureLeagueCreated(page);
+    const leagues = await getLeaguesByName(createdLeagueName);
+    expect(leagues).toHaveLength(1);
+    const league = leagues[0]!;
+
+    await page.goto("/account");
+
+    // Mock navigator.clipboard to avoid window focus dependencies and timeouts
+    await page.evaluate(() => {
+      let clipboardText = "";
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: async (text: string) => {
+            clipboardText = text;
+          },
+          readText: async () => {
+            return clipboardText;
+          }
+        },
+        configurable: true,
+        writable: true
+      });
+    });
+
+    const leagueItem = page
+      .getByRole("main")
+      .getByTestId("account-league-item")
+      .filter({ hasText: createdLeagueName })
+      .filter({ visible: true });
+
+    await expect(leagueItem).toBeVisible();
+
+    // Copiar código
+    const copyCodeBtn = leagueItem.getByRole("button", {
+      name: `Copiar código de invitación de ${createdLeagueName}`,
+    });
+    await copyCodeBtn.click();
+    await expect(
+      leagueItem.getByRole("button", {
+        name: `Código de invitación de ${createdLeagueName} copiado`,
+      }),
+    ).toBeVisible();
+
+    const clipboardCode = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardCode).toBe(league.invite_code);
+
+    // Copiar enlace
+    const copyLinkBtn = leagueItem.getByRole("button", {
+      name: `Copiar enlace de invitación de ${createdLeagueName}`,
+    });
+    await copyLinkBtn.click();
+    await expect(
+      leagueItem.getByRole("button", {
+        name: `Enlace de invitación de ${createdLeagueName} copiado`,
+      }),
+    ).toBeVisible();
+
+    const clipboardLink = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardLink).toContain(`/join/${league.invite_code}`);
   });
 
   test("LIG-03: crear liga con pago refleja monto e instrucciones en la invitación", async () => {
