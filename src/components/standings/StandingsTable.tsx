@@ -147,6 +147,18 @@ export function StandingsTable({
                       duelos
                     </span>
                   )}
+                  {showDuels && row.awardPoints > 0 && (
+                    <span
+                      className="text-xs text-muted-foreground"
+                      aria-label={`${row.awardPoints} puntos de premios especiales`}
+                      data-testid="standings-awards"
+                    >
+                      <span className="font-semibold text-foreground">
+                        {row.awardPoints.toFixed(1)}
+                      </span>{" "}
+                      premios
+                    </span>
+                  )}
                 </div>
               </div>
 

@@ -49,7 +49,9 @@ export async function StandingsBoard() {
   // La RLS ya autoriza estas lecturas a un miembro: league_members/profiles de
   // su liga, los matches (catálogo común) y las predicciones de rivales para
   // partidos desbloqueados (finished → siempre visibles). NO usar service_role.
-  const [{ data: memberRows }, { data: finished }, { data: league }] =
+  // Los puntos de premios especiales llegan agregados por el RPC (BUG-004):
+  // la RLS oculta los picks rivales, el RPC expone SOLO el total por usuario.
+  const [{ data: memberRows }, { data: finished }, { data: league }, { data: awardRows }] =
     await Promise.all([
       supabase
         .from("league_members")
@@ -64,7 +66,14 @@ export async function StandingsBoard() {
         .select("name, requires_payment, payment_amount, payment_instructions")
         .eq("id", leagueId)
         .single(),
+      supabase.rpc("fn_get_league_award_points", { p_league_id: leagueId }),
     ]);
+
+  const awardPointsByUser = new Map(
+    ((awardRows ?? []) as Array<{ user_id: string; award_points: number }>).map(
+      (row) => [row.user_id, Number(row.award_points ?? 0)],
+    ),
+  );
 
   const finishedMatches: StandingMatch[] = (finished ?? []).map((m) => ({
     id: m.id,
@@ -102,6 +111,7 @@ export async function StandingsBoard() {
     paymentStatus: m.payment_status,
     joinedAt: m.joined_at,
     duelPoints: Number(m.wager_balance ?? 0),
+    awardPoints: awardPointsByUser.get(m.user_id) ?? 0,
   }));
 
   const currentMember = rows.find((m) => m.user_id === userId);

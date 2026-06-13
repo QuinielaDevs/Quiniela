@@ -17,6 +17,12 @@ import { AwardSelector } from "./AwardSelector";
 
 type Selections = Record<AwardCategory, string | null>;
 
+/** Puntos ganados por categoría (vista special_predictions_with_points):
+ *  solo hay entrada con isCorrect=true cuando el admin resolvió el ganador. */
+export type EarnedAwardPoints = Partial<
+  Record<AwardCategory, { isCorrect: boolean; points: number }>
+>;
+
 interface AwardsBoardProps {
   leagueId: string;
   selectedCandidates: Record<AwardCategory, AwardCandidate | null>;
@@ -24,6 +30,7 @@ interface AwardsBoardProps {
   isLocked?: boolean;
   activePhaseLabel?: string;
   activePhaseCode?: string;
+  earnedPoints?: EarnedAwardPoints;
 }
 
 export function AwardsBoard({
@@ -33,6 +40,7 @@ export function AwardsBoard({
   isLocked = false,
   activePhaseLabel = "Semifinales en adelante",
   activePhaseCode = "D",
+  earnedPoints = {},
 }: AwardsBoardProps) {
   const [selections, setSelections] = useState<Selections>(initialSelections);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -186,6 +194,15 @@ export function AwardsBoard({
             <CardHeader className="pb-3">
               <CardTitle className="text-lg text-white">{title}</CardTitle>
               <CardDescription className="text-white/60">{hint}</CardDescription>
+              {earnedPoints[category]?.isCorrect && (
+                <p
+                  className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full border border-[#E9C46A]/40 bg-[#E9C46A]/15 px-3 py-1 text-xs font-bold text-[#E9C46A]"
+                  data-testid="award-earned-badge"
+                >
+                  <span aria-hidden="true">🎉</span> ¡Acertaste! +
+                  {earnedPoints[category]!.points} pts
+                </p>
+              )}
             </CardHeader>
             <CardContent>
               <AwardSelector

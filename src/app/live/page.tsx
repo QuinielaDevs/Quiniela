@@ -36,19 +36,29 @@ export async function LiveBoard() {
     );
   }
 
-  const [{ data: memberRows }, { data: matchRows }] = await Promise.all([
-    supabase
-      .from("league_members")
-      .select("user_id, payment_status, joined_at, wager_balance, profiles(display_name, avatar_url)")
-      .eq("league_id", leagueId),
-    supabase
-      .from("matches")
-      .select(
-        "id, status, matchday, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time",
-      )
-      .in("status", ["finished", "live"])
-      .order("match_time", { ascending: true }),
-  ]);
+  // awardRows: total de premios especiales por usuario (BUG-004); la proyectada
+  // los suma igual que la clasificación oficial General.
+  const [{ data: memberRows }, { data: matchRows }, { data: awardRows }] =
+    await Promise.all([
+      supabase
+        .from("league_members")
+        .select("user_id, payment_status, joined_at, wager_balance, profiles(display_name, avatar_url)")
+        .eq("league_id", leagueId),
+      supabase
+        .from("matches")
+        .select(
+          "id, status, matchday, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time",
+        )
+        .in("status", ["finished", "live"])
+        .order("match_time", { ascending: true }),
+      supabase.rpc("fn_get_league_award_points", { p_league_id: leagueId }),
+    ]);
+
+  const awardPointsByUser = new Map(
+    ((awardRows ?? []) as Array<{ user_id: string; award_points: number }>).map(
+      (row) => [row.user_id, Number(row.award_points ?? 0)],
+    ),
+  );
 
   const matches: LiveMatch[] = (matchRows ?? []).map((match) => ({
     id: match.id,
@@ -86,6 +96,7 @@ export async function LiveBoard() {
       paymentStatus: member.payment_status,
       joinedAt: member.joined_at,
       duelPoints: Number(member.wager_balance ?? 0),
+      awardPoints: awardPointsByUser.get(member.user_id) ?? 0,
     }),
   );
 

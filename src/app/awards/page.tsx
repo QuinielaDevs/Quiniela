@@ -10,7 +10,7 @@ import type {
   AwardCandidate,
   AwardCategory,
 } from "@/types";
-import { AwardsBoard } from "@/components/awards/AwardsBoard";
+import { AwardsBoard, type EarnedAwardPoints } from "@/components/awards/AwardsBoard";
 import { AppTopNav } from "@/components/layout/AppTopNav";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
 
@@ -162,10 +162,13 @@ async function AwardsForLeague({
 
   const supabase = await createClient();
 
+  // La vista special_predictions_with_points añade is_correct/points (BUG-004):
+  // la RLS (security_invoker) limita a las filas PROPIAS, que es lo que se
+  // muestra aquí; points > 0 solo cuando el admin resolvió el ganador.
   const [{ data: predictions }] = await Promise.all([
     supabase
-      .from("special_predictions")
-      .select("category, candidate_id")
+      .from("special_predictions_with_points")
+      .select("category, candidate_id, is_correct, points")
       .eq("league_id", activeLeague.id)
       .eq("user_id", userId),
   ]);
@@ -173,6 +176,8 @@ async function AwardsForLeague({
   const preds = (predictions ?? []) as Array<{
     category: string;
     candidate_id: string;
+    is_correct: boolean;
+    points: number;
   }>;
 
   const initialSelections: Record<AwardCategory, string | null> = {
@@ -185,11 +190,16 @@ async function AwardsForLeague({
     top_scorer: null,
     mvp: null,
   };
+  const earnedPoints: EarnedAwardPoints = {};
 
   for (const p of preds) {
     const cat = p.category as AwardCategory;
     if (cat === "champion" || cat === "top_scorer" || cat === "mvp") {
       initialSelections[cat] = p.candidate_id;
+      earnedPoints[cat] = {
+        isCorrect: p.is_correct,
+        points: Number(p.points ?? 0),
+      };
     }
   }
 
@@ -272,6 +282,7 @@ async function AwardsForLeague({
         isLocked={isLocked}
         activePhaseLabel={activePhaseLabel}
         activePhaseCode={activePhaseCode}
+        earnedPoints={earnedPoints}
       />
     </>
   );

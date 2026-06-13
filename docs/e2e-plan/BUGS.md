@@ -94,7 +94,26 @@
 - **Esperado**: Los puntos acumulados al acertar los premios especiales (campeón, goleador, MVP) según la fase de su predicción deberían sumarse al total general del usuario en `/standings` y/o mostrarse explícitamente en `/account` (insignias, perfil).
 - **Real**: Ninguna vista de la UI consulta ni expone los puntos obtenidos por predicciones especiales. La lógica matemática e invariante de cálculo de puntos por predicción especial existe en la vista `special_predictions_with_points` de Postgres, pero está desconectada del front-end.
 - **Archivos implicados**: `src/app/standings/page.tsx`, `src/app/account/page.tsx`
-- **Estado**: abierto
+- **Estado**: **corregido** (2026-06-11). Decisión de producto del mantenedor:
+  los premios **suman al ranking oficial**, con desglose en `/awards`.
+  - **Nueva migración** `20260611150000_league_award_points_rpc.sql`:
+    `fn_get_league_award_points(p_league_id)` (SECURITY DEFINER, gate de
+    membresía). La RLS oculta los picks rivales (`select_own` deliberado de
+    Story 6.1), así que el RPC expone SOLO `(user_id, award_points)` agregado —
+    nunca los picks; pre-resolución devuelve 0 para todos.
+  - **Motor** (`src/utils/standings.ts`): `awardPoints` suma a `totalPoints`
+    SOLO en el acumulado General (un premio no pertenece a ninguna jornada) y
+    en la proyectada de `/live` (que es una vista del General). Desempates sin
+    cambios.
+  - **UI**: `/standings` muestra chip "premios" en General
+    (`standings-awards`); `/awards` muestra el badge "🎉 ¡Acertaste! +N pts"
+    por categoría resuelta (`award-earned-badge`, vía la vista con las filas
+    propias); `/live` incluye los premios en el total proyectado.
+  - **Tests**: 4 unit nuevos en `standings.test.ts` (General/fase/proyectada/
+    default), stubs de página con `rpc`, y AWD-08 extendido con los asserts de
+    UI en `/awards` y `/standings`.
+  - Nota: NO se tocó `/account` (la opción elegida fue ranking + desglose en
+    `/awards`; las insignias de `/account` siguen siendo solo de jornadas).
 
 ## BUG-005 — El dismiss de GoalToast mediante click en la "x" no funciona debido a la captura de puntero (pointer capture) del contenedor
 

@@ -381,6 +381,26 @@ test.describe("/awards — Premios Especiales", () => {
     // Argentina acierta en fase A -> 50 pts. Melvin falla -> 0 pts.
     expect(champPoints).toBe(50);
     expect(mvpPoints).toBe(0);
+
+    // UI de /awards (BUG-004): la categoría acertada muestra el badge de puntos
+    // ganados; la fallada no muestra nada.
+    await page.reload();
+    const champCardAfter = board.locator('[data-category="champion"]');
+    await expect(champCardAfter.getByTestId("award-earned-badge")).toHaveText(
+      "🎉 ¡Acertaste! +50 pts",
+    );
+    const mvpCardAfter = board.locator('[data-category="mvp"]');
+    await expect(mvpCardAfter.getByTestId("award-earned-badge")).toHaveCount(0);
+
+    // UI de /standings (BUG-004): el total General del usuario incluye los
+    // premios y se desglosa en el chip "premios".
+    await page.goto("/standings");
+    const row = page
+      .getByRole("main")
+      .locator(
+        `[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`,
+      );
+    await expect(row.getByTestId("standings-awards")).toContainText("50.0");
   });
 
   test("AWD-09: Candidato inactivo no listado", async () => {

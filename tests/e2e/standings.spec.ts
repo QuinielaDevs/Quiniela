@@ -414,6 +414,7 @@ test.describe("Clasificación oficial (e2e)", () => {
 
     // Tab General (Acumulada): debe sumar 5.0 + 3.0 = 8.0 pts
     const pointsGeneral = page
+      .getByRole("main")
       .getByTestId("standings-row")
       .filter({ hasText: fixture.users[0]!.displayName! })
       .getByTestId("standings-points");

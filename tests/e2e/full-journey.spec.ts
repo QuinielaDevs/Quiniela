@@ -17,6 +17,13 @@ import {
   type PhasesSnapshot,
 } from "./helpers/seed/phases";
 import {
+  snapshotWinners,
+  restoreWinners,
+  setWinner,
+  getCandidate,
+  type WinnersSnapshot,
+} from "./helpers/seed/awards";
+import {
   createUser,
   deleteE2EUser,
   loginAs,
@@ -126,6 +133,7 @@ test.describe("Gran tour multi-usuario (e2e)", () => {
   let pageCarla: Page;
 
   let phasesSnap: PhasesSnapshot;
+  let winnersSnap: WinnersSnapshot;
   let leagueId = "";
   let inviteCode = "";
   let partido1: SeededMatchRow; // J1, finalizable + duelo
@@ -137,6 +145,10 @@ test.describe("Gran tour multi-usuario (e2e)", () => {
     phasesSnap = await snapshotPhases();
     await setActivePhase("A");
     stack.add(() => restorePhases(phasesSnap));
+
+    // Ganadores de premios especiales (estado GLOBAL): snapshot + restore.
+    winnersSnap = await snapshotWinners();
+    stack.add(() => restoreWinners(winnersSnap));
 
     // Tres usuarios reales (admin API + login por formulario).
     ana = await createUser({ runId, tag: "ana", displayName: `E2E Ana ${runId}` });
@@ -493,6 +505,26 @@ test.describe("Gran tour multi-usuario (e2e)", () => {
       expect(m!.away_score).toBe(0);
     });
 
+    await test.step("13b. Resolver ganador de premios especiales → Argentina gana campeón", async () => {
+      const argCandidate = await getCandidate("champion", { name: "Argentina" });
+      await setWinner("champion", argCandidate.id);
+
+      // Verificar que en base de datos se hayan procesado correctamente los puntos
+      const { data: points } = await admin
+        .from("special_predictions_with_points")
+        .select("user_id, points")
+        .eq("league_id", leagueId)
+        .eq("category", "champion");
+
+      const anaPts = points!.find((p) => p.user_id === ana.userId)?.points;
+      const betoPts = points!.find((p) => p.user_id === beto.userId)?.points;
+      const carlaPts = points!.find((p) => p.user_id === carla.userId)?.points;
+
+      expect(anaPts).toBe(50);
+      expect(betoPts).toBe(0);
+      expect(carlaPts).toBe(50);
+    });
+
     await test.step("14. /standings: orden y puntos = buildStandings(datos sembrados)", async () => {
       // Expectativa SIN números mágicos: se reconstruye con la MISMA lógica de
       // producción (buildStandings) a partir de los datos reales en BD.
@@ -506,6 +538,17 @@ test.describe("Gran tour multi-usuario (e2e)", () => {
         .eq("league_id", leagueId)
         .eq("match_id", partido1.id);
       const m = await getMatch(partido1.id);
+
+      const { data: awardRows } = await admin
+        .from("special_predictions_with_points")
+        .select("user_id, points")
+        .eq("league_id", leagueId);
+
+      const awardPointsByUser = new Map<string, number>();
+      for (const row of (awardRows ?? [])) {
+        const current = awardPointsByUser.get(row.user_id) ?? 0;
+        awardPointsByUser.set(row.user_id, current + Number(row.points ?? 0));
+      }
 
       const displayNameById: Record<string, string> = {
         [ana.userId]: ana.displayName!,
@@ -521,6 +564,7 @@ test.describe("Gran tour multi-usuario (e2e)", () => {
           paymentStatus: r.payment_status,
           joinedAt: r.joined_at,
           duelPoints: Number(r.wager_balance),
+          awardPoints: awardPointsByUser.get(r.user_id) ?? 0,
         })),
         [
           {
@@ -541,21 +585,36 @@ test.describe("Gran tour multi-usuario (e2e)", () => {
         })),
       );
 
-      // Cordura: el orden esperado es Ana (5.0) > Beto (2.0) > Carla (0.0).
+      // Cordura: el orden esperado ahora incluye premios especiales.
+      // Puntos predicciones: Ana (5.0), Beto (2.0), Carla (0.0)
+      // Puntos premios: Ana (50.0), Beto (0.0), Carla (50.0)
+      // Totales: Ana (55.0), Carla (50.0), Beto (2.0)
+      // Por tanto, el orden de la clasificación oficial es: Ana > Carla > Beto
       expect(expectedRows.map((r) => r.displayName)).toEqual([
         ana.displayName,
-        beto.displayName,
         carla.displayName,
+        beto.displayName,
       ]);
 
       await pageAna.goto("/standings");
-      const uiRows = pageAna.getByTestId("standings-row");
+      const uiRows = pageAna.getByRole("main").getByTestId("standings-row");
       await expect(uiRows).toHaveCount(expectedRows.length);
       for (let i = 0; i < expectedRows.length; i++) {
-        await expect(uiRows.nth(i)).toContainText(expectedRows[i]!.displayName);
-        await expect(uiRows.nth(i).getByTestId("standings-points")).toHaveText(
+        const row = uiRows.nth(i);
+        await expect(row).toContainText(expectedRows[i]!.displayName);
+        await expect(row.getByTestId("standings-points")).toHaveText(
           expectedRows[i]!.totalPoints.toFixed(1),
         );
+
+        // Validar si muestra el chip de premios
+        const expectedAwardPts = expectedRows[i]!.awardPoints;
+        if (expectedAwardPts > 0) {
+          await expect(row.getByTestId("standings-awards")).toContainText(
+            expectedAwardPts.toFixed(1),
+          );
+        } else {
+          await expect(row.getByTestId("standings-awards")).toHaveCount(0);
+        }
       }
     });
 
