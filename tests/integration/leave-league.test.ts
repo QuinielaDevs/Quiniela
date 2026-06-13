@@ -154,4 +154,104 @@ describe("fn_leave_league", () => {
     expect(error).not.toBeNull();
     expect(error?.code).toBe("P0002");
   });
+
+  it("al salir se cancelan sus duelos pending/active y se reembolsa el escrow (BUG-002)", async () => {
+    const leagueId = await createLeagueWith([
+      { id: adminUser.id, role: "admin" },
+      { id: memberUser.id, role: "member" },
+    ]);
+
+    // Partido futuro (catálogo global: prefijo test_, se borra al final).
+    const { data: match, error: matchError } = await admin
+      .from("matches")
+      .insert({
+        home_team: `test_leave_h_${Date.now()}`,
+        away_team: `test_leave_a_${Date.now()}`,
+        match_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        status: "scheduled",
+        matchday: 1,
+        stage: "group",
+      })
+      .select("id")
+      .single();
+    expect(matchError).toBeNull();
+
+    try {
+      // Duelo directo ACTIVO entre admin (creador) y member (retado), con el
+      // escrow de ambos retenido en el ledger: balances 100 → 90 y dos
+      // transacciones de retención de -10 referenciando el reto.
+      const { data: challenge, error: challengeError } = await admin
+        .from("challenges")
+        .insert({
+          league_id: leagueId,
+          match_id: match!.id,
+          creator_id: adminUser.id,
+          challenged_id: memberUser.id,
+          type: "direct",
+          status: "active",
+          points_bet: 10,
+        })
+        .select("id")
+        .single();
+      expect(challengeError).toBeNull();
+
+      await admin.from("challenge_participants").insert([
+        { challenge_id: challenge!.id, user_id: adminUser.id, prediction_home: 2, prediction_away: 1 },
+        { challenge_id: challenge!.id, user_id: memberUser.id, prediction_home: 0, prediction_away: 0 },
+      ]);
+      for (const uid of [adminUser.id, memberUser.id]) {
+        await admin
+          .from("league_members")
+          .update({ wager_balance: 90 })
+          .eq("league_id", leagueId)
+          .eq("user_id", uid);
+        await admin.from("point_transactions").insert({
+          user_id: uid,
+          league_id: leagueId,
+          amount: -10,
+          description: "challenge_escrow_hold",
+          reference_id: challenge!.id,
+        });
+      }
+
+      const client = createAuthedClient(memberUser.token);
+      const { error } = await client.rpc("fn_leave_league", {
+        p_league_id: leagueId,
+      });
+      expect(error).toBeNull();
+      expect(await memberExists(leagueId, memberUser.id)).toBe(false);
+
+      // El duelo queda cancelado y la contraparte recupera su escrow.
+      const { data: chal } = await admin
+        .from("challenges")
+        .select("status")
+        .eq("id", challenge!.id)
+        .single();
+      expect(chal!.status).toBe("canceled");
+
+      const { data: adminMember } = await admin
+        .from("league_members")
+        .select("wager_balance")
+        .eq("league_id", leagueId)
+        .eq("user_id", adminUser.id)
+        .single();
+      expect(Number(adminMember!.wager_balance)).toBe(100);
+
+      // El ledger del reto queda en neto 0 para AMBOS: al saliente también se
+      // le inserta su fila de reembolso aunque su membresía ya no exista.
+      const { data: txs } = await admin
+        .from("point_transactions")
+        .select("user_id, amount")
+        .eq("reference_id", challenge!.id);
+      const net = (uid: string) =>
+        txs!
+          .filter((t) => t.user_id === uid)
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+      expect(net(adminUser.id)).toBe(0);
+      expect(net(memberUser.id)).toBe(0);
+    } finally {
+      // challenges.match_id es ON DELETE CASCADE: borrar el partido se lleva el reto.
+      await admin.from("matches").delete().eq("id", match!.id);
+    }
+  });
 });

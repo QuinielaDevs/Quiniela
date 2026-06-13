@@ -74,6 +74,7 @@ export function LeagueCreateForm() {
         <Label htmlFor="league-name">Nombre de la liga</Label>
         <Input
           id="league-name"
+          data-testid="league-name-input"
           className="h-12"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -138,6 +139,7 @@ export function LeagueCreateForm() {
         </span>
         <Switch
           id="requires-payment"
+          data-testid="requires-payment-switch"
           checked={requiresPayment}
           onCheckedChange={setRequiresPayment}
           aria-label="Requiere pago de inscripción"
@@ -152,6 +154,7 @@ export function LeagueCreateForm() {
               <Label htmlFor="payment-amount">Monto de inscripción</Label>
               <Input
                 id="payment-amount"
+                data-testid="payment-amount-input"
                 className="h-12"
                 type="number"
                 inputMode="decimal"
@@ -169,6 +172,7 @@ export function LeagueCreateForm() {
               </Label>
               <Textarea
                 id="payment-instructions"
+                data-testid="payment-instructions-input"
                 value={paymentInstructions}
                 onChange={(e) => setPaymentInstructions(e.target.value)}
                 placeholder="Bizum / Zelle / efectivo — incluye datos y concepto"
@@ -183,6 +187,7 @@ export function LeagueCreateForm() {
       {error && (
         <p
           role="alert"
+          data-testid="create-league-error"
           className="rounded-sm border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
         >
           {error}
@@ -194,6 +199,7 @@ export function LeagueCreateForm() {
         type="submit"
         size="xl"
         disabled={isPending}
+        data-testid="create-league-submit"
         className="mt-2 w-full bg-accent font-bold text-accent-foreground hover:bg-accent/90"
       >
         {isPending ? "Creando…" : "Crear Liga"}

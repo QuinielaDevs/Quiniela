@@ -75,8 +75,8 @@ async function DesafioLoader({ params }: PageProps) {
   const supabase = await createClient();
 
   // 1) Consultar sesión de usuario
-  const { data: { user } } = await supabase.auth.getUser();
-  const userId = user?.id ?? null;
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub ?? null;
 
   // 2) Consultar datos del desafío vía RPC seguro con gate
   const { data: challengeData, error } = await supabase

@@ -39,7 +39,7 @@ whole tournament. The core loop:
 - **Special awards.** Call the big outcomes (champion, finalists, top scorer,
   etc.). The earlier you lock them in, the more they're worth — 50 points before
   the opening match, down to 2 points from the semifinals onward.
-- **Duels / challenges (*desafíos*).** Bet part of your balance head-to-head
+- **Duels / challenges (_desafíos_).** Bet part of your balance head-to-head
   against another member. Stakes go into escrow and pay out when the challenge
   resolves.
 - **Standings.** Per-league leaderboards with a defined tiebreaker order, updated
@@ -59,23 +59,23 @@ Final points for a match are:
 final points = base points × multiplier
 ```
 
-| Outcome              | Base points | Meaning                                            |
-| -------------------- | ----------- | -------------------------------------------------- |
-| **Exact score**      | highest     | You got both teams' goals right.                   |
-| **Correct result**   | medium      | Right winner (or draw), wrong scoreline.           |
-| **No hit**           | 0           | The match ended with a different result.           |
+| Outcome            | Base points | Meaning                                  |
+| ------------------ | ----------- | ---------------------------------------- |
+| **Exact score**    | highest     | You got both teams' goals right.         |
+| **Correct result** | medium      | Right winner (or draw), wrong scoreline. |
+| **No hit**         | 0           | The match ended with a different result. |
 
 The **multiplier** is determined by how early you predict — predict before the
 tournament heats up and a correct call is worth more.
 
 **Special awards** are scored on a separate, phase-based scale:
 
-| When you locked it in        | Reward  |
-| ---------------------------- | ------- |
-| Before the opening match     | 50 pts  |
-| During the group stage       | 25 pts  |
-| Round of 32 / 16 / quarters  | 10 pts  |
-| Semifinals onward            | 2 pts   |
+| When you locked it in       | Reward |
+| --------------------------- | ------ |
+| Before the opening match    | 50 pts |
+| During the group stage      | 25 pts |
+| Round of 32 / 16 / quarters | 10 pts |
+| Semifinals onward           | 2 pts  |
 
 (The exact base values and multiplier tiers live in
 [`src/utils/scoring`](src/utils/scoring.ts) and
@@ -205,17 +205,23 @@ for results. It:
 
 ### Useful scripts
 
-| Script                  | What it does                          |
-| ----------------------- | ------------------------------------- |
-| `npm run dev`           | Start the Next.js dev server          |
-| `npm run build`         | Production build                      |
-| `npm run lint`          | ESLint                                |
-| `npm run typecheck`     | TypeScript type checking              |
-| `npm run db:types`      | Regenerate Supabase TypeScript types  |
-| `npm run sync-matches`  | Sync match data                       |
-| `npm run seed:setup`    | Fetch and generate seed SQL           |
+| Script                 | What it does                         |
+| ---------------------- | ------------------------------------ |
+| `npm run dev`          | Start the Next.js dev server         |
+| `npm run build`        | Production build                     |
+| `npm run lint`         | ESLint                               |
+| `npm run typecheck`    | TypeScript type checking             |
+| `npm run db:types`     | Regenerate Supabase TypeScript types |
+| `npm run sync-matches` | Sync match data                      |
+| `npm run seed:setup`   | Fetch and generate seed SQL          |
 
 ## Testing
+
+> **Runbook completo en [docs/testing.md](docs/testing.md)**: los tres niveles
+> (unit / integration / E2E Playwright), requisitos, estructura de `tests/e2e`,
+> tags, pipeline de CI (4 jobs paralelos + nightly) y política anti-flaky.
+
+### Pruebas de Contrato (Vitest)
 
 ```bash
 npm run test:unit          # Vitest unit tests

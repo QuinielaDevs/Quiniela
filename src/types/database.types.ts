@@ -932,6 +932,13 @@ export type Database = {
           requires_payment: boolean
         }[]
       }
+      fn_get_league_award_points: {
+        Args: { p_league_id: string }
+        Returns: {
+          award_points: number
+          user_id: string
+        }[]
+      }
       fn_join_league_by_invite: {
         Args: { p_invite_code: string }
         Returns: {

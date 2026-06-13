@@ -6,6 +6,7 @@ import {
   deleteE2EUser,
 } from "./helpers/auth";
 import { seedPredictionsE2E } from "./helpers/seed";
+import { selectPhaseTab } from "./helpers/ui";
 
 // E2E de la página /predictions con foco en partidos finalizados y el modo
 // resultado de la MatchCard. Los seeds están en helpers/seed.ts.
@@ -44,13 +45,16 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
     const page = context.page;
     await page.goto("/predictions");
     const activeTab = page.locator('[role="tab"][aria-selected="true"]');
+    // toHaveCount(1) absorbe el duplicado transitorio del tablist en dev
+    // (ver helpers/ui.ts) antes de assertear el texto del tab activo.
+    await expect(activeTab).toHaveCount(1);
     await expect(activeTab).toContainText("Jornada 1");
   });
 
   test("puede navegar a tabs de fases pasadas (Jornada 1)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
     // Debe ver partidos finalizados + el scheduled de J1
     await expect(page.getByText("Finalizado").first()).toBeVisible();
   });
@@ -58,7 +62,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("puede navegar a tabs de fases futuras (Jornada 2)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+    await selectPhaseTab(page, "Jornada 2");
     await expect(page.getByText("test_mexico")).toBeVisible();
     await expect(page.getByText("test_canada")).toBeVisible();
   });
@@ -70,7 +74,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("Jornada 1 muestra partidos finalizados + scheduled", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     // test_argentina (finished), test_brasil (finished), test_uruguay (finished), test_ecuador (scheduled)
     await expect(page.getByText("test_argentina").first()).toBeVisible();
@@ -85,7 +89,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("partido finalizado muestra el resultado real (3-0)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     // test_argentina 3-0 test_bolivia
     const argCard = page
@@ -99,7 +103,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("partido finalizado muestra la predicción del usuario", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     // test_argentina 3-0 test_bolivia, predicción 2-0
     const argCard = page
@@ -114,7 +118,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("badge amarillo (acierto parcial) en test_argentina 3-0 (predicción 2-0)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     const argCard = page
       .locator("article", { hasText: "test_argentina" })
@@ -132,7 +136,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("badge verde (acierto exacto) en test_brasil 1-1 (predicción 1-1)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     const braCard = page
       .locator("article", { hasText: "test_brasil" })
@@ -148,7 +152,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("badge gris (fallo) en test_uruguay 0-2 (predicción 1-0)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     const uruCard = page
       .locator("article", { hasText: "test_uruguay" })
@@ -163,7 +167,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("card finalizada NO tiene GoalPickers (no editable)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     const argCard = page
       .locator("article", { hasText: "test_argentina" })
@@ -177,7 +181,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("card finalizada NO tiene botón de deshacer", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     const argCard = page
       .locator("article", { hasText: "test_argentina" })
@@ -191,7 +195,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("partido live muestra 'En vivo' y GoalPickers deshabilitados", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     const liveCard = page
       .locator("article", { hasText: "test_espana" })
@@ -208,7 +212,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("partido suspended muestra 'Suspendido' sin resultado", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+    await selectPhaseTab(page, "Jornada 2");
     const suspendedCard = page
       .locator("article", { hasText: "test_francia" })
       .filter({ hasText: "test_italia" })
@@ -224,7 +228,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("partido scheduled muestra GoalPickers funcionales", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     const ecuCard = page
       .locator("article", { hasText: "test_ecuador" })
@@ -243,7 +247,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("dentro de Jornada 1, partidos scheduled aparecen antes que finished", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     // El primer article del tab debe ser el de test_ecuador (scheduled, único de J1).
     // Los finished (test_argentina, test_brasil, test_uruguay) vienen después.
@@ -272,7 +276,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("muestra chip de drift en J2 con saved=2.5x (would-be menor)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+    await selectPhaseTab(page, "Jornada 2");
 
     const mexCard = page
       .locator("article", { hasText: "test_mexico" })
@@ -296,7 +300,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("el multiplicador guardado (2.5x) sigue visible junto al chip de drift", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+    await selectPhaseTab(page, "Jornada 2");
 
     const mexCard = page
       .locator("article", { hasText: "test_mexico" })
@@ -312,7 +316,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("el chip de drift tiene aria-label descriptivo accesible", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+    await selectPhaseTab(page, "Jornada 2");
 
     const mexCard = page
       .locator("article", { hasText: "test_mexico" })
@@ -335,7 +339,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("NO muestra chip de drift en J1 con saved=1.0x (ya en floor)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     // test_ecuador está en J1 con saved=1.0x. Aunque el torneo avance,
     // J1 siempre es 1.0x (línea base). No hay drift que mostrar.
@@ -350,7 +354,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
   test("NO muestra chip de drift en partidos finished (delegado al PointsBadge)", async () => {
     const page = context.page;
     await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 1" }).click();
+    await selectPhaseTab(page, "Jornada 1");
 
     // test_argentina es un partido finished (con saved=1.25x). El chip
     // ámbar no debe aparecer porque el multiplicador ya se muestra en el

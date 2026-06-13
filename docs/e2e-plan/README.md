@@ -1,0 +1,140 @@
+# Plan maestro de pruebas E2E exhaustivas — Pija Quiniela
+
+Plan de implementación por fases para llevar la suite E2E (Playwright) de su estado embrionario actual a una cobertura exhaustiva de TODA la funcionalidad del producto, ejecutable fase a fase por agentes independientes.
+
+## Estado de partida (diagnóstico, 2026-06-09)
+
+- **E2E actual**: 3 specs, ~23 tests, solo `/predictions` en profundidad (`predictions-finished.spec.ts`). 7 de las 8 rutas principales sin cobertura E2E. Solo 11 `data-testid` en 3 componentes.
+- **Niveles inferiores fuertes**: ~23 archivos unit y ~35 integration cubren bien RPCs, RLS, triggers, webhooks y paridad de scoring TS↔SQL. El hueco es la capa de **flujos de usuario reales por UI** y los **circuitos completos** (webhook→Realtime→UI, acción→trigger→ledger→UI).
+- Infra sólida para construir encima: Supabase local + seeds, auth por formulario real, seed con service role, HMAC reutilizable, CI con stack local.
+
+## Visión objetivo
+
+≈ **160 casos E2E enumerados** (≈137 nuevos + 23 existentes) cubriendo: smoke de todas las rutas, ciclo de auth completo (incl. recuperación de contraseña con email local), funnel de ligas e invitaciones, edición de predicciones con autosave/candados/multiplicadores dinámicos, clasificación con los 4 desempates, panel admin con efectos en BD, economía completa de duelos con invariante de ledger verificada por test, premios especiales con fases A-D, Realtime en vivo con toasts, webhooks firmados de extremo a extremo, un gran tour multi-usuario y casos extremos transversales — más CI paralelo con nightly completo.
+
+## Documentos
+
+| Doc | Contenido | Fase ejecutable |
+|---|---|---|
+| [`00-contexto.md`](00-contexto.md) | **Lectura obligatoria de todo agente**: producto, rutas, modelo de datos, reglas de negocio, runbook, infraestructura existente, trampas conocidas, convenciones y reglas de oro | — |
+| [`01-fase-1-fundacion.md`](01-fase-1-fundacion.md) | Instrumentación `data-testid` + helpers composables (multi-user, seeds, webhook firmado, fases, mail, db-assert, multiplicador dinámico) + config | Sí |
+| [`02-fase-2-smoke-auth.md`](02-fase-2-smoke-auth.md) | Smoke de todas las rutas + ciclo completo de autenticación (25 casos) | Sí |
+| [`03-fase-3-ligas.md`](03-fase-3-ligas.md) | Crear liga, landing de invitación, unión, deep-link, pagos, reglas (18 casos) | Sí |
+| [`04-fase-4-predicciones.md`](04-fase-4-predicciones.md) | Edición táctil, autosave/debounce, undo, defaults, candados, multiplicadores, offline (19 casos nuevos) | Sí |
+| [`05-fase-5-standings-admin.md`](05-fase-5-standings-admin.md) | Ranking + desempates, filtros, panel admin completo con efectos en BD (20 casos) | Sí |
+| [`06-fase-6-duelos.md`](06-fase-6-duelos.md) | Escrow, aceptación/rechazo/expiración, resolución (4 variantes), landing pública, invariante de ledger (21 casos) | Sí |
+| [`07-fase-7-premios.md`](07-fase-7-premios.md) | Premios especiales por fase A-D, bloqueo, resolución, alcance per-league (12 casos) | Sí |
+| [`08-fase-8-live-webhooks.md`](08-fase-8-live-webhooks.md) | `/live` con Realtime + webhooks Zafronix E2E con seguridad HMAC (19 casos) | Sí |
+| [`09-fase-9-journey-edge.md`](09-fase-9-journey-edge.md) | Gran tour multi-usuario (20 pasos) + cuenta/insignias/salir de liga/extremos (12 casos) | Sí |
+| [`10-fase-10-ci.md`](10-fase-10-ci.md) | CI paralelo, nightly, artefactos, política anti-flaky, presupuesto de tiempo | Sí |
+| `BUGS.md` | Registro de bugs de producto encontrados por los tests (lo crea la Fase 1) | — |
+| [`SEGUIMIENTO.md`](SEGUIMIENTO.md) | Estado por fase + decisiones de diseño que no deben revertirse + hallazgos/desviaciones + infraestructura disponible | — |
+
+## Orden y dependencias
+
+```
+Fase 1 (fundación)  ──►  Fase 2 (smoke/auth)  ──►  Fase 3 (ligas)
+                                                      │
+        ┌─────────────────────────────────────────────┤
+        ▼                     ▼                       ▼
+   Fase 4 (predicciones)  Fase 5 (standings/admin)  Fase 7 (premios)
+        │                     │
+        └─────────►  Fase 6 (duelos)  ◄───────────────┘ (usa helpers de 5)
+                          │
+                          ▼
+                 Fase 8 (live/webhooks)
+                          │
+                          ▼
+                 Fase 9 (gran tour + extremos)
+                          │
+                          ▼
+                 Fase 10 (CI)
+```
+
+Las fases 4, 5 y 7 pueden ejecutarse en paralelo por agentes distintos **solo si trabajan en ramas separadas** (sus specs no colisionan), pero la integración debe ser secuencial (la BD de test es compartida en runtime: la suite siempre corre con `workers: 1`).
+
+## Cómo ejecutar una fase (instrucciones para el orquestador)
+
+Prompt plantilla para el agente ejecutor de la fase N:
+
+> Ejecuta la Fase N del plan E2E de este repo.
+> 1. Lee COMPLETOS `docs/e2e-plan/00-contexto.md` y `docs/e2e-plan/0N-fase-….md`.
+> 2. Verifica el entorno: `npx supabase start`, `npx supabase db reset`, `npm run test:e2e` en verde antes de empezar.
+> 3. Lee el código fuente listado en "Contexto requerido" de tu fase ANTES de escribir tests (textos, labels y comportamientos reales salen de ahí, no del plan).
+> 4. Implementa los entregables y casos de tu fase respetando las convenciones (§8) y reglas de oro (§9) del contexto. No modifiques lógica de producción (solo `data-testid` si tu fase lo indica). Si encuentras un bug de producto, regístralo en `docs/e2e-plan/BUGS.md` y marca el test `fixme`.
+> 5. Termina con TODO verde: `npm run lint && npm run typecheck && npm run test:unit && npm run test:e2e` (suite completa, 3 ejecuciones seguidas de e2e para validar estabilidad).
+> 6. Rellena "Notas de ejecución" de tu doc de fase y actualiza la tabla de estado del `README.md` del plan.
+
+## Estado
+
+| Fase | Estado | Fecha | Tests añadidos | Notas |
+|---|---|---|---|---|
+| 1 — Fundación | ✅ completada | 2026-06-09 | 0 (por diseño; 22 existentes verdes ×3) | 64 testids nuevos (~37 componentes), 14 módulos de helpers, proyecto `desktop-chromium`, `BUGS.md`. RPC real: `create_challenge` (no `fn_…`). Flake de tablist duplicado en dev mitigado con `selectPhaseTab` (ver Notas de la fase). |
+| 2 — Smoke + Auth | ✅ completada | 2026-06-10 | 26 (25 activos + 1 `fixme` BUG-001) | `smoke.spec.ts` + `auth.spec.ts`. Allow-list 3100 + rate limit de email en `config.toml`; `NEXT_PUBLIC_*` locales en `.env.test.local`. BUG-001: `/desafio` anon redirige a login. Ver Notas de la fase. |
+| 3 — Ligas | ✅ completada | 2026-06-10 | 18 (LIG-01 migrado del spec antiguo) | `league-create.spec.ts` + `league-join.spec.ts`. La landing auto-une al autenticado; monto 0 es válido por schema; códigos del seed ajustados al alfabeto real. Ver Notas de la fase. |
+| 4 — Predicciones | ✅ completada | 2026-06-10 | 19 | `predictions-edit.spec.ts` + `predictions-lock.spec.ts`. OJO: candado = kickoff EXACTO (sin ventana 1 min; §4.3 desactualizado) y debounce real 1500 ms. Ver Notas de la fase. |
+| 5 — Standings + Admin | ✅ completada | 2026-06-10 | 20 (19 activos + 1 `fixme` BUG-002) | `standings.spec.ts` y `standings-admin.spec.ts`. ADM-04 validado en RPC; ADM-08 marcado con `fixme` por trigger ausente de escrow. Ver Notas de la fase. |
+| 6 — Duelos | ✅ completada | 2026-06-10 | 21 (18 activos + 3 fixme BUG-001) | `duels.spec.ts`. Invariante del ledger verificada tras cada test; corregido payload del webhook enviando teams. Ver Notas de la fase. |
+| 7 — Premios | ✅ completada | 2026-06-10 | 13 (12 activos + 1 `fixme` BUG-003) | `awards.spec.ts`. Gaps en UI de puntos (BUG-004) y prop de phase code (BUG-003) registrados. Ver Notas de la fase. |
+| 8 — Live + Webhooks | ✅ completada | 2026-06-10 (rev. 2026-06-11) | 18 `test()` (17 activos + 1 `fixme` BUG-005) | `live.spec.ts` y `webhooks.spec.ts`. Cobertura LIVE-01→07 y WHK-01→12. HMAC/replay/out-of-order/malformados validados E2E. **Desviación §9.1**: BUG-006 — `/live` no recibía Realtime para usuarios autenticados; se corrigió producción (`LiveStandingsBoard` ahora hace `realtime.setAuth` + migración `REPLICA IDENTITY FULL`). Mantenido y documentado por decisión del mantenedor. Ver Notas de la fase y BUGS.md. |
+| 9 — Journey + Extremos | ✅ completada | 2026-06-11 | 13 (gran tour `@slow` de 20 pasos + EDG-01..12) | `full-journey.spec.ts` y `account-edge.spec.ts`. Gran tour verde ×3. Semántica real de `leave_league`/cleanup copiada a notas (borra predicciones/medallas/perfil; NO cancela duelos → mismo gap de BUG-002). Steppers/nav vía `dispatchEvent` por el orphan del takeover de next dev. Sin bugs nuevos. Ver Notas de la fase. |
+| 10 — CI | ✅ completada | 2026-06-11 | 0 (infra; no añade tests) | `ci.yml` en 4 jobs paralelos (quality/unit/integration/e2e) + `e2e-nightly.yml` (suite completa diaria + manual). Cache de browsers Playwright; artefactos `test-results/` en fallo; screenshot/vídeo CI-only. Script `test:e2e:ci` (mobile sin `@slow`). Política anti-flaky y runbook (`docs/testing.md`) publicados. DoD 1-2 (PR/nightly en verde) pendientes de ejecutar en GitHub. Ver Notas de la fase. |
+
+## CI y política anti-flaky (Fase 10)
+
+Runbook operativo completo (cómo correr cada nivel, requisitos, estructura) en
+[`docs/testing.md`](../testing.md). Resumen del pipeline:
+
+- **`ci.yml` (PR/push a `main`)**: 4 jobs **paralelos** — `quality` (lint+typecheck),
+  `unit`, `integration` (Supabase, 20 min) y `e2e` (Supabase + `test:e2e:ci`:
+  proyecto mobile sin `@slow`, 25 min). El tiempo del PR es el del job más lento,
+  no la suma. `integration` y `e2e` levantan **cada uno su propio** stack de
+  Supabase (la BD de test no puede compartirse — trampa §7.1). Cache de npm +
+  browsers de Playwright. Artefactos: HTML report siempre, `test-results/`
+  (traces/vídeos/capturas) solo en fallo.
+- **`e2e-nightly.yml` (diario 03:00 UTC + `workflow_dispatch`)**: suite E2E
+  **completa** (`test:e2e`) — ambos proyectos y todos los tags, incluidos `@slow`
+  y `@desktop`. Reportes/traces 14 días.
+
+### Política anti-flaky (vinculante)
+
+1. **`retries: 2` SOLO en CI** (local `retries: 0`: el fallo se ve al instante).
+2. Un test con retry en **>20% de los runs** → entra en lista de vigilancia de
+   [`BUGS.md`](BUGS.md) y **se investiga**, no se ignora.
+3. **Prohibido subir timeouts globales** para arreglar un caso puntual: ajustar
+   el `expect({ timeout })` de ESE test (patrón `@realtime`).
+4. **Prohibido `test.skip`/`test.fixme` sin entrada enlazada en `BUGS.md`**.
+   Nunca debilitar un assert para estabilizar (regla de oro §9.5).
+5. Determinismo: cero red externa, `runId` único, restaurar SIEMPRE el estado
+   global mutado (fases de torneo, ganadores de premios).
+
+### Presupuesto de tiempo
+
+Objetivo: PR ≤ ~20 min. Como la suite E2E corre con `workers: 1` (trampa §7.1),
+su duración es **lineal** (suma de los tests). Palancas, en orden:
+
+1. Recortar el solapamiento con `integration` (casos E2E que solo re-verifican BD
+   sin UI nueva).
+2. **Última** palanca (alta complejidad): split por `--shard` de Playwright
+   **manteniendo `workers:1` y una BD por shard** — cada shard su propio
+   `supabase start` en un job distinto (los shards NO pueden compartir BD).
+
+La medición real se documenta en las Notas de ejecución de
+[`10-fase-10-ci.md`](10-fase-10-ci.md).
+
+## Fuera de alcance (deliberado, con justificación)
+
+- **OAuth de Google real**: CI usa placeholders; se cubre la redirección al provider, no el consentimiento (00-contexto §7.6).
+- **Sandbox real de Zafronix**: ya cubierto por `tests/integration/zafronix-sandbox-e2e.test.ts` (se omite sin `ZAFRONIX_SANDBOX_KEY`); el E2E usa webhooks firmados localmente contra el endpoint real.
+- **Fallback de polling tras caída de Realtime**: simular la caída del websocket es frágil; queda como verificación manual documentada (Fase 8).
+- **Cron de respaldo con ETags**: cubierto en integration (`sync-matches.test.ts`).
+- **Cross-browser (Firefox/WebKit)**: la app es móvil-first Chromium-céntrica y el CI instala solo Chromium; reevaluar tras la Fase 10 si el presupuesto de tiempo lo permite.
+- **Pruebas de carga/concurrencia masiva**: fuera del propósito de esta suite funcional.
+
+## Métricas de éxito del plan completo
+
+1. Todas las rutas y todos los flujos de usuario del producto tienen al menos un test E2E feliz + sus negativos clave.
+2. Las 5 invariantes críticas se verifican por UI+BD: candado de kickoff, time-gating de lectura, conservación del ledger, multiplicador server-authoritative, bloqueo de fase D.
+3. El circuito externo completo (webhook firmado → BD → trigger → Realtime → UI) está probado sin mocks.
+4. Suite estable: 3 ejecuciones locales seguidas en verde por fase; flaky rate en CI < 5% por test.
+5. CI da señal en ≤ 20 min en PRs y cobertura completa nightly.

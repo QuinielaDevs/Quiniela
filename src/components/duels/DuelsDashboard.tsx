@@ -232,6 +232,9 @@ export function DuelsDashboard({
     return (
       <div
         key={challenge.id}
+        data-testid="duel-card"
+        data-challenge-id={challenge.id}
+        data-status={challenge.status}
         className={cn(
           "rounded-md border border-border bg-card p-4 flex flex-col gap-3 relative transition-all",
           challenge.status === "active" && "border-primary/45 shadow-sm",
@@ -323,6 +326,7 @@ export function DuelsDashboard({
                   onClick={() => handleOpenAccept(challenge)}
                   disabled={isActionPending}
                   size="sm"
+                  data-testid="accept-duel-button"
                   className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 font-bold"
                 >
                   Aceptar
@@ -332,6 +336,7 @@ export function DuelsDashboard({
                   disabled={isActionPending}
                   variant="outline"
                   size="sm"
+                  data-testid="reject-duel-button"
                   className="flex-1 border-border text-destructive hover:bg-destructive/10 font-bold"
                 >
                   Rechazar
@@ -343,6 +348,7 @@ export function DuelsDashboard({
                 onClick={() => handleOpenAccept(challenge)}
                 disabled={isActionPending}
                 size="sm"
+                data-testid="join-pool-button"
                 className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold"
               >
                 Unirse al Pozo
@@ -364,6 +370,7 @@ export function DuelsDashboard({
                   disabled={isActionPending}
                   variant="outline"
                   size="sm"
+                  data-testid="cancel-duel-button"
                   className="flex-1 border-border text-destructive hover:bg-destructive/10 font-bold"
                 >
                   Cancelar
@@ -377,7 +384,7 @@ export function DuelsDashboard({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-testid="duels-dashboard">
       {/* Saldo y CTA */}
       <div className="rounded-lg border border-border bg-card p-5 shadow-sm flex flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -386,7 +393,7 @@ export function DuelsDashboard({
               Saldo para Apuestas
             </span>
             <div className="flex items-baseline gap-1 text-accent font-display">
-              <span className="text-3xl font-extrabold">{wagerBalance.toFixed(2)}</span>
+              <span className="text-3xl font-extrabold" data-testid="duel-balance">{wagerBalance.toFixed(2)}</span>
               <span className="text-sm font-semibold">pts</span>
             </div>
           </div>
@@ -397,6 +404,7 @@ export function DuelsDashboard({
 
         <Button
           onClick={() => setIsCreateOpen(true)}
+          data-testid="create-duel-button"
           className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold h-12 flex items-center justify-center gap-1.5"
         >
           <Plus className="size-5" />

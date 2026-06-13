@@ -15,6 +15,7 @@ export function BottomNavbar() {
   return (
     <nav
       aria-label="Navegación principal"
+      data-testid="bottom-nav"
       className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card lg:hidden"
     >
       <ul className="mx-auto flex w-full max-w-md items-stretch">
@@ -43,12 +44,19 @@ export function BottomNavbar() {
                 <Link
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
+                  data-testid="nav-item"
+                  data-route={item.href}
                   className="block"
                 >
                   {content}
                 </Link>
               ) : (
-                <span aria-disabled="true" className="block cursor-not-allowed">
+                <span
+                  aria-disabled="true"
+                  data-testid="nav-item"
+                  data-route={item.href}
+                  className="block cursor-not-allowed"
+                >
                   {content}
                 </span>
               )}

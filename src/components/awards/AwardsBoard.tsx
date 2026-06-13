@@ -17,6 +17,12 @@ import { AwardSelector } from "./AwardSelector";
 
 type Selections = Record<AwardCategory, string | null>;
 
+/** Puntos ganados por categoría (vista special_predictions_with_points):
+ *  solo hay entrada con isCorrect=true cuando el admin resolvió el ganador. */
+export type EarnedAwardPoints = Partial<
+  Record<AwardCategory, { isCorrect: boolean; points: number }>
+>;
+
 interface AwardsBoardProps {
   leagueId: string;
   selectedCandidates: Record<AwardCategory, AwardCandidate | null>;
@@ -24,6 +30,7 @@ interface AwardsBoardProps {
   isLocked?: boolean;
   activePhaseLabel?: string;
   activePhaseCode?: string;
+  earnedPoints?: EarnedAwardPoints;
 }
 
 export function AwardsBoard({
@@ -33,6 +40,7 @@ export function AwardsBoard({
   isLocked = false,
   activePhaseLabel = "Semifinales en adelante",
   activePhaseCode = "D",
+  earnedPoints = {},
 }: AwardsBoardProps) {
   const [selections, setSelections] = useState<Selections>(initialSelections);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -65,9 +73,12 @@ export function AwardsBoard({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" data-testid="awards-board">
       {isLocked && (
-        <div className="flex items-center gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+        <div
+          className="flex items-center gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200"
+          data-testid="award-locked-notice"
+        >
           <span className="text-xl" aria-hidden="true">🔒</span>
           <div>
             <p className="font-semibold">Predicciones bloqueadas</p>
@@ -87,7 +98,11 @@ export function AwardsBoard({
         </p>
       ) : null}
 
-      <div className="rounded-lg border border-white/10 bg-[#1B263B] p-4 text-sm">
+      <div
+        className="rounded-lg border border-white/10 bg-[#1B263B] p-4 text-sm"
+        data-testid="award-phase-points"
+        data-active-phase={activePhaseCode}
+      >
         <h3 className="font-display font-bold text-white mb-2 flex items-center gap-1.5 text-base">
           <span>🏆</span> Puntuación Especial Decreciente
         </h3>
@@ -170,10 +185,24 @@ export function AwardsBoard({
 
       <div className="flex flex-col gap-5 lg:grid lg:grid-cols-3 lg:items-start lg:gap-5">
         {AWARD_CATEGORIES.map(({ category, title, hint }) => (
-          <Card key={category} className="border-white/10 bg-[#1B263B]">
+          <Card
+            key={category}
+            data-testid="award-category"
+            data-category={category}
+            className="border-white/10 bg-[#1B263B]"
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-lg text-white">{title}</CardTitle>
               <CardDescription className="text-white/60">{hint}</CardDescription>
+              {earnedPoints[category]?.isCorrect && (
+                <p
+                  className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full border border-[#E9C46A]/40 bg-[#E9C46A]/15 px-3 py-1 text-xs font-bold text-[#E9C46A]"
+                  data-testid="award-earned-badge"
+                >
+                  <span aria-hidden="true">🎉</span> ¡Acertaste! +
+                  {earnedPoints[category]!.points} pts
+                </p>
+              )}
             </CardHeader>
             <CardContent>
               <AwardSelector

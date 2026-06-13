@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getClaims = vi.fn();
 const from = vi.fn();
+// RPC fn_get_league_award_points (BUG-004): por defecto sin premios resueltos.
+const rpc = vi.fn(async () => ({ data: [], error: null }));
 const redirect = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
 });
@@ -14,7 +16,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/utils/supabase/server", () => ({
-  createClient: vi.fn(async () => ({ auth: { getClaims }, from })),
+  createClient: vi.fn(async () => ({ auth: { getClaims }, from, rpc })),
 }));
 
 // Componentes cliente stubbeados: el test enfoca el plumbing de datos de la página.

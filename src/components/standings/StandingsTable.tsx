@@ -80,12 +80,14 @@ export function StandingsTable({
         (solo ganador o empate, 2 pts).
       </p>
 
-      <ol className="flex flex-col gap-2">
+      <ol className="flex flex-col gap-2" data-testid="standings-table">
         {rows.map((row) => {
           const isLeader = row.rank === 1;
           return (
             <li
               key={row.userId}
+              data-testid="standings-row"
+              data-user-id={row.userId}
               className={cn(
                 "flex items-center gap-3 rounded-md border bg-card p-3",
                 isLeader ? "border-accent" : "border-border",
@@ -97,6 +99,7 @@ export function StandingsTable({
                   isLeader ? "text-accent" : "text-muted-foreground",
                 )}
                 aria-label={`Posición ${row.rank}`}
+                data-testid="standings-rank"
               >
                 {row.rank}
               </span>
@@ -117,6 +120,7 @@ export function StandingsTable({
                   <span
                     className="text-xs text-muted-foreground"
                     aria-label={`${row.exactCount} aciertos exactos`}
+                    data-testid="standings-exact"
                   >
                     <span className="font-semibold text-foreground">
                       {row.exactCount}
@@ -143,12 +147,25 @@ export function StandingsTable({
                       duelos
                     </span>
                   )}
+                  {showDuels && row.awardPoints > 0 && (
+                    <span
+                      className="text-xs text-muted-foreground"
+                      aria-label={`${row.awardPoints} puntos de premios especiales`}
+                      data-testid="standings-awards"
+                    >
+                      <span className="font-semibold text-foreground">
+                        {row.awardPoints.toFixed(1)}
+                      </span>{" "}
+                      premios
+                    </span>
+                  )}
                 </div>
               </div>
 
               <span
                 className="shrink-0 font-display text-lg font-bold text-accent"
                 aria-label={`${row.totalPoints} puntos`}
+                data-testid="standings-points"
               >
                 {row.totalPoints.toFixed(1)}
               </span>

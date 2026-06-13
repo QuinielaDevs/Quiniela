@@ -164,6 +164,8 @@ export function MemberAdminList({
           return (
             <li
               key={member.userId}
+              data-testid="member-admin-row"
+              data-user-id={member.userId}
               className="flex items-center gap-3 rounded-md border border-border bg-card p-3"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -199,6 +201,7 @@ export function MemberAdminList({
                 type="button"
                 onClick={() => togglePayment(member)}
                 disabled={isPending && isRowPending}
+                data-testid="payment-toggle"
                 aria-pressed={isPaid}
                 aria-label={`Pago de ${member.displayName}: ${
                   isPaid ? "Pagado" : "Pendiente"
@@ -224,6 +227,7 @@ export function MemberAdminList({
                     })
                   }
                   aria-label={`Dar de baja a ${member.displayName}`}
+                  data-testid="expel-button"
                   className="inline-flex size-12 shrink-0 items-center justify-center rounded-full text-destructive"
                 >
                   <UserMinus className="size-5" aria-hidden="true" />

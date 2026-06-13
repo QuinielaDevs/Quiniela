@@ -1,0 +1,94 @@
+name: E2E Nightly (suite completa)
+
+# El PR corre un subset rápido (mobile, sin @slow). Este nightly corre la suite
+# E2E COMPLETA: incluye los @slow (esperas reales de kickoff, ~70 s c/u) y el
+# proyecto desktop-chromium (@desktop). Así el feedback de PR es ágil sin perder
+# cobertura: lo lento y exhaustivo se valida de madrugada sobre `main`.
+
+on:
+  schedule:
+    # 03:00 UTC todos los días. Recuerda: GitHub deshabilita los `schedule` en
+    # repos sin actividad ~60 días, y corre sobre la rama por defecto (main).
+    - cron: "0 3 * * *"
+  workflow_dispatch: # lanzamiento manual desde la pestaña Actions (DoD nº 2)
+
+jobs:
+  e2e-full:
+    name: E2E completa (mobile + desktop, incl. @slow)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GOOGLE_CLIENT_ID: ci-placeholder-client-id
+      GOOGLE_CLIENT_SECRET: ci-placeholder-secret
+      ZAFRONIX_WEBHOOK_SECRET: whsec_test_secret_for_integration_tests_only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers (chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local stack
+        run: supabase start
+
+      - name: Export Supabase local credentials
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          : "${API_URL:?supabase status no devolvió API_URL}"
+          : "${ANON_KEY:?supabase status no devolvió ANON_KEY}"
+          : "${SERVICE_ROLE_KEY:?supabase status no devolvió SERVICE_ROLE_KEY}"
+          PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-$ANON_KEY}"
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
+          } >> "$GITHUB_ENV"
+
+      # Suite COMPLETA, ambos proyectos, todos los tags. workers:1 (trampa §7.1).
+      - name: Run full E2E suite
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload test-results (traces/vídeos/capturas)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-test-results
+          path: test-results/
+          retention-days: 14
+
+      - name: Stop Supabase local stack
+        if: always()
+        run: supabase stop || true

@@ -21,6 +21,8 @@ export function BadgeHistory({ badges }: { badges: AccountBadgeView[] }) {
           {badges.map((badge) => (
             <li
               key={`${badge.matchday}-${badge.badgeType}`}
+              data-testid="badge-item"
+              data-badge={badge.badgeType}
               className="rounded-sm border border-border bg-background p-3"
             >
               <div className="flex items-start justify-between gap-3">

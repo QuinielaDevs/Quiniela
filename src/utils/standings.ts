@@ -26,6 +26,10 @@ export type StandingMember = {
   /** Saldo de puntos de duelos (league_members.wager_balance). Toda la liga,
    *  no por jornada. 2º criterio de desempato. Opcional → 0 si no se provee. */
   duelPoints?: number;
+  /** Puntos de premios especiales (RPC fn_get_league_award_points, BUG-004).
+   *  Solo suman al total en el acumulado General: un premio no pertenece a
+   *  ninguna jornada/fase. Opcional → 0 si no se provee. */
+  awardPoints?: number;
 };
 
 export type StandingMatch = {
@@ -58,6 +62,8 @@ export type StandingRow = {
   resultCount: number;
   /** Saldo de puntos de duelos usado en el desempate y mostrado en General. */
   duelPoints: number;
+  /** Puntos de premios especiales incluidos en totalPoints (solo General). */
+  awardPoints: number;
 };
 
 export type ProjectedStandingRow = StandingRow & {
@@ -102,6 +108,11 @@ export function buildStandings(
     predictions.map((p) => [`${p.userId}:${p.matchId}`, p]),
   );
 
+  // Los premios especiales no pertenecen a ninguna jornada/fase: solo entran
+  // en el acumulado General (BUG-004).
+  const includeAwards =
+    targetPhaseKey === undefined || targetPhaseKey === "general";
+
   const rows = members.map((member) => {
     let totalPoints = 0;
     let exactCount = 0;
@@ -123,13 +134,16 @@ export function buildStandings(
       else if (base === POINTS_RESULT) resultCount += 1;
     }
 
+    const awardPoints = includeAwards ? round2(member.awardPoints ?? 0) : 0;
+
     return {
       member,
-      totalPoints: round2(totalPoints),
+      totalPoints: round2(totalPoints + awardPoints),
       exactCount,
       resultCount,
       // Saldo de duelos (wager_balance) de toda la liga. 2º criterio de desempate.
       duelPoints: member.duelPoints ?? 0,
+      awardPoints,
     };
   });
 
@@ -156,6 +170,7 @@ export function buildStandings(
     exactCount: row.exactCount,
     resultCount: row.resultCount,
     duelPoints: row.duelPoints,
+    awardPoints: row.awardPoints,
   }));
 }
 
@@ -206,13 +221,18 @@ export function buildProjectedStandings(
       else if (base === POINTS_RESULT) resultCount += 1;
     }
 
+    // La proyectada es una vista del acumulado General: los premios siempre
+    // entran (BUG-004), igual que en buildStandings sin filtro de fase.
+    const awardPoints = round2(member.awardPoints ?? 0);
+
     return {
       member,
-      totalPoints: round2(totalPoints),
+      totalPoints: round2(totalPoints + awardPoints),
       livePoints: round2(livePoints),
       exactCount,
       resultCount,
       duelPoints: member.duelPoints ?? 0,
+      awardPoints,
     };
   });
 
@@ -235,6 +255,7 @@ export function buildProjectedStandings(
     exactCount: row.exactCount,
     resultCount: row.resultCount,
     duelPoints: row.duelPoints,
+    awardPoints: row.awardPoints,
     livePoints: row.livePoints,
   }));
 }

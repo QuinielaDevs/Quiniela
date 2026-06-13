@@ -387,3 +387,57 @@ describe("buildStandings — detalle de criterios (exactos/resultado/duelos)", (
     expect(rows[0]).toMatchObject({ duelPoints: 0, resultCount: 0 });
   });
 });
+
+describe("puntos de premios especiales (BUG-004)", () => {
+  it("suman al total en el acumulado General y pueden decidir el orden", () => {
+    const members = [
+      member("a"),
+      // b pierde en partidos (2 vs 5) pero acertó el campeón (+50).
+      member("b", { awardPoints: 50 }),
+    ];
+    const matches = [match("m1", { homeScore: 2, awayScore: 1 })];
+    const predictions = [
+      prediction("a", "m1", { homeScorePred: 2, awayScorePred: 1 }),
+      prediction("b", "m1", { homeScorePred: 3, awayScorePred: 0 }),
+    ];
+
+    const rows = buildStandings(members, matches, predictions, "general");
+
+    expect(rows.map((r) => r.userId)).toEqual(["b", "a"]);
+    expect(rows[0]).toMatchObject({ totalPoints: 52, awardPoints: 50 });
+    expect(rows[1]).toMatchObject({ totalPoints: 5, awardPoints: 0 });
+  });
+
+  it("NO suman en una pestaña de jornada/fase (no pertenecen a ninguna)", () => {
+    const members = [member("a", { awardPoints: 50 })];
+    const matches = [match("m1", { matchday: 1, homeScore: 2, awayScore: 1 })];
+    const predictions = [
+      prediction("a", "m1", { homeScorePred: 2, awayScorePred: 1 }),
+    ];
+
+    const rows = buildStandings(members, matches, predictions, 1);
+
+    expect(rows[0]).toMatchObject({ totalPoints: 5, awardPoints: 0 });
+  });
+
+  it("la proyectada (live) los incluye sin contarlos como livePoints", () => {
+    const members = [member("a", { awardPoints: 25 })];
+    const matches = [match("m1", { status: "live", homeScore: 1, awayScore: 0 })];
+    const predictions = [
+      prediction("a", "m1", { homeScorePred: 1, awayScorePred: 0 }),
+    ];
+
+    const rows = buildProjectedStandings(members, matches, predictions);
+
+    expect(rows[0]).toMatchObject({
+      totalPoints: 30,
+      livePoints: 5,
+      awardPoints: 25,
+    });
+  });
+
+  it("awardPoints por defecto es 0 cuando el miembro no lo provee", () => {
+    const rows = buildStandings([member("a")], [], []);
+    expect(rows[0]).toMatchObject({ awardPoints: 0, totalPoints: 0 });
+  });
+});

@@ -10,7 +10,10 @@ const DEFAULT_BODY =
 // propio `body` contextual. El formulario es un client component.
 export function NoLeagueState({ body = DEFAULT_BODY }: { body?: string }) {
   return (
-    <div className="rounded-md border border-border bg-card p-6 text-card-foreground">
+    <div
+      className="rounded-md border border-border bg-card p-6 text-card-foreground"
+      data-testid="no-league-state"
+    >
       <h2 className="font-display text-lg font-bold">
         Aún no perteneces a una liga
       </h2>

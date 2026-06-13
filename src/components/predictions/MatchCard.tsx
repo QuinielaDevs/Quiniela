@@ -193,9 +193,9 @@ export function MatchCard({
   const lastSavedRef = useRef<PendingPrediction | null>(
     hasInitialPrediction
       ? {
-          homeScorePred: initialHomeScore,
-          awayScorePred: initialAwayScore,
-        }
+        homeScorePred: initialHomeScore,
+        awayScorePred: initialAwayScore,
+      }
       : null,
   );
 
@@ -234,10 +234,10 @@ export function MatchCard({
     Number.isInteger(match.away_score);
   const basePoints = isFinishedWithResult
     ? calculateBasePoints(
-        { home: initialHomeScore, away: initialAwayScore },
-        { home: match.home_score as number, away: match.away_score as number },
-        "finished",
-      )
+      { home: initialHomeScore, away: initialAwayScore },
+      { home: match.home_score as number, away: match.away_score as number },
+      "finished",
+    )
     : POINTS_NONE;
   // Si el servidor ya evaluó y pobló points_earned, lo preferimos al cálculo
   // cliente (es la fuente de verdad); si no, mostramos el cálculo local
@@ -629,6 +629,8 @@ export function MatchCard({
 
   return (
     <article
+      data-testid="match-card"
+      data-match-id={match.id}
       className={cn(
         "rounded-md border border-border bg-card p-4 text-card-foreground transition-colors",
         saveState === "saved" && "border-success ring-1 ring-success/60",
@@ -666,7 +668,10 @@ export function MatchCard({
           {match.status === "scheduled" && !isTbd && (
             <>
               <span>·</span>
-              <span className="font-semibold text-accent" data-testid="multiplier-badge">
+              <span
+                className="font-semibold text-accent"
+                data-testid="multiplier-badge"
+              >
                 {formatMultiplier(displayMultiplier)}
               </span>
               {multiplierDrift && (
@@ -706,6 +711,8 @@ export function MatchCard({
             <div
               className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
               role="status"
+              data-testid="lock-indicator"
+              data-reason="tbd"
             >
               <Lock className="size-3.5" aria-hidden="true" />
               {TBD_COPY}
@@ -714,6 +721,8 @@ export function MatchCard({
             <div
               className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
               role="status"
+              data-testid="lock-indicator"
+              data-reason={match.status}
             >
               <Lock className="size-3.5" aria-hidden="true" />
               {closedStatusCopy(match.status)}
@@ -773,6 +782,7 @@ export function MatchCard({
               label={homeLabel}
               disabled={controlsDisabled}
               max={MAX_PREDICTION_SCORE}
+              side="home"
             />
           )}
         </div>
@@ -818,6 +828,7 @@ export function MatchCard({
               label={awayLabel}
               disabled={controlsDisabled}
               max={MAX_PREDICTION_SCORE}
+              side="away"
             />
           )}
         </div>
@@ -851,6 +862,7 @@ export function MatchCard({
             type="button"
             onClick={handleUndo}
             disabled={undoBusy}
+            data-testid="undo-button"
             className="h-9 shrink-0 rounded-sm border border-border px-4 text-sm font-semibold disabled:opacity-50"
           >
             {undoBusy ? "Deshaciendo…" : "Deshacer cambio"}

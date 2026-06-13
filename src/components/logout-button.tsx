@@ -26,6 +26,7 @@ export function LogoutButton() {
       variant="outline"
       onClick={logout}
       disabled={isPending}
+      data-testid="logout-button"
       aria-label="Cerrar sesión"
     >
       <LogOut aria-hidden="true" />

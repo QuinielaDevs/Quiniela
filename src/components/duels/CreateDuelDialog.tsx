@@ -154,7 +154,10 @@ export function CreateDuelDialog({
 
         {successChallengeId ? (
           /* PANTALLA DE ÉXITO */
-          <div className="p-6 flex flex-col items-center text-center space-y-4">
+          <div
+            className="p-6 flex flex-col items-center text-center space-y-4"
+            data-testid="create-duel-success"
+          >
             <div className="size-16 rounded-full bg-success/20 flex items-center justify-center text-success border border-success/40 animate-bounce">
               <span className="text-2xl font-bold">✓</span>
             </div>
@@ -207,6 +210,7 @@ export function CreateDuelDialog({
               </Label>
               <select
                 id="match-select"
+                data-testid="duel-match-select"
                 value={matchId}
                 onChange={(e) => setMatchId(e.target.value)}
                 required
@@ -234,10 +238,15 @@ export function CreateDuelDialog({
               <Label className="text-xs uppercase font-semibold text-muted-foreground block">
                 Tipo de Reto
               </Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div
+                className="grid grid-cols-2 gap-2"
+                data-testid="duel-type-toggle"
+                data-type={type}
+              >
                 <button
                   type="button"
                   onClick={() => setType("direct")}
+                  data-testid="duel-type-direct"
                   className={cn(
                     "h-12 border rounded-sm font-semibold transition-all text-sm",
                     type === "direct"
@@ -250,6 +259,7 @@ export function CreateDuelDialog({
                 <button
                   type="button"
                   onClick={() => setType("open")}
+                  data-testid="duel-type-open"
                   className={cn(
                     "h-12 border rounded-sm font-semibold transition-all text-sm",
                     type === "open"
@@ -270,6 +280,7 @@ export function CreateDuelDialog({
                 </Label>
                 <select
                   id="rival-select"
+                  data-testid="duel-rival-select"
                   value={challengedId}
                   onChange={(e) => setChallengedId(e.target.value)}
                   required={type === "direct"}
@@ -297,6 +308,7 @@ export function CreateDuelDialog({
               </div>
               <Input
                 id="points-bet"
+                data-testid="duel-bet-input"
                 type="number"
                 min={1}
                 value={pointsBet}
@@ -326,6 +338,8 @@ export function CreateDuelDialog({
                     onChange={setPredictionHome}
                     label="Equipo Local"
                     disabled={isPending}
+                    side="home"
+                    testId="duel-home-pred"
                   />
                 </div>
                 <div className="font-display font-bold text-muted-foreground">vs</div>
@@ -338,13 +352,18 @@ export function CreateDuelDialog({
                     onChange={setPredictionAway}
                     label="Equipo Visitante"
                     disabled={isPending}
+                    side="away"
+                    testId="duel-away-pred"
                   />
                 </div>
               </div>
             </div>
 
             {error && (
-              <div className="text-sm font-semibold text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+              <div
+                data-testid="create-duel-error"
+                className="text-sm font-semibold text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3"
+              >
                 {error}
               </div>
             )}
@@ -353,6 +372,7 @@ export function CreateDuelDialog({
             <div className="pt-2">
               <Button
                 type="submit"
+                data-testid="create-duel-submit"
                 disabled={isPending || isBalanceInsufficient || !matchId}
                 className={cn(
                   "w-full h-12 font-extrabold text-base transition-colors",

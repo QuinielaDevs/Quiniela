@@ -167,6 +167,8 @@ export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
           return (
             <article
               key={league.leagueId}
+              data-testid="account-league-item"
+              data-league-id={league.leagueId}
               className="py-3 first:pt-4 last:pb-0"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -276,6 +278,7 @@ export function AccountLeaguesPanel({ leagues }: AccountLeaguesPanelProps) {
                 <button
                   type="button"
                   onClick={() => openLeaveDialog(league)}
+                  data-testid="leave-league-button"
                   className="inline-flex items-center gap-1.5 text-sm font-medium text-destructive hover:underline"
                   aria-label={`Abandonar la liga ${league.leagueName}`}
                 >

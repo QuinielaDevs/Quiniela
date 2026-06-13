@@ -59,7 +59,10 @@ export function JoinLeagueCard({
   };
 
   return (
-    <Card className="border-border bg-card text-card-foreground">
+    <Card
+      className="border-border bg-card text-card-foreground"
+      data-testid="join-league-card"
+    >
       <CardHeader className="gap-3">
         <div className="flex items-center gap-3">
           <Image
@@ -77,7 +80,10 @@ export function JoinLeagueCard({
           </div>
         </div>
         <div className="space-y-2">
-          <CardTitle className="font-display text-3xl leading-tight">
+          <CardTitle
+            className="font-display text-3xl leading-tight"
+            data-testid="join-league-name"
+          >
             Únete a {invite.league_name}
           </CardTitle>
           <CardDescription className="text-base text-muted-foreground">
@@ -87,7 +93,10 @@ export function JoinLeagueCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {invite.requires_payment ? (
-          <div className="rounded-sm border border-destructive/70 bg-destructive/10 p-4">
+          <div
+            className="rounded-sm border border-destructive/70 bg-destructive/10 p-4"
+            data-testid="join-payment-info"
+          >
             <p className="font-display text-lg font-semibold text-foreground">
               Tarifa de inscripción: {formatPaymentAmount(invite.payment_amount)}
             </p>
@@ -102,7 +111,10 @@ export function JoinLeagueCard({
             )}
           </div>
         ) : (
-          <div className="rounded-sm border border-success/60 bg-success/10 p-4">
+          <div
+            className="rounded-sm border border-success/60 bg-success/10 p-4"
+            data-testid="join-payment-info"
+          >
             <p className="font-display text-lg font-semibold text-foreground">
               Liga sin pago requerido
             </p>
@@ -139,7 +151,10 @@ export function JoinLeagueCard({
         )}
 
         {error && (
-          <p className="rounded-sm border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive-foreground">
+          <p
+            data-testid="join-error"
+            className="rounded-sm border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive-foreground"
+          >
             {error}
           </p>
         )}
