@@ -48,6 +48,8 @@ export function CandidatePicker({
               type="button"
               disabled={disabled}
               onClick={() => onSelect(candidate.id)}
+              data-testid="candidate-option"
+              data-candidate-id={candidate.id}
               aria-pressed={isSelected}
               aria-label={`Elegir a ${candidate.name}${
                 candidate.team_name ? ` (${candidate.team_name})` : ""

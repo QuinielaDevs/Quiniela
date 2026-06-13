@@ -17,6 +17,10 @@ interface GoalPickerProps {
   min?: number;
   /** Máximo opcional. Sin tope por defecto; clamp solo en `min`. */
   max?: number;
+  /** Lado del marcador, expuesto como data-side para los tests E2E. */
+  side?: "home" | "away";
+  /** data-testid de la raíz (default "goal-picker"); permite ids contextuales. */
+  testId?: string;
 }
 
 // Control táctil +/- de un marcador (UX-DR-4). El número se muestra en un <span>
@@ -35,6 +39,8 @@ export function GoalPicker({
   disabled = false,
   min = 0,
   max,
+  side,
+  testId = "goal-picker",
 }: GoalPickerProps) {
   const canDecrement = !disabled && value > min;
   const canIncrement = !disabled && (max === undefined || value < max);
@@ -50,12 +56,17 @@ export function GoalPicker({
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div
+      className="flex items-center gap-1.5"
+      data-testid={testId}
+      data-side={side}
+    >
       <button
         type="button"
         onClick={decrement}
         disabled={!canDecrement}
         aria-label={`Disminuir goles de ${label}`}
+        data-testid="goal-decrement"
         className={cn(STEPPER_BUTTON_CLASSES)}
       >
         <Minus className="size-5" aria-hidden="true" />
@@ -64,6 +75,7 @@ export function GoalPicker({
       <span
         className="min-w-6 text-center font-display text-2xl font-extrabold tabular-nums text-foreground"
         aria-live="polite"
+        data-testid="goal-value"
       >
         {value}
       </span>
@@ -73,6 +85,7 @@ export function GoalPicker({
         onClick={increment}
         disabled={!canIncrement}
         aria-label={`Incrementar goles de ${label}`}
+        data-testid="goal-increment"
         className={cn(STEPPER_BUTTON_CLASSES)}
       >
         <Plus className="size-5" aria-hidden="true" />

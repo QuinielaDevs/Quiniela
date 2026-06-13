@@ -39,6 +39,7 @@ export function JoinByCodeForm() {
         <Input
           id="invite-code"
           name="invite-code"
+          data-testid="join-code-input"
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           placeholder="Ej. ABC123"
@@ -53,6 +54,7 @@ export function JoinByCodeForm() {
       <Button
         type="submit"
         size="xl"
+        data-testid="join-submit"
         className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
         disabled={isPending || code.trim().length === 0}
       >
@@ -62,6 +64,7 @@ export function JoinByCodeForm() {
       {error && (
         <p
           role="alert"
+          data-testid="join-error"
           className="rounded-sm border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive-foreground"
         >
           {error}

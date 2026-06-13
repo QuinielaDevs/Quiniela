@@ -47,6 +47,7 @@ export function WelcomePaymentModal({
         aria-modal="true"
         aria-labelledby="welcome-pay-title"
         aria-describedby="welcome-pay-desc"
+        data-testid="welcome-payment-modal"
         className="w-full max-w-sm rounded-md border border-border bg-card p-6 text-card-foreground"
         onClick={(e) => e.stopPropagation()}
       >
@@ -65,15 +66,24 @@ export function WelcomePaymentModal({
           </p>
 
           <div className="rounded-sm border border-destructive/60 bg-destructive/10 p-3">
-            <p className="font-display text-base font-semibold text-foreground">
+            <p
+              className="font-display text-base font-semibold text-foreground"
+              data-testid="payment-amount"
+            >
               Tarifa de inscripción: {formatPaymentAmount(amount)}
             </p>
             {instructions ? (
-              <p className="mt-2 leading-6 text-muted-foreground">
+              <p
+                className="mt-2 leading-6 text-muted-foreground"
+                data-testid="payment-instructions"
+              >
                 {instructions}
               </p>
             ) : (
-              <p className="mt-2 text-muted-foreground">
+              <p
+                className="mt-2 text-muted-foreground"
+                data-testid="payment-instructions"
+              >
                 Encuentra las instrucciones de pago en las reglas de la liga.
               </p>
             )}
@@ -84,6 +94,7 @@ export function WelcomePaymentModal({
           <button
             type="button"
             onClick={() => setOpen(false)}
+            data-testid="welcome-payment-close"
             className="h-12 flex-1 rounded-sm border border-border text-sm font-semibold text-muted-foreground"
           >
             Ahora no

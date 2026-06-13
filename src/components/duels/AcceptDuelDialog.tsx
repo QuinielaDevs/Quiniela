@@ -161,6 +161,8 @@ export function AcceptDuelDialog({
                   onChange={setPredictionHome}
                   label={challenge.match.home_team}
                   disabled={isPending}
+                  side="home"
+                  testId="accept-home-pred"
                 />
               </div>
               <div className="font-display font-bold text-muted-foreground">vs</div>
@@ -173,13 +175,18 @@ export function AcceptDuelDialog({
                   onChange={setPredictionAway}
                   label={challenge.match.away_team}
                   disabled={isPending}
+                  side="away"
+                  testId="accept-away-pred"
                 />
               </div>
             </div>
           </div>
 
           {error && (
-            <div className="text-sm font-semibold text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+            <div
+              data-testid="accept-duel-error"
+              className="text-sm font-semibold text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3"
+            >
               {error}
             </div>
           )}
@@ -188,6 +195,7 @@ export function AcceptDuelDialog({
           <div className="pt-2">
             <Button
               type="submit"
+              data-testid="accept-duel-submit"
               disabled={isPending || isBalanceInsufficient}
               className={cn(
                 "w-full h-12 font-extrabold text-base transition-colors",

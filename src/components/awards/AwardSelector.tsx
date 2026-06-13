@@ -176,6 +176,8 @@ export function AwardSelector({
             setIsOpen(true);
             setTimeout(() => inputRef.current?.focus(), 50);
           }}
+          data-testid="selected-candidate"
+          data-candidate-id={displayCandidate.id}
           className="mt-2 flex cursor-pointer items-center gap-2.5 rounded-lg border border-[#E9C46A]/40 bg-[#E9C46A]/10 px-3 py-2"
           role="button"
           tabIndex={0}
@@ -221,6 +223,8 @@ export function AwardSelector({
                   type="button"
                   disabled={disabled}
                   onClick={() => selectCandidate(c)}
+                  data-testid="candidate-option"
+                  data-candidate-id={c.id}
                   className={cn(
                     "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/5",
                     isSelected && "bg-[#E9C46A]/10",
@@ -257,6 +261,8 @@ export function AwardSelector({
                       type="button"
                       disabled={disabled}
                       onClick={() => selectCandidate(player)}
+                      data-testid="candidate-option"
+                      data-candidate-id={player.id}
                       className={cn(
                         "flex w-full items-center gap-3 pl-9 pr-3 py-2 text-left transition-colors hover:bg-white/5",
                         isSelected && "bg-[#E9C46A]/10",

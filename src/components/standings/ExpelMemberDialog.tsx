@@ -51,6 +51,7 @@ export function ExpelMemberDialog({
         aria-modal="true"
         aria-labelledby="expel-dialog-title"
         aria-describedby="expel-dialog-desc"
+        data-testid="expel-dialog"
         className="w-full max-w-xs rounded-md border border-border bg-card p-5 text-card-foreground shadow-none"
         onClick={(e) => e.stopPropagation()}
       >
@@ -85,6 +86,7 @@ export function ExpelMemberDialog({
             type="button"
             onClick={onConfirm}
             disabled={pending}
+            data-testid="expel-confirm"
             className={cn(
               "h-12 flex-1 rounded-sm bg-destructive text-sm font-semibold text-destructive-foreground disabled:opacity-50",
             )}

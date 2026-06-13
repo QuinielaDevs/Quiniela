@@ -189,7 +189,7 @@ export function PredictionsBoardView({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" data-testid="predictions-board">
       {phases.length > 1 && (
         <ScrollableTabs
           tabs={phases}

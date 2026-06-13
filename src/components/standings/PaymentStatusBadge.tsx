@@ -16,6 +16,8 @@ export function PaymentStatusBadge({
   const isPaid = status === "paid";
   return (
     <span
+      data-testid="payment-status-badge"
+      data-status={status}
       className={cn(
         "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
         isPaid

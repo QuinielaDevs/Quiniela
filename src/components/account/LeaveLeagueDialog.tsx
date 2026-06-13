@@ -56,6 +56,7 @@ export function LeaveLeagueDialog({
         aria-modal="true"
         aria-labelledby="leave-dialog-title"
         aria-describedby="leave-dialog-desc"
+        data-testid="leave-league-dialog"
         className="w-full max-w-sm rounded-md border border-border bg-card p-5 text-card-foreground"
         onClick={(e) => e.stopPropagation()}
       >
@@ -116,6 +117,7 @@ export function LeaveLeagueDialog({
             type="button"
             onClick={onConfirm}
             disabled={pending || !acknowledged}
+            data-testid="leave-league-confirm"
             className="h-12 flex-1 rounded-sm bg-destructive text-sm font-semibold text-destructive-foreground disabled:opacity-50"
           >
             {pending ? "Saliendo…" : "Abandonar liga"}

@@ -148,7 +148,11 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
   }
 
   return (
-    <li className="flex flex-col gap-3 rounded-md border border-border bg-card p-3 relative">
+    <li
+      data-testid="match-admin-row"
+      data-match-id={match.id}
+      className="flex flex-col gap-3 rounded-md border border-border bg-card p-3 relative"
+    >
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-md border border-border bg-card p-5 shadow-2xl space-y-4">
@@ -217,6 +221,8 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
             label={match.homeTeam}
             disabled={isPending}
             max={99}
+            side="home"
+            testId="admin-home-score"
           />
           <span className="font-display text-lg text-muted-foreground">–</span>
           <GoalPicker
@@ -225,6 +231,8 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
             label={match.awayTeam}
             disabled={isPending}
             max={99}
+            side="away"
+            testId="admin-away-score"
           />
         </div>
       )}
@@ -236,6 +244,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
         </label>
         <select
           id={`status-${match.id}`}
+          data-testid="admin-status-select"
           value={status}
           onChange={(e) => setStatus(e.target.value as MatchStatus)}
           disabled={isPending}
@@ -252,6 +261,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
           type="button"
           onClick={save}
           disabled={isPending || !dirty}
+          data-testid="admin-save-result"
           className={cn(
             "inline-flex h-12 min-w-[88px] items-center justify-center rounded-sm px-4 text-sm font-semibold disabled:opacity-40",
             "bg-primary text-primary-foreground",
@@ -264,6 +274,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
       {error && (
         <p
           role="status"
+          data-testid="admin-result-error"
           className="rounded-sm border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
           {error}
