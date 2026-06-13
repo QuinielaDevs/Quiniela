@@ -91,6 +91,7 @@ describe("MatchCard", () => {
   beforeEach(() => {
     cleanup();
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z"));
     vi.mocked(savePrediction).mockReset();
     vi.mocked(revertPrediction).mockReset();
     setOnline(true);
@@ -589,7 +590,7 @@ describe("MatchCard", () => {
       />,
     );
     expect(screen.queryByText("2.5x")).toBeNull();
-    expect(screen.getByText("1.3x")).toBeInTheDocument();
+    expect(screen.getByText("1.0x")).toBeInTheDocument();
   });
 
   it("el texto de la advertencia muestra el saved vs next multiplier correctos", async () => {

@@ -1,5 +1,5 @@
 import { render, screen, cleanup } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getClaims = vi.fn();
 const from = vi.fn();
@@ -63,7 +63,6 @@ async function renderBoard() {
 
 describe("/predictions (PredictionsBoard)", () => {
   beforeEach(() => {
-    cleanup();
     vi.resetModules();
     vi.clearAllMocks();
     getClaims.mockResolvedValue({ data: { claims: { sub: "user-1" } } });
@@ -77,6 +76,12 @@ describe("/predictions (PredictionsBoard)", () => {
       ],
       error: null,
     });
+  });
+
+  afterEach(async () => {
+    cleanup();
+    // Flush pending microtasks/timers so they run before JSDOM is destroyed
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it("redirige a login si no hay sesion", async () => {

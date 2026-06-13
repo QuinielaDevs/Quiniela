@@ -24,9 +24,8 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          const safeOptions = process.env.NODE_ENV === "development"
-            ? { secure: false }
-            : {};
+          const safeOptions =
+            process.env.NODE_ENV === "development" ? { secure: false } : {};
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
@@ -34,7 +33,10 @@ export async function updateSession(request: NextRequest) {
             request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, { ...options, ...safeOptions }),
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              ...safeOptions,
+            }),
           );
         },
       },
@@ -62,7 +64,9 @@ export async function updateSession(request: NextRequest) {
     // WhatsApp/OG no llevan cookies y la página ya soporta anon (RPC
     // fn_get_challenge_landing con grant a anon, predicciones time-gated).
     !request.nextUrl.pathname.startsWith("/desafio") &&
-    !request.nextUrl.pathname.startsWith("/api/webhooks")
+    !request.nextUrl.pathname.startsWith("/api/webhooks") &&
+    !request.nextUrl.pathname.startsWith("/api/standings") &&
+    !request.nextUrl.pathname.startsWith("/api/sync")
   ) {
     // Usuario no autenticado: lo mandamos a login PERO conservando el destino
     // original en `?next` para volver tras autenticarse (no se pierde el invite

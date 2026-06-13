@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ComponentPropsWithoutRef } from "react";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
 const single = vi.fn();
@@ -11,6 +12,19 @@ const redirect = vi.fn((url: string) => {
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   redirect,
+}));
+
+vi.mock("next/image", () => ({
+  default: ({ src, alt, ...props }: ComponentPropsWithoutRef<"img">) => {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={alt ?? ""} {...props} />;
+  },
+}));
+
+vi.mock("@/components/google-signin-button", () => ({
+  GoogleSignInButton: () => (
+    <button type="button">Continuar con Google</button>
+  ),
 }));
 
 vi.mock("@/utils/supabase/server", () => ({
@@ -40,6 +54,12 @@ describe("/join/[invite_code]", () => {
       });
     });
     getClaims.mockResolvedValue({ data: null, error: null });
+  });
+
+  afterEach(async () => {
+    cleanup();
+    // Flush pending microtasks/timers so they run before JSDOM is destroyed
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it("renderiza nombre de liga y CTA Google para visitantes no autenticados", async () => {

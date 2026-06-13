@@ -1,102 +1,219 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+<h1 align="center">PIJA Quiniela</h1>
 
 <p align="center">
- The fastest way to build apps with Next.js and Supabase
+  A private World Cup 2026 prediction pool for your group — championship mode.
 </p>
 
 <p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
   <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
+  <a href="#what-it-does"><strong>What it does</strong></a> ·
+  <a href="#how-scoring-works"><strong>Scoring</strong></a> ·
+  <a href="#tech-stack"><strong>Tech stack</strong></a> ·
+  <a href="#run-locally"><strong>Run locally</strong></a> ·
+  <a href="#testing"><strong>Testing</strong></a>
 </p>
 <br/>
 
-## Features
-
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Proxy
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
-
 ## Demo
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+Live app: **[quiniela-six-nu.vercel.app](https://quiniela-six-nu.vercel.app/)**
 
-## Deploy to Vercel
+Sign in with email or Google, join a league with an invite code, and start
+predicting scores for the FIFA World Cup 2026.
 
-Vercel deployment will guide you through creating a Supabase account and project.
+## What it does
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+PIJA Quiniela is a private prediction game built around the 2026 FIFA World Cup.
+Each group creates its own **league**, invites members, and competes over the
+whole tournament. The core loop:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+- **Predict match scores.** Set the result you expect for every fixture before
+  kickoff. Predictions lock at match start. A default `0-0` counts if you don't
+  submit one, and you have a short grace window to undo a prediction after
+  saving.
+- **Earn points.** You score by getting the outcome right, with a bonus for
+  nailing the exact scoreline (see [Scoring](#how-scoring-works)).
+- **Predict early, score more.** Every prediction carries a multiplier that's
+  higher the earlier in the tournament you commit — there's a real cost to
+  waiting.
+- **Special awards.** Call the big outcomes (champion, finalists, top scorer,
+  etc.). The earlier you lock them in, the more they're worth — 50 points before
+  the opening match, down to 2 points from the semifinals onward.
+- **Duels / challenges (_desafíos_).** Bet part of your balance head-to-head
+  against another member. Stakes go into escrow and pay out when the challenge
+  resolves.
+- **Standings.** Per-league leaderboards with a defined tiebreaker order, updated
+  as results come in.
+- **Live & rules.** A live view for matches in progress and an in-app rules page
+  explaining scoring and multipliers.
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+Leagues are admin-managed (one admin per league, with the ability to promote
+members), and the tournament calendar, phases, and results are driven by seeded
+World Cup 2026 data plus a webhook integration that syncs match results.
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+## How scoring works
 
-## Clone and run locally
+Final points for a match are:
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+```
+final points = base points × multiplier
+```
 
-2. Create a Next.js app using the Supabase Starter template npx command
+| Outcome            | Base points | Meaning                                  |
+| ------------------ | ----------- | ---------------------------------------- |
+| **Exact score**    | highest     | You got both teams' goals right.         |
+| **Correct result** | medium      | Right winner (or draw), wrong scoreline. |
+| **No hit**         | 0           | The match ended with a different result. |
+
+The **multiplier** is determined by how early you predict — predict before the
+tournament heats up and a correct call is worth more.
+
+**Special awards** are scored on a separate, phase-based scale:
+
+| When you locked it in       | Reward |
+| --------------------------- | ------ |
+| Before the opening match    | 50 pts |
+| During the group stage      | 25 pts |
+| Round of 32 / 16 / quarters | 10 pts |
+| Semifinals onward           | 2 pts  |
+
+(The exact base values and multiplier tiers live in
+[`src/utils/scoring`](src/utils/scoring.ts) and
+[`src/config/tournamentPhases.ts`](src/config/tournamentPhases.ts), which is the
+canonical source of truth for the 2026 phase boundaries.)
+
+## Tech stack
+
+- **[Next.js](https://nextjs.org)** (App Router, Server Actions) with **React 19**
+- **[Supabase](https://supabase.com)** — Postgres, Auth (email + Google OAuth),
+  Row Level Security, RPCs, and Realtime, wired up with `@supabase/ssr`
+- **[Tailwind CSS](https://tailwindcss.com)** + **[shadcn/ui](https://ui.shadcn.com/)**
+- **[Zod](https://zod.dev)** for validation
+- **Vitest** (unit + integration) and **Playwright** (e2e)
+- Deployed on **Vercel**
+
+## Services & APIs
+
+### Supabase (backend)
+
+The whole backend runs on Supabase:
+
+- **Postgres** as the system of record. The schema is defined entirely in
+  [`supabase/migrations`](supabase/migrations) — leagues & members, matches,
+  predictions, special awards, challenges/escrow, standings, and tournament
+  phases.
+- **Auth** with email/password and **Google OAuth** (`@supabase/ssr`, cookie
+  based sessions across Server Components, Server Actions, and middleware).
+- **Row Level Security** on every table so members only ever see and mutate data
+  for leagues they belong to.
+- **RPCs (Postgres functions)** for all the gameplay that must be atomic and
+  trusted server-side — creating/joining a league by invite code, locking and
+  scoring predictions, applying the per-round multiplier, resolving challenges
+  and escrow payouts, advancing the knockout bracket, and admin result entry.
+- **Realtime** — the live standings board subscribes to a per-league channel
+  (`live-matches:{leagueId}`) and recomputes positions as match rows change
+  ([`LiveStandingsBoard.tsx`](src/components/live/LiveStandingsBoard.tsx)).
+
+### Server Actions
+
+Client mutations go through Next.js Server Actions, validated with Zod, grouped
+by domain in [`src/app/actions`](src/app/actions):
+
+- `leagues.actions.ts` — create/join/leave leagues, member & admin management
+- `predictions.actions.ts` — submit, edit (within the lock window), and undo
+- `special-predictions.actions.ts` — special award picks
+- `matches.actions.ts` — match data + admin result entry
+- `duels.actions.ts` — create / accept / reject challenges
+- `awards-search.actions.ts` — search award candidates (teams/players)
+
+### Zafronix API (external football data)
+
+Tournament data — fixtures, teams, rosters, and live results for World Cup
+2026 — comes from the **Zafronix** API. The integration is unified in
+[`src/lib/zafronix`](src/lib/zafronix) and documented in
+[`docs/zafronix-api-unification.md`](docs/zafronix-api-unification.md) and
+[`docs/zafronix-webhook-contract.md`](docs/zafronix-webhook-contract.md).
+
+**Outbound (pull):**
+
+- `GET /fifa/worldcup/v1/matches?year=2026` — the canonical fixtures feed, plus
+  team and roster endpoints used to seed the database
+  ([`scripts/fetch-seed-data.ts`](scripts/fetch-seed-data.ts),
+  [`scripts/restore-zafronix-data.ts`](scripts/restore-zafronix-data.ts)).
+- A **backup sync** ([`scripts/sync-matches.ts`](scripts/sync-matches.ts)) runs
+  as a GitHub Actions cron every 30 minutes, using conditional `If-None-Match`
+  ETag requests to refresh scores without burning the API quota.
+
+**Inbound (push) — webhook:** `POST /api/webhooks/zafronix`
+([route](src/app/api/webhooks/zafronix/route.ts)) is the primary, real-time path
+for results. It:
+
+- verifies an **HMAC-SHA256** signature (`X-Zafronix-Signature-256`) over
+  `timestamp.rawBody` using `ZAFRONIX_WEBHOOK_SECRET`, with timing-safe
+  comparison and a replay window check;
+- handles the `match.finalized`, `match.patched`, and `match.postponed` events;
+- resolves the local match by `external_ref`, bracket slot, or normalized team
+  names, then triggers scoring/accrual RPCs.
+
+### Internal API routes
+
+- `POST /api/sync` ([route](src/app/api/sync/route.ts)) — authenticated batch
+  upsert of match statuses/scores (≤100 per call), guarded by a
+  `Bearer ${CRON_SECRET}` header. Used as a controlled, server-to-server entry
+  point for score updates.
+
+## Run locally
+
+> Requires Node and the Supabase CLI (run it with `npx supabase ...` — no global
+> install needed).
+
+1. **Install dependencies**
 
    ```bash
-   npx create-next-app --example with-supabase with-supabase-app
+   npm install
    ```
+
+2. **Configure environment.** Copy `.env.example` to `.env.local` and fill in
+   your Supabase project values:
+
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your-project-url
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
+   ```
+
+   Both values are in your [Supabase project's API settings](https://supabase.com/dashboard/project/_/settings/api).
+   See `.env.example` for the full set of variables (Google OAuth, integration
+   tests, and the match-sync webhook).
+
+3. **(Optional) Run Supabase locally** and apply migrations:
 
    ```bash
-   yarn create next-app --example with-supabase with-supabase-app
+   npx supabase start
    ```
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+   Migrations live in [`supabase/migrations`](supabase/migrations) and define the
+   full schema (leagues, predictions, matches, awards, challenges/escrow,
+   standings, RLS, and RPCs).
 
-3. Use `cd` to change into the app's directory
-
-   ```bash
-   cd with-supabase-app
-   ```
-
-4. Rename `.env.example` to `.env.local` and update the following:
-
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
-
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
-
-5. You can now run the Next.js local development server:
+4. **Start the dev server**
 
    ```bash
    npm run dev
    ```
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+   The app runs at [localhost:3000](http://localhost:3000/).
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+### Useful scripts
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+| Script                 | What it does                         |
+| ---------------------- | ------------------------------------ |
+| `npm run dev`          | Start the Next.js dev server         |
+| `npm run build`        | Production build                     |
+| `npm run lint`         | ESLint                               |
+| `npm run typecheck`    | TypeScript type checking             |
+| `npm run db:types`     | Regenerate Supabase TypeScript types |
+| `npm run sync-matches` | Sync match data                      |
+| `npm run seed:setup`   | Fetch and generate seed SQL          |
 
 ## Testing
 
@@ -106,43 +223,20 @@ If you wish to just develop locally and not deploy to Vercel, [follow the steps 
 
 ### Pruebas de Contrato (Vitest)
 
-El proyecto cuenta con dos suites de pruebas principales:
+```bash
+npm run test:unit          # Vitest unit tests
+npm run test:integration   # Vitest integration tests (against local Supabase)
+npm run test:e2e           # Playwright end-to-end tests
+npm run test:ci            # All of the above
+```
 
-- **Unitarias (`npm run test:unit`)**: Pruebas rápidas y 100% offline. Incluye la validación del contrato de webhooks entrantes de Zafronix usando samples oficiales. Para más detalles, ver [zafronix-webhook-contract.md](docs/zafronix-webhook-contract.md).
-- **Integración (`npm run test:integration`)**: Corren contra el Supabase local (Docker). Requisitos:
-
-- Docker + `npx supabase start` corriendo, con `project_id` == nombre del
-  directorio del proyecto.
-- Un archivo `.env.test.local` (gitignored) generado con las credenciales
-  locales. Lo carga `tests/integration/setup-env.ts`.
+Integration tests run against a local Supabase instance and read their
+credentials from `.env.test.local` (gitignored). Generate it with:
 
 ```bash
 npx supabase status -o env > .env.test.local
 ```
 
-Variables relevantes para los tests (ver `.env.example` para la lista completa):
+## License
 
-| Variable | Obligatoria | Para qué |
-| --- | --- | --- |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Sí | Clientes de test contra el Supabase local. |
-| `ZAFRONIX_WEBHOOK_SECRET` | Sí | El handler `POST /api/webhooks/zafronix` responde **500** si falta. Los tests del webhook RE-FIRMAN con exactamente este valor (`tests/integration/helpers/hmac.ts`). En CI se exporta un valor de prueba determinista. |
-| `ZAFRONIX_SANDBOX_KEY` (`zwc_skt_…`) | **Opcional** | Habilita el **ciclo live** contra el Sandbox real de Zafronix (año 9999) en `tests/integration/zafronix-sandbox-e2e.test.ts`. Sin ella, esos casos se **omiten (skip)** y el resto queda verde. **No** se inyecta en CI (mantiene el pipeline offline y no consume el cap de reset 10/h ni la cuota diaria). |
-
-> El ciclo live escribe en el **año 9999** del sandbox (las claves `zwc_skt_…`
-> solo pueden mutar ese año), por lo que los datos reales del Mundial 2026
-> quedan aislados por la propia API. Para activarlo en local, añade a
-> `.env.test.local`:
->
-> ```env
-> ZAFRONIX_SANDBOX_KEY=zwc_skt_tu_clave_de_sandbox
-> ```
-
-## Feedback and issues
-
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
-
-## More Supabase examples
-
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+[MIT](LICENSE)

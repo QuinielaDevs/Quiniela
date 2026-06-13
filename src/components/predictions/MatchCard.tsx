@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Lock, MapPin, Target, TrendingDown, XCircle } from "lucide-react";
 
 import {
@@ -193,9 +193,9 @@ export function MatchCard({
   const lastSavedRef = useRef<PendingPrediction | null>(
     hasInitialPrediction
       ? {
-          homeScorePred: initialHomeScore,
-          awayScorePred: initialAwayScore,
-        }
+        homeScorePred: initialHomeScore,
+        awayScorePred: initialAwayScore,
+      }
       : null,
   );
 
@@ -234,10 +234,10 @@ export function MatchCard({
     Number.isInteger(match.away_score);
   const basePoints = isFinishedWithResult
     ? calculateBasePoints(
-        { home: initialHomeScore, away: initialAwayScore },
-        { home: match.home_score as number, away: match.away_score as number },
-        "finished",
-      )
+      { home: initialHomeScore, away: initialAwayScore },
+      { home: match.home_score as number, away: match.away_score as number },
+      "finished",
+    )
     : POINTS_NONE;
   // Si el servidor ya evaluó y pobló points_earned, lo preferimos al cálculo
   // cliente (es la fuente de verdad); si no, mostramos el cálculo local
@@ -255,15 +255,24 @@ export function MatchCard({
         ? "result"
         : "miss";
 
-  const formattedTime = useMemo(() => {
+  // Se formatea tras el montaje (no en SSR): el servidor renderizaría la hora
+  // en SU zona horaria y, con la hidratación, ese texto quedaba pegado en el
+  // DOM hasta un remount. En el cliente toLocaleString usa la zona del usuario.
+  const [formattedTime, setFormattedTime] = useState("");
+  useEffect(() => {
     const date = new Date(match.match_time);
-    if (!Number.isFinite(date.getTime())) return "";
-    return date.toLocaleString("es", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    if (!Number.isFinite(date.getTime())) {
+      setFormattedTime("");
+      return;
+    }
+    setFormattedTime(
+      date.toLocaleString("es", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    );
   }, [match.match_time]);
 
   const [timeLeft, setTimeLeft] = useState<string>("");
@@ -642,7 +651,7 @@ export function MatchCard({
           {formattedTime && (
             <>
               <span>·</span>
-              <span suppressHydrationWarning>{formattedTime}</span>
+              <span>{formattedTime}</span>
             </>
           )}
           {/* Multiplicador en cabecera: solo se muestra en partidos scheduled
