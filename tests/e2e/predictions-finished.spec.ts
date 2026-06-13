@@ -373,6 +373,13 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
       { auth: { persistSession: false, autoRefreshToken: false } }
     );
 
+    // Obtener los partidos reales (no test) que están en el pasado o presente para poder restaurarlos
+    const { data: realPastMatches } = await admin
+      .from("matches")
+      .select("id, match_time, status")
+      .not("home_team", "like", "test_%")
+      .lte("match_time", new Date().toISOString());
+
     // Obtener las IDs de los partidos sembrados para este test
     const { data: testMatches } = await admin
       .from("matches")
@@ -387,108 +394,129 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
     futureTime.setUTCDate(futureTime.getUTCDate() + 10);
     const futureTimeStr = futureTime.toISOString();
 
-    await admin
-      .from("matches")
-      .update({ match_time: futureTimeStr })
-      .in("id", matchIds);
-
-    // Eliminar la predicción existente para test_mexico para probar el estado limpio (sin predicción previa)
-    await admin
-      .from("predictions")
-      .delete()
-      .eq("match_id", j2Match.id)
-      .eq("user_id", context.userId);
-
-    // Navegar y verificar que el multiplicador mostrado para J2 (test_mexico) es 1.25x (o 1.3x redondeado en UI)
-    await page.goto("/predictions");
-    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
-
-    const mexCard = page
-      .locator("article", { hasText: "test_mexico" })
-      .filter({ hasText: "test_canada" })
-      .first();
-
-    // Verificamos que el multiplicador esperado para J2 pre-torneo es 1.3x (redondeado en UI)
-    await expect(mexCard.getByTestId("multiplier-badge")).toHaveText("1.3x");
-
-    // Guardar una predicción y verificar que en BD se graba exactamente como 1.25
-    await mexCard.getByLabel(/Incrementar goles de test_mexico/).first().click();
-    // Esperamos a que se guarde
-    await expect(mexCard.getByTestId("save-status")).toHaveAttribute("data-state", "saved", { timeout: 10000 });
-
-    const { data: predPre } = await admin
-      .from("predictions")
-      .select("multiplier")
-      .eq("match_id", j2Match.id)
-      .eq("user_id", context.userId)
-      .single();
-
-    expect(Number(predPre!.multiplier)).toBe(1.25);
-
-    // 2) Estado Torneo Iniciado: Pasamos un partido de la J1 al pasado (kickoff)
-    const pastTime = new Date();
-    pastTime.setUTCHours(pastTime.getUTCHours() - 1);
-    const pastTimeStr = pastTime.toISOString();
-
-    const j1KickoffMatch = testMatches!.find(m => m.matchday === 1 && m.home_team === "test_ecuador")!;
-
-    await admin
-      .from("matches")
-      .update({ match_time: pastTimeStr, status: "live" })
-      .eq("id", j1KickoffMatch.id);
-
-    // Recargar la página para limpiar estado de cookies/sesión
-    await page.reload();
-    await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
-
-    // La tarjeta de J2 ahora debe mostrar el chip de drift (next es 1.0x, saved es 1.25x -> drift)
-    const driftChip = mexCard.getByTestId("multiplier-drift-chip");
-    await expect(driftChip).toBeVisible();
-    await expect(driftChip).toHaveText("1.00x");
-
-    // Modificar la predicción de J2. Debe disparar la advertencia de degradación.
-    await mexCard.getByLabel(/Incrementar goles de test_mexico/).first().click();
-
-    const dialog = mexCard.getByRole("alertdialog", {
-      name: "Advertencia de multiplicador",
-    });
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText("Tu multiplicador bajara de 1.3x a 1.0x.");
-
-    // Continuar y verificar que el multiplicador baja a 1.00x en la BD
-    await dialog.getByRole("button", { name: "Continuar" }).click();
-    await expect(mexCard.getByTestId("save-status")).toHaveAttribute("data-state", "saved", { timeout: 10000 });
-
-    const { data: predPost } = await admin
-      .from("predictions")
-      .select("multiplier")
-      .eq("match_id", j2Match.id)
-      .eq("user_id", context.userId)
-      .single();
-
-    expect(Number(predPost!.multiplier)).toBe(1.00);
-
-    // Restaurar los estados originales de los partidos para no romper la limpieza del afterAll
-    for (const m of testMatches!) {
-      let status = "scheduled";
-      let match_time: string;
-      if (m.home_team === "test_argentina" || m.home_team === "test_brasil" || m.home_team === "test_uruguay") {
-        status = "finished";
-        match_time = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
-      } else if (m.home_team === "test_espana") {
-        status = "live";
-        match_time = new Date().toISOString();
-      } else if (m.home_team === "test_francia") {
-        status = "suspended";
-        match_time = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      } else {
-        const days = m.matchday === 1 ? 1 : 2;
-        match_time = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-      }
+    try {
+      // Mover partidos de prueba al futuro
       await admin
         .from("matches")
-        .update({ status, match_time })
-        .eq("id", m.id);
+        .update({ match_time: futureTimeStr })
+        .in("id", matchIds);
+
+      // Mover partidos reales pasados al futuro
+      if (realPastMatches && realPastMatches.length > 0) {
+        await admin
+          .from("matches")
+          .update({ match_time: futureTimeStr })
+          .in("id", realPastMatches.map(m => m.id));
+      }
+
+      // Eliminar la predicción existente para test_mexico para probar el estado limpio (sin predicción previa)
+      await admin
+        .from("predictions")
+        .delete()
+        .eq("match_id", j2Match.id)
+        .eq("user_id", context.userId);
+
+      // Navegar y verificar que el multiplicador mostrado para J2 (test_mexico) es 1.25x (o 1.3x redondeado en UI)
+      await page.goto("/predictions");
+      await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+
+      const mexCard = page
+        .locator("article", { hasText: "test_mexico" })
+        .filter({ hasText: "test_canada" })
+        .first();
+
+      // Verificamos que el multiplicador esperado para J2 pre-torneo es 1.3x (redondeado en UI)
+      await expect(mexCard.getByTestId("multiplier-badge")).toHaveText("1.3x");
+
+      // Guardar una predicción y verificar que en BD se graba exactamente como 1.25
+      await mexCard.getByLabel(/Incrementar goles de test_mexico/).first().click();
+      // Esperamos a que se guarde
+      await expect(mexCard.getByTestId("save-status")).toHaveAttribute("data-state", "saved", { timeout: 10000 });
+
+      const { data: predPre } = await admin
+        .from("predictions")
+        .select("multiplier")
+        .eq("match_id", j2Match.id)
+        .eq("user_id", context.userId)
+        .single();
+
+      expect(Number(predPre!.multiplier)).toBe(1.25);
+
+      // 2) Estado Torneo Iniciado: Pasamos un partido de la J1 al pasado (kickoff)
+      const pastTime = new Date();
+      pastTime.setUTCHours(pastTime.getUTCHours() - 1);
+      const pastTimeStr = pastTime.toISOString();
+
+      const j1KickoffMatch = testMatches!.find(m => m.matchday === 1 && m.home_team === "test_ecuador")!;
+
+      await admin
+        .from("matches")
+        .update({ match_time: pastTimeStr, status: "live" })
+        .eq("id", j1KickoffMatch.id);
+
+      // Recargar la página para limpiar estado de cookies/sesión
+      await page.reload();
+      await page.locator('[role="tab"]', { hasText: "Jornada 2" }).click();
+
+      // La tarjeta de J2 ahora debe mostrar el chip de drift (next es 1.0x, saved es 1.25x -> drift)
+      const driftChip = mexCard.getByTestId("multiplier-drift-chip");
+      await expect(driftChip).toBeVisible();
+      await expect(driftChip).toHaveText("1.00x");
+
+      // Modificar la predicción de J2. Debe disparar la advertencia de degradación.
+      await mexCard.getByLabel(/Incrementar goles de test_mexico/).first().click();
+
+      const dialog = mexCard.getByRole("alertdialog", {
+        name: "Advertencia de multiplicador",
+      });
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText("Tu multiplicador bajara de 1.3x a 1.0x.");
+
+      // Continuar y verificar que el multiplicador baja a 1.00x en la BD
+      await dialog.getByRole("button", { name: "Continuar" }).click();
+      await expect(mexCard.getByTestId("save-status")).toHaveAttribute("data-state", "saved", { timeout: 10000 });
+
+      const { data: predPost } = await admin
+        .from("predictions")
+        .select("multiplier")
+        .eq("match_id", j2Match.id)
+        .eq("user_id", context.userId)
+        .single();
+
+      expect(Number(predPost!.multiplier)).toBe(1.00);
+    } finally {
+      // Restaurar los estados originales de los partidos para no romper la limpieza del afterAll
+      for (const m of testMatches!) {
+        let status = "scheduled";
+        let match_time: string;
+        if (m.home_team === "test_argentina" || m.home_team === "test_brasil" || m.home_team === "test_uruguay") {
+          status = "finished";
+          match_time = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+        } else if (m.home_team === "test_espana") {
+          status = "live";
+          match_time = new Date().toISOString();
+        } else if (m.home_team === "test_francia") {
+          status = "suspended";
+          match_time = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        } else {
+          const days = m.matchday === 1 ? 1 : 2;
+          match_time = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+        }
+        await admin
+          .from("matches")
+          .update({ status, match_time })
+          .eq("id", m.id);
+      }
+
+      // Restaurar los partidos reales originales
+      if (realPastMatches && realPastMatches.length > 0) {
+        for (const rm of realPastMatches) {
+          await admin
+            .from("matches")
+            .update({ match_time: rm.match_time, status: rm.status })
+            .eq("id", rm.id);
+        }
+      }
     }
   });
 });

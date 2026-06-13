@@ -91,6 +91,7 @@ describe("MatchCard", () => {
   beforeEach(() => {
     cleanup();
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-03T20:00:00.000Z"));
     vi.mocked(savePrediction).mockReset();
     vi.mocked(revertPrediction).mockReset();
     setOnline(true);

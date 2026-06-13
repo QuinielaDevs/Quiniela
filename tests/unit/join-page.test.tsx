@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef } from "react";
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
 const single = vi.fn();
@@ -54,6 +54,12 @@ describe("/join/[invite_code]", () => {
       });
     });
     getClaims.mockResolvedValue({ data: null, error: null });
+  });
+
+  afterEach(async () => {
+    cleanup();
+    // Flush pending microtasks/timers so they run before JSDOM is destroyed
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it("renderiza nombre de liga y CTA Google para visitantes no autenticados", async () => {
