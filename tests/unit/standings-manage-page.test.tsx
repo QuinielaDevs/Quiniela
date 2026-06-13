@@ -85,8 +85,10 @@ describe("/standings/manage (ManageBoard)", () => {
     getClaims.mockResolvedValue({ data: { claims: { sub: "user-1" } } });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     cleanup();
+    // Flush pending microtasks/timers so they run before JSDOM is destroyed
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it("redirige a login si no hay sesión", async () => {
