@@ -181,7 +181,7 @@ export async function syncMatches(
   const { data: localMatches, error: fetchError } = await supabase
     .from("matches")
     .select(
-      "id, external_ref, home_score, away_score, status, home_team, away_team, bracket_slot",
+      "id, external_ref, home_score, away_score, status, home_team, away_team, bracket_slot, match_time",
     );
 
   if (fetchError) {
@@ -241,6 +241,11 @@ export async function syncMatches(
       local.home_score !== apiMatch.homeScore ||
       local.away_score !== apiMatch.awayScore;
     const statusChanged = local.status !== mappedStatus;
+
+    // Detectar si el horario (match_time) cambió en la API
+    const timeChanged = apiMatch.kickoffUtc
+      ? new Date(local.match_time).getTime() !== new Date(apiMatch.kickoffUtc).getTime()
+      : false;
     
     // Solo actualizar nombres de equipos en eliminatoria si recibimos equipos reales (no placeholders)
     const canUpdateTeams =
@@ -256,7 +261,7 @@ export async function syncMatches(
       (local.home_team !== apiMatch.homeTeam ||
         local.away_team !== apiMatch.awayTeam);
 
-    if (!scoreChanged && !statusChanged && !teamsChanged) {
+    if (!scoreChanged && !statusChanged && !teamsChanged && !timeChanged) {
       continue;
     }
 
@@ -272,6 +277,10 @@ export async function syncMatches(
     if (canUpdateTeams) {
       updateData.home_team = apiMatch.homeTeam;
       updateData.away_team = apiMatch.awayTeam;
+    }
+
+    if (timeChanged && apiMatch.kickoffUtc) {
+      updateData.match_time = apiMatch.kickoffUtc;
     }
 
     updateDataList.push(updateData);
@@ -309,6 +318,67 @@ export async function syncMatches(
   return { status: "updated", updated: updateDataList.length };
 }
 
+// ── Lógica de Salida Temprana (Smart Polling) ──────────────────────
+
+/**
+ * Evalúa si debemos realizar la sincronización con la API de Zafronix
+ * basado en ventanas de tiempo críticas de los partidos.
+ */
+export async function shouldRunSync(
+  supabase: SupabaseClient,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const utcH = now.getUTCHours();
+  const utcM = now.getUTCMinutes();
+
+  // 1. Ventana de sincronización diaria completa: 3:00 AM - 3:10 AM UTC (actualizar fixtures/bracket)
+  if (utcH === 3 && utcM < 10) {
+    console.log(" Daily full sync window active (3:00 AM UTC). Running full synchronization.");
+    return true;
+  }
+
+  // 2. Consultar partidos que no estén finalizados ni cancelados
+  const { data: matches, error } = await supabase
+    .from("matches")
+    .select("status, match_time")
+    .in("status", ["scheduled", "live"]);
+
+  if (error) {
+    console.error("⚠️ Error querying matches for sync window:", error.message);
+    return true; // En caso de error de DB, procedemos por seguridad
+  }
+
+  if (!matches || matches.length === 0) {
+    console.log("💤 No scheduled or live matches found in database.");
+    return false;
+  }
+
+  const nowMs = now.getTime();
+  const tenMinutesInMs = 10 * 60 * 1000;
+  const hundredMinutesInMs = 100 * 60 * 1000;
+  const limitInMs = 210 * 60 * 1000; // 3 horas y 30 minutos
+
+  for (const match of matches) {
+    const matchTimeMs = new Date(match.match_time).getTime();
+
+    // Condición A: Faltan 10 minutos o menos para el inicio
+    const isJustBeforeKickoff = nowMs >= matchTimeMs - tenMinutesInMs && nowMs < matchTimeMs;
+
+    // Condición B: Ya pasaron entre 100 y 210 minutos desde el inicio y sigue sin finalizar localmente
+    const isPostMatchPolling = nowMs >= matchTimeMs + hundredMinutesInMs && nowMs < matchTimeMs + limitInMs;
+
+    if (isJustBeforeKickoff || isPostMatchPolling) {
+      console.log(
+        `🎯 Sync window active for match starting at ${match.match_time} (status: ${match.status}). ` +
+        `Current state: isJustBeforeKickoff=${isJustBeforeKickoff}, isPostMatchPolling=${isPostMatchPolling}`,
+      );
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // ── Entry Point (ejecución directa) ────────────────────────────────
 
 async function main(): Promise<void> {
@@ -316,6 +386,7 @@ async function main(): Promise<void> {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const wcApiKey = process.env.WC_API_KEY;
+  const forceSync = process.env.FORCE_SYNC === "true";
 
   const missing: string[] = [];
   if (!supabaseUrl) missing.push("SUPABASE_URL");
@@ -335,6 +406,16 @@ async function main(): Promise<void> {
   });
 
   try {
+    if (forceSync) {
+      console.log("🔄 Force sync enabled (FORCE_SYNC=true). Bypassing early-exit check.");
+    } else {
+      const runSync = await shouldRunSync(supabase);
+      if (!runSync) {
+        console.log("💤 No active match windows found (early exit). Exiting successfully.");
+        process.exit(0);
+      }
+    }
+
     await syncMatches(supabase, wcApiKey!);
   } catch (error) {
     console.error("❌ Error fatal durante la sincronización:", error);

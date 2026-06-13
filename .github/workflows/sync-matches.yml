@@ -7,8 +7,8 @@ name: Sync Matches (Backup Cron)
 
 on:
   schedule:
-    # Cada 30 minutos durante el periodo de partidos (junio y julio)
-    - cron: "*/30 * * 6,7 *"
+    # Cada 2 minutos durante el periodo de partidos (junio y julio)
+    - cron: "*/2 * * 6,7 *"
   workflow_dispatch: # Permitir ejecución manual desde la UI de GitHub
 
 jobs:
@@ -34,3 +34,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           WC_API_KEY: ${{ secrets.WC_API_KEY }}
+          FORCE_SYNC: ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
