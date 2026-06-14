@@ -9,7 +9,7 @@ type MemberRow = {
   role: LeagueRole;
   payment_status: PaymentStatus;
   joined_at: string;
-  wager_balance: number;
+  wager_balance?: number;
   profiles: { display_name: string; avatar_url: string } | null;
 };
 
@@ -72,15 +72,16 @@ export async function GET(req: NextRequest) {
 
   try {
     // 4. Consultar datos requeridos para el cálculo de la tabla
-    const [membersRes, matchesRes] = await Promise.all([
+    const [membersRes, matchesRes, duelPointsRes] = await Promise.all([
       supabase
         .from("league_members")
-        .select("user_id, role, payment_status, joined_at, wager_balance, profiles(display_name, avatar_url)")
+        .select("user_id, role, payment_status, joined_at, profiles(display_name, avatar_url)")
         .eq("league_id", leagueId),
       supabase
         .from("matches")
         .select("id, status, matchday, stage, home_score, away_score")
         .eq("status", "finished"),
+      supabase.rpc("fn_get_league_duel_points", { p_league_id: leagueId }),
     ]);
 
     if (membersRes.error) {
@@ -91,6 +92,16 @@ export async function GET(req: NextRequest) {
       console.error("Error fetching matches:", matchesRes.error);
       throw matchesRes.error;
     }
+    if (duelPointsRes.error) {
+      console.error("Error fetching league duel points:", duelPointsRes.error);
+      throw duelPointsRes.error;
+    }
+
+    const duelPointsByUser = new Map(
+      ((duelPointsRes.data ?? []) as Array<{ user_id: string; duel_points: number }>).map(
+        (row) => [row.user_id, Number(row.duel_points ?? 0)],
+      ),
+    );
 
     const memberRows = (membersRes.data ?? []) as unknown as MemberRow[];
     
@@ -142,7 +153,7 @@ export async function GET(req: NextRequest) {
       avatarUrl: m.profiles?.avatar_url ?? "/assets/avatars/default-player.svg",
       paymentStatus: m.payment_status,
       joinedAt: m.joined_at,
-      duelPoints: Number(m.wager_balance ?? 0),
+      duelPoints: duelPointsByUser.get(m.user_id) ?? 0,
     }));
 
     // 7. Calcular las posiciones

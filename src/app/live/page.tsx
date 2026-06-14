@@ -17,7 +17,7 @@ type MemberRow = {
   user_id: string;
   payment_status: PaymentStatus;
   joined_at: string;
-  wager_balance: number;
+  wager_balance?: number;
   profiles: { display_name: string; avatar_url: string } | null;
 };
 
@@ -38,11 +38,11 @@ export async function LiveBoard() {
 
   // awardRows: total de premios especiales por usuario (BUG-004); la proyectada
   // los suma igual que la clasificación oficial General.
-  const [{ data: memberRows }, { data: matchRows }, { data: awardRows }] =
+  const [{ data: memberRows }, { data: matchRows }, { data: awardRows }, { data: duelRows }] =
     await Promise.all([
       supabase
         .from("league_members")
-        .select("user_id, payment_status, joined_at, wager_balance, profiles(display_name, avatar_url)")
+        .select("user_id, payment_status, joined_at, profiles(display_name, avatar_url)")
         .eq("league_id", leagueId),
       supabase
         .from("matches")
@@ -52,11 +52,18 @@ export async function LiveBoard() {
         .in("status", ["finished", "live"])
         .order("match_time", { ascending: true }),
       supabase.rpc("fn_get_league_award_points", { p_league_id: leagueId }),
+      supabase.rpc("fn_get_league_duel_points", { p_league_id: leagueId }),
     ]);
 
   const awardPointsByUser = new Map(
     ((awardRows ?? []) as Array<{ user_id: string; award_points: number }>).map(
       (row) => [row.user_id, Number(row.award_points ?? 0)],
+    ),
+  );
+
+  const duelPointsByUser = new Map(
+    ((duelRows ?? []) as Array<{ user_id: string; duel_points: number }>).map(
+      (row) => [row.user_id, Number(row.duel_points ?? 0)],
     ),
   );
 
@@ -95,7 +102,7 @@ export async function LiveBoard() {
       avatarUrl: member.profiles?.avatar_url ?? "/assets/avatars/default-player.svg",
       paymentStatus: member.payment_status,
       joinedAt: member.joined_at,
-      duelPoints: Number(member.wager_balance ?? 0),
+      duelPoints: duelPointsByUser.get(member.user_id) ?? 0,
       awardPoints: awardPointsByUser.get(member.user_id) ?? 0,
     }),
   );
