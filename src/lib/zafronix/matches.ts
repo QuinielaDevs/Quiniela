@@ -57,7 +57,19 @@ export const zafronixMatchSchema = z.object({
     ])
     .nullable()
     .optional(),
-  weather: z.string().nullable().optional(),
+  weather: z
+    .union([
+      z.string(),
+      z.object({
+        tempC: z.number().nullable().optional(),
+        humidityPct: z.number().nullable().optional(),
+        precipitationMm: z.number().nullable().optional(),
+        windKmh: z.number().nullable().optional(),
+        code: z.number().nullable().optional(),
+      }).passthrough(),
+    ])
+    .nullable()
+    .optional(),
 });
 
 export type ZafronixMatch = z.infer<typeof zafronixMatchSchema>;

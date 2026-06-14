@@ -169,6 +169,39 @@ describe("Pin del Schema Canónico (REST API GET /matches)", () => {
     });
   });
 
+  describe("Union type: weather", () => {
+    it("acepta weather como string", () => {
+      const result = zafronixMatchSchema.safeParse(makeMatch({ weather: "Sunny" }));
+      expect(result.success).toBe(true);
+      expect(result.data?.weather).toBe("Sunny");
+    });
+
+    it("acepta weather como objeto estructurado", () => {
+      const weatherObj = {
+        tempC: 22.6,
+        humidityPct: 53,
+        precipitationMm: 0.7,
+        windKmh: 2.5,
+        code: 53,
+      };
+      const result = zafronixMatchSchema.safeParse(makeMatch({ weather: weatherObj }));
+      expect(result.success).toBe(true);
+      expect(result.data?.weather).toEqual(weatherObj);
+    });
+
+    it("acepta weather null", () => {
+      const result = zafronixMatchSchema.safeParse(makeMatch({ weather: null }));
+      expect(result.success).toBe(true);
+      expect(result.data?.weather).toBeNull();
+    });
+
+    it("acepta match sin weather (undefined)", () => {
+      const without = omit(makeMatch(), "weather");
+      const result = zafronixMatchSchema.safeParse(without);
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe("Nullable fields", () => {
     it("acepta homeTeam null", () => {
       const result = zafronixMatchSchema.safeParse(makeMatch({ homeTeam: null }));

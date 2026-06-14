@@ -256,7 +256,7 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
 
       const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
 
-      expect(result).toEqual({ status: "not_modified" });
+      expect(result).toEqual({ status: "not_modified", changes: [] });
 
       // Verificar que no se modificaron los partidos
       const { data: match } = await supabase
@@ -361,7 +361,22 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
 
       const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
 
-      expect(result).toEqual({ status: "updated", updated: 1 });
+      expect(result).toEqual({
+        status: "updated",
+        updated: 1,
+        changes: [
+          {
+            id: groupMatchId,
+            home_team: "España",
+            away_team: "Portugal",
+            changes: {
+              home_score: { from: 1, to: 2 },
+              away_score: { from: 0, to: 1 },
+              status: { from: "live", to: "finished" },
+            },
+          },
+        ],
+      });
 
       // Verificar que el partido de grupo se actualizó
       const { data: updatedMatch } = await supabase
@@ -408,7 +423,21 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
 
       const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
 
-      expect(result).toEqual({ status: "updated", updated: 1 });
+      expect(result).toEqual({
+        status: "updated",
+        updated: 1,
+        changes: [
+          {
+            id: groupMatchId,
+            home_team: "España",
+            away_team: "Portugal",
+            changes: {
+              home_score: { from: 1, to: 2 },
+              away_score: { from: 0, to: 1 },
+            },
+          },
+        ],
+      });
 
       const { data: groupMatch } = await supabase
         .from("matches")
@@ -448,7 +477,24 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
 
       const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
 
-      expect(result).toEqual({ status: "updated", updated: 1 });
+      expect(result).toEqual({
+        status: "updated",
+        updated: 1,
+        changes: [
+          {
+            id: knockoutMatchId,
+            home_team: "Brasil",
+            away_team: "Argentina",
+            changes: {
+              home_team: { from: "Por definir", to: "Brasil" },
+              away_team: { from: "Por definir", to: "Argentina" },
+              home_score: { from: null, to: 2 },
+              away_score: { from: null, to: 3 },
+              status: { from: "scheduled", to: "finished" },
+            },
+          },
+        ],
+      });
 
       const { data: match } = await supabase
         .from("matches")
@@ -503,7 +549,7 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
       const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
 
       // Ningún partido debería haberse actualizado
-      expect(result).toEqual({ status: "updated", updated: 0 });
+      expect(result).toEqual({ status: "updated", updated: 0, changes: [] });
     });
 
     it("ignora partidos de la API que no existen en la DB local", async () => {
@@ -523,7 +569,7 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
 
       const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
 
-      expect(result).toEqual({ status: "updated", updated: 0 });
+      expect(result).toEqual({ status: "updated", updated: 0, changes: [] });
     });
   });
 

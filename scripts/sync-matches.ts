@@ -116,7 +116,19 @@ export async function syncMatches(
   supabase: SupabaseClient,
   apiKey: string,
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
-): Promise<{ status: "not_modified" } | { status: "updated"; updated: number }> {
+): Promise<
+  | { status: "not_modified"; changes: never[] }
+  | {
+      status: "updated";
+      updated: number;
+      changes: Array<{
+        id: string;
+        home_team: string | null;
+        away_team: string | null;
+        changes: Record<string, { from: unknown; to: unknown }>;
+      }>;
+    }
+> {
   // Validación de API Key
   if (!apiKey || apiKey.trim() === "") {
     throw new Error("El X-API-Key de Zafronix no puede estar vacío.");
@@ -145,7 +157,7 @@ export async function syncMatches(
     console.log(
       "✅ 304 Not Modified — No hay cambios en la API. Sin consumo de cuota.",
     );
-    return { status: "not_modified" };
+    return { status: "not_modified", changes: [] };
   }
 
   if (!response.ok) {
@@ -211,6 +223,12 @@ export async function syncMatches(
 
   // 9. Comparar y preparar actualizaciones solo de los partidos que cambiaron
   const updateDataList: Array<{ id: string; [key: string]: unknown }> = [];
+  const changesList: Array<{
+    id: string;
+    home_team: string | null;
+    away_team: string | null;
+    changes: Record<string, { from: unknown; to: unknown }>;
+  }> = [];
 
   for (const apiMatch of apiMatches) {
     // 9.1 Mapear dinámicamente el partido de la API al local
@@ -284,6 +302,29 @@ export async function syncMatches(
     }
 
     updateDataList.push(updateData);
+
+    const changesObj: Record<string, { from: unknown; to: unknown }> = {};
+    if (scoreChanged) {
+      changesObj.home_score = { from: local.home_score, to: apiMatch.homeScore };
+      changesObj.away_score = { from: local.away_score, to: apiMatch.awayScore };
+    }
+    if (statusChanged) {
+      changesObj.status = { from: local.status, to: mappedStatus };
+    }
+    if (timeChanged && apiMatch.kickoffUtc) {
+      changesObj.match_time = { from: local.match_time, to: apiMatch.kickoffUtc };
+    }
+    if (teamsChanged) {
+      changesObj.home_team = { from: local.home_team, to: apiMatch.homeTeam };
+      changesObj.away_team = { from: local.away_team, to: apiMatch.awayTeam };
+    }
+
+    changesList.push({
+      id: local.id,
+      home_team: canUpdateTeams ? apiMatch.homeTeam : local.home_team,
+      away_team: canUpdateTeams ? apiMatch.awayTeam : local.away_team,
+      changes: changesObj,
+    });
   }
 
   // 9.2 Ejecutar las consultas en paralelo con Promise.all para evitar consultas N+1 secuenciales
@@ -315,7 +356,7 @@ export async function syncMatches(
       `ETag actualizado: ${newETag && allUpdatesSucceeded ? newETag : "(no actualizado)"}`,
   );
 
-  return { status: "updated", updated: updateDataList.length };
+  return { status: "updated", updated: updateDataList.length, changes: changesList };
 }
 
 // ── Lógica de Salida Temprana (Smart Polling) ──────────────────────
