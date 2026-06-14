@@ -170,7 +170,7 @@ describe("buildStandings", () => {
     expect(rows[1]).toMatchObject({ userId: "b", totalPoints: 10, exactCount: 1 });
   });
 
-  it("desempata por joined_at (el que entro antes va primero) con puntos y exactos iguales", () => {
+  it("no desempata por joined_at, sino que comparten rank (empate real) e isTie es true", () => {
     const members = [
       member("late", { joinedAt: "2026-06-02T10:00:00.000Z" }),
       member("early", { joinedAt: "2026-06-01T10:00:00.000Z" }),
@@ -183,10 +183,11 @@ describe("buildStandings", () => {
 
     const rows = buildStandings(members, matches, predictions);
 
-    expect(rows.map((r) => r.userId)).toEqual(["early", "late"]);
+    expect(rows[0]).toMatchObject({ userId: "early", rank: 1, isTie: true });
+    expect(rows[1]).toMatchObject({ userId: "late", rank: 1, isTie: true });
   });
 
-  it("liga sin partidos finished: todos a 0 ordenados por joined_at", () => {
+  it("liga sin partidos finished: todos a 0 con rank compartido 1 e isTie true", () => {
     const members = [
       member("b", { joinedAt: "2026-06-03T00:00:00.000Z" }),
       member("a", { joinedAt: "2026-06-01T00:00:00.000Z" }),
@@ -199,6 +200,8 @@ describe("buildStandings", () => {
 
     expect(rows.map((r) => r.userId)).toEqual(["a", "b"]);
     expect(rows.every((r) => r.totalPoints === 0)).toBe(true);
+    expect(rows[0]).toMatchObject({ rank: 1, isTie: true });
+    expect(rows[1]).toMatchObject({ rank: 1, isTie: true });
   });
 
   it("no puntúa un acierto aparente contra un finished con marcadores null (predicción != 0-0)", () => {
@@ -217,7 +220,8 @@ describe("buildStandings", () => {
 
   it("desempate final determinista por userId ante empate TOTAL (mismo joined_at)", () => {
     // Mismos puntos, exactos y joined_at → el orden lo decide userId de forma
-    // estable (no depende del orden de entrada ni de la implementación de sort).
+    // estable (no depende del orden de entrada ni de la implementación de sort),
+    // pero ambos comparten el rank 1 y tienen isTie true.
     const sameJoin = "2026-06-01T00:00:00.000Z";
     const members = [
       member("zoe", { joinedAt: sameJoin }),
@@ -232,6 +236,8 @@ describe("buildStandings", () => {
     const rows = buildStandings(members, matches, predictions);
 
     expect(rows.map((r) => r.userId)).toEqual(["ana", "zoe"]);
+    expect(rows[0]).toMatchObject({ rank: 1, isTie: true });
+    expect(rows[1]).toMatchObject({ rank: 1, isTie: true });
   });
 
   it("filtra por phaseKey de eliminatoria y aisla los puntos de esa fase", () => {
@@ -250,6 +256,71 @@ describe("buildStandings", () => {
 
     const q = buildStandings(members, matches, predictions, "quarter");
     expect(q[0]).toMatchObject({ totalPoints: 5, exactCount: 1 });
+  });
+
+  it("desempata por cantidad de resultados acertados (resultCount) cuando puntos y exactos empatan", () => {
+    const members = [member("b"), member("a")];
+    const matches = [
+      match("m1", { homeScore: 2, awayScore: 1 }),
+      match("m2", { homeScore: 1, awayScore: 1 }),
+    ];
+    const predictions = [
+      // a: 1 exacto (5 pts) + 1 resultado (2 pts, mult 1.0) = 7 pts. exacts = 1, results = 1
+      prediction("a", "m1", { homeScorePred: 2, awayScorePred: 1, multiplier: 1 }),
+      prediction("a", "m2", { homeScorePred: 2, awayScorePred: 2, multiplier: 1 }), // result (empate diferente)
+      // b: 1 exacto con mult 1.4 (7 pts). exacts = 1, results = 0
+      prediction("b", "m1", { homeScorePred: 2, awayScorePred: 1, multiplier: 1.4 }),
+    ];
+
+    const rows = buildStandings(members, matches, predictions);
+    expect(rows[0]).toMatchObject({ userId: "a", totalPoints: 7, exactCount: 1, resultCount: 1, isTie: false });
+    expect(rows[1]).toMatchObject({ userId: "b", totalPoints: 7, exactCount: 1, resultCount: 0, isTie: false });
+  });
+
+  it("desempata por puntos de premios especiales (awardPoints) cuando puntos, exactos y resultados empatan", () => {
+    const members = [
+      member("b", { awardPoints: 0 }),
+      member("a", { awardPoints: 15 }),
+    ];
+    const matches = [
+      match("m1", { homeScore: 2, awayScore: 1 }),
+      match("m2", { homeScore: 1, awayScore: 1 }),
+    ];
+    const predictions = [
+      // a: 2 exactos (10 pts) + 15 awards = 25 pts. exacts = 2, results = 0
+      prediction("a", "m1", { homeScorePred: 2, awayScorePred: 1, multiplier: 1 }),
+      prediction("a", "m2", { homeScorePred: 1, awayScorePred: 1, multiplier: 1 }),
+      // b: 2 exactos con mult 2.5 (25 pts). awards = 0 -> exacts = 2, results = 0
+      prediction("b", "m1", { homeScorePred: 2, awayScorePred: 1, multiplier: 2.5 }),
+      prediction("b", "m2", { homeScorePred: 1, awayScorePred: 1, multiplier: 2.5 }),
+    ];
+
+    const rows = buildStandings(members, matches, predictions);
+    expect(rows[0]).toMatchObject({ userId: "a", totalPoints: 25, exactCount: 2, awardPoints: 15, isTie: false });
+    expect(rows[1]).toMatchObject({ userId: "b", totalPoints: 25, exactCount: 2, awardPoints: 0, isTie: false });
+  });
+
+  it("asigna el mismo rank visible a usuarios en empate absoluto y calcula el salto correcto para el siguiente", () => {
+    // a y b empatan en todo. c es mejor y d es peor.
+    const members = [member("d"), member("b"), member("a"), member("c")];
+    const matches = [
+      match("m1", { homeScore: 2, awayScore: 1 }),
+      match("m2", { homeScore: 1, awayScore: 1 }),
+    ];
+    const predictions = [
+      prediction("c", "m1", { homeScorePred: 2, awayScorePred: 1 }),
+      prediction("c", "m2", { homeScorePred: 1, awayScorePred: 1 }),
+      prediction("a", "m1", { homeScorePred: 2, awayScorePred: 1 }),
+      prediction("b", "m1", { homeScorePred: 2, awayScorePred: 1 }),
+      prediction("d", "m2", { homeScorePred: 2, awayScorePred: 2 }),
+    ];
+
+    const rows = buildStandings(members, matches, predictions);
+
+    expect(rows[0]).toMatchObject({ userId: "c", rank: 1, isTie: false });
+    expect(rows[1]).toMatchObject({ rank: 2, isTie: true });
+    expect(rows[2]).toMatchObject({ rank: 2, isTie: true });
+    expect(rows[3]).toMatchObject({ userId: "d", rank: 4, isTie: false });
   });
 });
 
@@ -326,6 +397,7 @@ describe("buildProjectedStandings", () => {
   });
 
   it("mantiene desempate canonico y orden estable", () => {
+    // Ahora no se desempata por joined_at, sino que comparten rank (isTie = true)
     const members = [
       member("late", { joinedAt: "2026-06-02T00:00:00.000Z" }),
       member("early", { joinedAt: "2026-06-01T00:00:00.000Z" }),
@@ -339,6 +411,8 @@ describe("buildProjectedStandings", () => {
     const rows = buildProjectedStandings(members, matches, predictions);
 
     expect(rows.map((r) => r.userId)).toEqual(["early", "late"]);
+    expect(rows[0]).toMatchObject({ rank: 1, isTie: true });
+    expect(rows[1]).toMatchObject({ rank: 1, isTie: true });
   });
 });
 

@@ -23,8 +23,8 @@ export type StandingMember = {
   avatarUrl: string;
   paymentStatus: PaymentStatus;
   joinedAt: string; // ISO 8601 UTC (league_members.joined_at)
-  /** Saldo de puntos de duelos (league_members.wager_balance). Toda la liga,
-   *  no por jornada. 2º criterio de desempato. Opcional → 0 si no se provee. */
+  /** Puntos ganados en duelos de la liga (calculados vía RPC fn_get_league_duel_points).
+   *  Toda la liga, no por jornada. 4º criterio de desempate. Opcional → 0 si no se provee. */
   duelPoints?: number;
   /** Puntos de premios especiales (RPC fn_get_league_award_points, BUG-004).
    *  Solo suman al total en el acumulado General: un premio no pertenece a
@@ -64,6 +64,8 @@ export type StandingRow = {
   duelPoints: number;
   /** Puntos de premios especiales incluidos en totalPoints (solo General). */
   awardPoints: number;
+  /** Indica si comparte el rank con otro miembro debido a un empate absoluto en los 5 criterios principales. */
+  isTie: boolean;
 };
 
 export type ProjectedStandingRow = StandingRow & {
@@ -80,9 +82,9 @@ function round2(value: number): number {
  *
  * @param phaseKeyOrMatchday  undefined = acumulado (General); string/número = fase/jornada específica.
  *
- * Desempate (Story 3.1 AC #5): puntos desc → marcadores exactos desc →
- * saldo de duelos (wager_balance) desc → joined_at asc. El saldo de duelos
- * llega vía `member.duelPoints` (0 si no se provee).
+ * Desempate: puntos desc → marcadores exactos desc → resultados desc → premios desc → puntos de duelos desc.
+ * Si persiste el empate absoluto (mismos valores en todos los 5 criterios principales),
+ * comparten la posición (rank) y se usa userId como orden determinista estable.
  */
 export function buildStandings(
   members: StandingMember[],
@@ -141,7 +143,7 @@ export function buildStandings(
       totalPoints: round2(totalPoints + awardPoints),
       exactCount,
       resultCount,
-      // Saldo de duelos (wager_balance) de toda la liga. 2º criterio de desempate.
+      // Puntos ganados en duelos de toda la liga. 4º criterio de desempate.
       duelPoints: member.duelPoints ?? 0,
       awardPoints,
     };
@@ -150,28 +152,50 @@ export function buildStandings(
   rows.sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
     if (b.exactCount !== a.exactCount) return b.exactCount - a.exactCount;
+    if (b.resultCount !== a.resultCount) return b.resultCount - a.resultCount;
+    if (b.awardPoints !== a.awardPoints) return b.awardPoints - a.awardPoints;
     if (b.duelPoints !== a.duelPoints) return b.duelPoints - a.duelPoints;
-    // joined_at ascendente: ISO 8601 UTC ordena lexicográficamente.
-    const byJoined = a.member.joinedAt.localeCompare(b.member.joinedAt);
-    if (byJoined !== 0) return byJoined;
-    // Clave final estable: ante empate TOTAL (puntos+exactos+duelos+joined_at),
-    // ordenar por userId garantiza un orden determinista (no depende del orden
-    // de inserción ni de la implementación de sort).
+    // Clave final estable: ante empate TOTAL (puntos+exactos+resultados+awards+duelos),
+    // ordenar por userId garantiza un orden determinista en la lista interna.
     return a.member.userId.localeCompare(b.member.userId);
   });
 
-  return rows.map((row, index) => ({
-    rank: index + 1,
-    userId: row.member.userId,
-    displayName: row.member.displayName,
-    avatarUrl: row.member.avatarUrl,
-    paymentStatus: row.member.paymentStatus,
-    totalPoints: row.totalPoints,
-    exactCount: row.exactCount,
-    resultCount: row.resultCount,
-    duelPoints: row.duelPoints,
-    awardPoints: row.awardPoints,
-  }));
+  const areRowsEqual = (r1: typeof rows[0] | undefined, r2: typeof rows[0] | undefined) => {
+    if (!r1 || !r2) return false;
+    return r1.totalPoints === r2.totalPoints &&
+           r1.exactCount === r2.exactCount &&
+           r1.resultCount === r2.resultCount &&
+           r1.awardPoints === r2.awardPoints &&
+           r1.duelPoints === r2.duelPoints;
+  };
+
+  let currentRank = 1;
+  return rows.map((row, index) => {
+    if (index > 0) {
+      const prev = rows[index - 1];
+      if (!areRowsEqual(row, prev)) {
+        currentRank = index + 1;
+      }
+    }
+
+    const isTieWithPrev = index > 0 && areRowsEqual(row, rows[index - 1]);
+    const isTieWithNext = index < rows.length - 1 && areRowsEqual(row, rows[index + 1]);
+    const isTie = isTieWithPrev || isTieWithNext;
+
+    return {
+      rank: currentRank,
+      userId: row.member.userId,
+      displayName: row.member.displayName,
+      avatarUrl: row.member.avatarUrl,
+      paymentStatus: row.member.paymentStatus,
+      totalPoints: row.totalPoints,
+      exactCount: row.exactCount,
+      resultCount: row.resultCount,
+      duelPoints: row.duelPoints,
+      awardPoints: row.awardPoints,
+      isTie,
+    };
+  });
 }
 
 /**
@@ -239,25 +263,49 @@ export function buildProjectedStandings(
   rows.sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
     if (b.exactCount !== a.exactCount) return b.exactCount - a.exactCount;
+    if (b.resultCount !== a.resultCount) return b.resultCount - a.resultCount;
+    if (b.awardPoints !== a.awardPoints) return b.awardPoints - a.awardPoints;
     if (b.duelPoints !== a.duelPoints) return b.duelPoints - a.duelPoints;
-    const byJoined = a.member.joinedAt.localeCompare(b.member.joinedAt);
-    if (byJoined !== 0) return byJoined;
     return a.member.userId.localeCompare(b.member.userId);
   });
 
-  return rows.map((row, index) => ({
-    rank: index + 1,
-    userId: row.member.userId,
-    displayName: row.member.displayName,
-    avatarUrl: row.member.avatarUrl,
-    paymentStatus: row.member.paymentStatus,
-    totalPoints: row.totalPoints,
-    exactCount: row.exactCount,
-    resultCount: row.resultCount,
-    duelPoints: row.duelPoints,
-    awardPoints: row.awardPoints,
-    livePoints: row.livePoints,
-  }));
+  const areRowsEqual = (r1: typeof rows[0] | undefined, r2: typeof rows[0] | undefined) => {
+    if (!r1 || !r2) return false;
+    return r1.totalPoints === r2.totalPoints &&
+           r1.exactCount === r2.exactCount &&
+           r1.resultCount === r2.resultCount &&
+           r1.awardPoints === r2.awardPoints &&
+           r1.duelPoints === r2.duelPoints;
+  };
+
+  let currentRank = 1;
+  return rows.map((row, index) => {
+    if (index > 0) {
+      const prev = rows[index - 1];
+      if (!areRowsEqual(row, prev)) {
+        currentRank = index + 1;
+      }
+    }
+
+    const isTieWithPrev = index > 0 && areRowsEqual(row, rows[index - 1]);
+    const isTieWithNext = index < rows.length - 1 && areRowsEqual(row, rows[index + 1]);
+    const isTie = isTieWithPrev || isTieWithNext;
+
+    return {
+      rank: currentRank,
+      userId: row.member.userId,
+      displayName: row.member.displayName,
+      avatarUrl: row.member.avatarUrl,
+      paymentStatus: row.member.paymentStatus,
+      totalPoints: row.totalPoints,
+      exactCount: row.exactCount,
+      resultCount: row.resultCount,
+      duelPoints: row.duelPoints,
+      awardPoints: row.awardPoints,
+      livePoints: row.livePoints,
+      isTie,
+    };
+  });
 }
 
 /** Jornadas distintas (asc) presentes en partidos finished. Para las pestañas. */

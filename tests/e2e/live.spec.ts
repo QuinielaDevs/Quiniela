@@ -101,6 +101,28 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
       multiplier: 1.0,
     });
 
+    // Sembrar ganancias de duelos en point_transactions para asegurar un orden de desempate determinista
+    await admin.from("point_transactions").insert([
+      {
+        user_id: fixture.users[0]!.userId,
+        league_id: fixture.league.id,
+        amount: 30.0,
+        description: "challenge_payout",
+      },
+      {
+        user_id: fixture.users[1]!.userId,
+        league_id: fixture.league.id,
+        amount: 20.0,
+        description: "challenge_payout",
+      },
+      {
+        user_id: fixture.users[2]!.userId,
+        league_id: fixture.league.id,
+        amount: 10.0,
+        description: "challenge_payout",
+      },
+    ]);
+
     // Navegar el viewer a /live y esperar suscripción Realtime activa
     const page = fixture.users[0]!.page!;
     await navigateToLivePage(page);
@@ -108,6 +130,10 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
   });
 
   test.afterAll(async () => {
+    await admin
+      .from("point_transactions")
+      .delete()
+      .eq("league_id", fixture.league.id);
     await stack.run();
   });
 
@@ -209,8 +235,8 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
     // Gol 4: 2-1 → 3-1 (genera toast fresco en caso de que los anteriores
     // se hayan auto-descartado tras los 5.5 s de AUTO_DISMISS_MS).
     //   A 3-1: user0(2pts), user1(2pts), user2(2pts) — los 3 empatados.
-    //   Tiebreaker por joined_at: user0(rank1), user1(rank2), user2(rank3).
-    //   user0 (viewer) mejora (estaba rank2 tras 2-1) → mover anunciado: viewer.
+    //   En empate absoluto se ordenan físicamente por userId fallback.
+    //   user0 (viewer) mejora su posición física (estaba rank2 tras 2-1) → mover anunciado: viewer.
     const { error } = await admin
       .from("matches")
       .update({ home_score: 3, away_score: 1 })

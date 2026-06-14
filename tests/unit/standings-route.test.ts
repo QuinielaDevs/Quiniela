@@ -48,6 +48,8 @@ const mockFromPreds = {
   })),
 };
 
+const mockRpc = vi.fn();
+
 const mockSupabase = {
   from: vi.fn((table) => {
     if (table === "league_members") return mockFromMembers;
@@ -55,6 +57,7 @@ const mockSupabase = {
     if (table === "predictions") return mockFromPreds;
     throw new Error(`Unexpected table: ${table}`);
   }),
+  rpc: mockRpc,
 };
 
 vi.mock("@supabase/supabase-js", () => ({
@@ -77,6 +80,7 @@ describe("API /api/standings GET handler", () => {
     mockInPreds.mockReset();
     mockEqPreds.mockClear();
     mockSupabase.from.mockClear();
+    mockRpc.mockReset();
   });
 
   afterEach(() => {
@@ -149,6 +153,10 @@ describe("API /api/standings GET handler", () => {
       data: [],
       error: null,
     });
+    mockRpc.mockResolvedValue({
+      data: [],
+      error: null,
+    });
 
     const req = new NextRequest(`http://localhost/api/standings?leagueId=${validLeagueId}`, {
       method: "GET",
@@ -207,6 +215,16 @@ describe("API /api/standings GET handler", () => {
       error: null,
     });
 
+    mockRpc.mockResolvedValue({
+      data: [
+        {
+          user_id: "user-uuid-1",
+          duel_points: 0.00,
+        },
+      ],
+      error: null,
+    });
+
     const req = new NextRequest(`http://localhost/api/standings?leagueId=${validLeagueId}`, {
       method: "GET",
       headers: { authorization: "Bearer bot-secret-token" },
@@ -224,5 +242,6 @@ describe("API /api/standings GET handler", () => {
     expect(mockSupabase.from).toHaveBeenCalledWith("league_members");
     expect(mockSupabase.from).toHaveBeenCalledWith("matches");
     expect(mockSupabase.from).toHaveBeenCalledWith("predictions");
+    expect(mockSupabase.rpc).toHaveBeenCalledWith("fn_get_league_duel_points", { p_league_id: validLeagueId });
   });
 });

@@ -231,15 +231,23 @@ export default function RulesPage() {
             <ol className="mt-3 grid gap-2 text-sm text-muted-foreground lg:grid-cols-3">
               <li className="rounded-sm border border-border bg-background p-3">
                 <span className="font-semibold text-foreground">1.</span>{" "}
-                Más marcadores exactos.
+                Más marcadores exactos (aciertos de 5 pts).
               </li>
               <li className="rounded-sm border border-border bg-background p-3">
                 <span className="font-semibold text-foreground">2.</span>{" "}
-                Puntos de duelos directos.
+                Más resultados acertados (aciertos de 2 pts, excluyendo exactos).
               </li>
               <li className="rounded-sm border border-border bg-background p-3">
                 <span className="font-semibold text-foreground">3.</span>{" "}
-                Fecha de entrada a la liga.
+                Más puntos por premios acertados (Awards).
+              </li>
+              <li className="rounded-sm border border-border bg-background p-3">
+                <span className="font-semibold text-foreground">4.</span>{" "}
+                Más puntos ganados en duelos (victorias resueltas).
+              </li>
+              <li className="rounded-sm border border-border bg-background p-3 lg:col-span-2">
+                <span className="font-semibold text-foreground">5.</span>{" "}
+                Empate absoluto: si persiste la igualdad en todos los criterios, comparten la posición y se define externamente (sorteo manual).
               </li>
             </ol>
           </section>

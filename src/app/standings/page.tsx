@@ -24,7 +24,7 @@ type MemberRow = {
   role: LeagueRole;
   payment_status: PaymentStatus;
   joined_at: string;
-  wager_balance: number;
+  wager_balance?: number;
   profiles: { display_name: string; avatar_url: string } | null;
 };
 
@@ -51,11 +51,11 @@ export async function StandingsBoard() {
   // partidos desbloqueados (finished → siempre visibles). NO usar service_role.
   // Los puntos de premios especiales llegan agregados por el RPC (BUG-004):
   // la RLS oculta los picks rivales, el RPC expone SOLO el total por usuario.
-  const [{ data: memberRows }, { data: finished }, { data: league }, { data: awardRows }] =
+  const [{ data: memberRows }, { data: finished }, { data: league }, { data: awardRows }, { data: duelRows }] =
     await Promise.all([
       supabase
         .from("league_members")
-        .select("user_id, role, payment_status, joined_at, wager_balance, profiles(display_name, avatar_url)")
+        .select("user_id, role, payment_status, joined_at, profiles(display_name, avatar_url)")
         .eq("league_id", leagueId),
       supabase
         .from("matches")
@@ -67,11 +67,18 @@ export async function StandingsBoard() {
         .eq("id", leagueId)
         .single(),
       supabase.rpc("fn_get_league_award_points", { p_league_id: leagueId }),
+      supabase.rpc("fn_get_league_duel_points", { p_league_id: leagueId }),
     ]);
 
   const awardPointsByUser = new Map(
     ((awardRows ?? []) as Array<{ user_id: string; award_points: number }>).map(
       (row) => [row.user_id, Number(row.award_points ?? 0)],
+    ),
+  );
+
+  const duelPointsByUser = new Map(
+    ((duelRows ?? []) as Array<{ user_id: string; duel_points: number }>).map(
+      (row) => [row.user_id, Number(row.duel_points ?? 0)],
     ),
   );
 
@@ -110,7 +117,7 @@ export async function StandingsBoard() {
     avatarUrl: m.profiles?.avatar_url ?? "/assets/avatars/default-player.svg",
     paymentStatus: m.payment_status,
     joinedAt: m.joined_at,
-    duelPoints: Number(m.wager_balance ?? 0),
+    duelPoints: duelPointsByUser.get(m.user_id) ?? 0,
     awardPoints: awardPointsByUser.get(m.user_id) ?? 0,
   }));
 
@@ -163,7 +170,7 @@ export async function StandingsBoard() {
 
 function BoardSkeleton() {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" data-testid="standings-skeleton">
       {[0, 1, 2, 3].map((i) => (
         <div
           key={i}

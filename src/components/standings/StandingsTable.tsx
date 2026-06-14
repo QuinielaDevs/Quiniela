@@ -74,10 +74,8 @@ export function StandingsTable({
 
       <p className="text-xs text-muted-foreground">
         Desempate: puntos → <strong className="font-semibold">exactos</strong>{" "}
-        (marcador exacto, 5 pts) →{" "}
-        <strong className="font-semibold">duelos</strong> (saldo). También se
-        muestran los aciertos de <strong className="font-semibold">resultado</strong>{" "}
-        (solo ganador o empate, 2 pts).
+        (5 pts) → <strong className="font-semibold">resultados</strong> (ganador/empate, 2 pts) →{" "}
+        <strong className="font-semibold">premios acertados</strong> → <strong className="font-semibold">puntos de duelos obtenidos</strong>. En empate absoluto comparten la posición.
       </p>
 
       <ol className="flex flex-col gap-2" data-testid="standings-table">
@@ -93,16 +91,23 @@ export function StandingsTable({
                 isLeader ? "border-accent" : "border-border",
               )}
             >
-              <span
-                className={cn(
-                  "w-6 shrink-0 text-center font-display text-lg font-bold",
-                  isLeader ? "text-accent" : "text-muted-foreground",
+              <div className="flex flex-col items-center shrink-0 w-8">
+                <span
+                  className={cn(
+                    "font-display text-lg font-bold text-center",
+                    isLeader ? "text-accent" : "text-muted-foreground",
+                  )}
+                  aria-label={`Posición ${row.rank}${row.isTie ? " empatada" : ""}`}
+                  data-testid="standings-rank"
+                >
+                  {row.rank}
+                </span>
+                {row.isTie && (
+                  <span className="text-[10px] text-muted-foreground leading-none" data-testid="standings-tie-badge">
+                    Empate
+                  </span>
                 )}
-                aria-label={`Posición ${row.rank}`}
-                data-testid="standings-rank"
-              >
-                {row.rank}
-              </span>
+              </div>
 
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -136,17 +141,6 @@ export function StandingsTable({
                     </span>{" "}
                     result.
                   </span>
-                  {showDuels && (
-                    <span
-                      className="text-xs text-muted-foreground"
-                      aria-label={`${row.duelPoints} puntos de duelos`}
-                    >
-                      <span className="font-semibold text-foreground">
-                        {row.duelPoints.toFixed(1)}
-                      </span>{" "}
-                      duelos
-                    </span>
-                  )}
                   {showDuels && row.awardPoints > 0 && (
                     <span
                       className="text-xs text-muted-foreground"
@@ -156,7 +150,18 @@ export function StandingsTable({
                       <span className="font-semibold text-foreground">
                         {row.awardPoints.toFixed(1)}
                       </span>{" "}
-                      premios
+                      pts premios
+                    </span>
+                  )}
+                  {showDuels && (
+                    <span
+                      className="text-xs text-muted-foreground"
+                      aria-label={`${row.duelPoints} puntos de duelos`}
+                    >
+                      <span className="font-semibold text-foreground">
+                        {row.duelPoints.toFixed(1)}
+                      </span>{" "}
+                      pts duelos
                     </span>
                   )}
                 </div>

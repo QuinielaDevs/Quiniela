@@ -2,18 +2,27 @@ import { test, expect } from "@playwright/test";
 
 import { createAdminClient, createAnonClient } from "./helpers/admin";
 import { createCleanupStack } from "./helpers/cleanup";
-import { deleteMatches, finishedMatch, seedMatches, suspendedMatch } from "./helpers/seed/matches";
+import { deleteMatches, editableMatch, finishedMatch, seedMatches, suspendedMatch } from "./helpers/seed/matches";
 import { seedPrediction } from "./helpers/seed/predictions";
 import { createLeagueWithUsers } from "./helpers/users";
 import { selectPhaseTab } from "./helpers/ui";
+import {
+  snapshotWinners,
+  restoreWinners,
+  getCandidate,
+  setWinner,
+  type WinnersSnapshot,
+} from "./helpers/seed/awards";
 
 test.describe("Clasificación oficial (e2e)", () => {
   const stack = createCleanupStack();
   const localMatchIds: string[] = [];
   let fixture: Awaited<ReturnType<typeof createLeagueWithUsers>>;
   const admin = createAdminClient();
+  let winnersSnap: WinnersSnapshot;
 
   test.beforeAll(async ({ browser }) => {
+    winnersSnap = await snapshotWinners();
     // Necesitamos 4 usuarios (1 admin, 3 miembros) para los escenarios de desempate
     fixture = await createLeagueWithUsers(browser, {
       members: 4,
@@ -31,6 +40,7 @@ test.describe("Clasificación oficial (e2e)", () => {
   });
 
   test.afterAll(async () => {
+    await restoreWinners(winnersSnap);
     await stack.run();
   });
 
@@ -98,26 +108,116 @@ test.describe("Clasificación oficial (e2e)", () => {
       evaluatedAt: new Date().toISOString(),
     });
 
+    // 1. Sembrar premios especiales (Awards)
+    // Buscamos un candidato de campeón
+    const candidate = await getCandidate("champion", { name: "Argentina" });
+    
+    // User 0 y User 1 eligen al candidato ganador
+    await admin.from("special_predictions").insert([
+      {
+        user_id: fixture.users[0]!.userId,
+        league_id: fixture.league.id,
+        category: "champion",
+        candidate_id: candidate.id,
+      },
+      {
+        user_id: fixture.users[1]!.userId,
+        league_id: fixture.league.id,
+        category: "champion",
+        candidate_id: candidate.id,
+      },
+    ]);
+
+    // Hacemos ganador al candidato
+    await setWinner("champion", candidate.id);
+
+    // 2. Sembrar ganancias de duelos en point_transactions
+    await admin.from("point_transactions").insert([
+      {
+        user_id: fixture.users[0]!.userId,
+        league_id: fixture.league.id,
+        amount: 50.0,
+        description: "challenge_payout",
+      },
+      {
+        user_id: fixture.users[1]!.userId,
+        league_id: fixture.league.id,
+        amount: 10.0,
+        description: "challenge_payout",
+      },
+      {
+        user_id: fixture.users[2]!.userId,
+        league_id: fixture.league.id,
+        amount: 5.0,
+        description: "challenge_payout",
+      },
+    ]);
+
     await page.goto("/standings");
+
+    await expect(page.getByTestId("standings-skeleton")).toBeHidden();
 
     const rows = page.getByTestId("standings-row");
     await expect(rows).toHaveCount(4);
 
-    // Fila 1: User 0 (12.5 pts)
+    // Obtenemos los puntos sumados de los premios para verificar con precisión el total esperado
+    const { data: awardData0 } = await admin
+      .from("special_predictions_with_points")
+      .select("points")
+      .eq("league_id", fixture.league.id)
+      .eq("user_id", fixture.users[0]!.userId)
+      .single();
+    const user0Awards = awardData0?.points ?? 0;
+
+    const { data: awardData1 } = await admin
+      .from("special_predictions_with_points")
+      .select("points")
+      .eq("league_id", fixture.league.id)
+      .eq("user_id", fixture.users[1]!.userId)
+      .single();
+    const user1Awards = awardData1?.points ?? 0;
+
+    const expectedPoints0 = (12.5 + Number(user0Awards)).toFixed(1);
+    const expectedPoints1 = (8.0 + Number(user1Awards)).toFixed(1);
+
+    // Fila 1: User 0 (12.5 pts + user0Awards)
     await expect(rows.nth(0)).toContainText(fixture.users[0]!.displayName!);
-    await expect(rows.nth(0).getByTestId("standings-points")).toHaveText("12.5");
+    await expect(rows.nth(0).getByTestId("standings-points")).toHaveText(expectedPoints0);
+    // Verificamos los badges en el orden exactos -> result -> premios -> duelos
+    await expect(rows.nth(0).getByTestId("standings-exact")).toContainText("1 exactos");
+    await expect(rows.nth(0).getByTestId("standings-awards")).toContainText(
+      `${Number(user0Awards).toFixed(1)} pts premios`,
+    );
+    await expect(rows.nth(0).locator("text=50.0 pts duelos")).toBeVisible();
 
-    // Fila 2: User 1 (8.0 pts)
+    // Fila 2: User 1 (8.0 pts + user1Awards)
     await expect(rows.nth(1)).toContainText(fixture.users[1]!.displayName!);
-    await expect(rows.nth(1).getByTestId("standings-points")).toHaveText("8.0");
+    await expect(rows.nth(1).getByTestId("standings-points")).toHaveText(expectedPoints1);
+    await expect(rows.nth(1).getByTestId("standings-exact")).toContainText("1 exactos");
+    await expect(rows.nth(1).getByTestId("standings-awards")).toContainText(
+      `${Number(user1Awards).toFixed(1)} pts premios`,
+    );
+    await expect(rows.nth(1).locator("text=10.0 pts duelos")).toBeVisible();
 
-    // Fila 3: User 2 (2.0 pts)
+    // Fila 3: User 2 (2.0 pts, 0 exactos, 5.0 duel pts)
     await expect(rows.nth(2)).toContainText(fixture.users[2]!.displayName!);
     await expect(rows.nth(2).getByTestId("standings-points")).toHaveText("2.0");
+    await expect(rows.nth(2).getByTestId("standings-exact")).toContainText("0 exactos");
+    await expect(rows.nth(2).locator("text=5.0 pts duelos")).toBeVisible();
 
     // Fila 4: User 3 (0.0 pts)
     await expect(rows.nth(3)).toContainText(fixture.users[3]!.displayName!);
     await expect(rows.nth(3).getByTestId("standings-points")).toHaveText("0.0");
+
+    // Limpieza específica de point_transactions y special_predictions para no ensuciar otros tests
+    await admin
+      .from("point_transactions")
+      .delete()
+      .eq("league_id", fixture.league.id);
+    await admin
+      .from("special_predictions")
+      .delete()
+      .eq("league_id", fixture.league.id);
   });
 
   test("STD-02: Desempate por exactos", async () => {
@@ -177,6 +277,8 @@ test.describe("Clasificación oficial (e2e)", () => {
 
     await page.goto("/standings");
 
+    await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+
     const rows = page.getByTestId("standings-row");
     // Fila 1 debe ser User 0 (puntos: 5.0, exactos: 1)
     await expect(rows.nth(0)).toContainText(fixture.users[0]!.displayName!);
@@ -187,7 +289,7 @@ test.describe("Clasificación oficial (e2e)", () => {
     await expect(rows.nth(1).getByTestId("standings-exact")).toContainText("0 exactos");
   });
 
-  test("STD-03: Desempate por wager_balance", async () => {
+  test("STD-03: Desempate por puntos de duelos", async () => {
     const page = fixture.users[0]!.page!;
     const matches = await seedMatches([
       finishedMatch({ home: 3, away: 0 }, { matchday: 1 }),
@@ -195,7 +297,7 @@ test.describe("Clasificación oficial (e2e)", () => {
     const m = matches[0]!;
     localMatchIds.push(m.id);
 
-    // Ambos usuarios con la misma predicción exacta (5 pts), pero User 0 tiene balance de duelos 50.0 y User 1 tiene 10.0
+    // Ambos usuarios con la misma predicción exacta (5 pts), pero User 0 tiene ganancias de duelos 50.0 y User 1 tiene 10.0
     await seedPrediction({
       leagueId: fixture.league.id,
       userId: fixture.users[0]!.userId,
@@ -217,53 +319,103 @@ test.describe("Clasificación oficial (e2e)", () => {
       evaluatedAt: new Date().toISOString(),
     });
 
-    // Actualizar balances de duelos en base de datos
+    // Insertar ganancias de duelos en point_transactions
     const { error: err0 } = await admin
-      .from("league_members")
-      .update({ wager_balance: 50.0 })
-      .eq("league_id", fixture.league.id)
-      .eq("user_id", fixture.users[0]!.userId);
+      .from("point_transactions")
+      .insert({
+        user_id: fixture.users[0]!.userId,
+        league_id: fixture.league.id,
+        amount: 50.0,
+        description: "challenge_payout",
+      });
     expect(err0).toBeNull();
 
     const { error: err1 } = await admin
-      .from("league_members")
-      .update({ wager_balance: 10.0 })
-      .eq("league_id", fixture.league.id)
-      .eq("user_id", fixture.users[1]!.userId);
+      .from("point_transactions")
+      .insert({
+        user_id: fixture.users[1]!.userId,
+        league_id: fixture.league.id,
+        amount: 10.0,
+        description: "challenge_payout",
+      });
     expect(err1).toBeNull();
 
-    // Restaurar balances en afterEach/cleanup para no impactar otros tests
-    localMatchIds.push(m.id); // Re-registrar para que afterEach se ejecute y limpie
+    // Registrar partido para que afterEach se ejecute y limpie
+    localMatchIds.push(m.id);
 
     await page.goto("/standings");
 
-    const rows = page.getByTestId("standings-row");
-    // Fila 1: User 0 (5.0 pts, 1 exacto, 50.0 wager)
-    await expect(rows.nth(0)).toContainText(fixture.users[0]!.displayName!);
-    // Fila 2: User 1 (5.0 pts, 1 exacto, 10.0 wager)
-    await expect(rows.nth(1)).toContainText(fixture.users[1]!.displayName!);
+    await expect(page.getByTestId("standings-skeleton")).toBeHidden();
 
-    // Restaurar a 0 en la BD
+    const rows = page.getByTestId("standings-row");
+    
+    // Obtenemos los locators filtrados por displayName
+    const rowUser0 = rows.filter({ hasText: fixture.users[0]!.displayName! });
+    const rowUser1 = rows.filter({ hasText: fixture.users[1]!.displayName! });
+
+    // Fila 1 debe ser User 0 (puesto 1 por desempate de duelos: 50.0 > 10.0)
+    await expect(rows.nth(0)).toContainText(fixture.users[0]!.displayName!);
+    await expect(rowUser0.getByTestId("standings-rank")).toHaveText("1");
+    await expect(rowUser0.getByTestId("standings-points")).toHaveText("5.0");
+    await expect(rowUser0.getByTestId("standings-exact")).toContainText("1 exactos");
+    await expect(rowUser0).toContainText("0 result.");
+    await expect(rowUser0).toContainText("50.0 pts duelos");
+
+    // Fila 2 debe ser User 1 (puesto 2)
+    await expect(rows.nth(1)).toContainText(fixture.users[1]!.displayName!);
+    await expect(rowUser1.getByTestId("standings-rank")).toHaveText("2");
+    await expect(rowUser1.getByTestId("standings-points")).toHaveText("5.0");
+    await expect(rowUser1.getByTestId("standings-exact")).toContainText("1 exactos");
+    await expect(rowUser1).toContainText("0 result.");
+    await expect(rowUser1).toContainText("10.0 pts duelos");
+
+    // Limpiar transacciones creadas en la BD
     await admin
-      .from("league_members")
-      .update({ wager_balance: 0.0 })
-      .eq("league_id", fixture.league.id);
+      .from("point_transactions")
+      .delete()
+      .eq("league_id", fixture.league.id)
+      .eq("description", "challenge_payout");
   });
 
-  test("STD-04: Desempate por joined_at", async () => {
+  test("STD-04: Empate absoluto (comparten posición y muestran badge de empate)", async () => {
     const page = fixture.users[0]!.page!;
     const matches = await seedMatches([
       finishedMatch({ home: 3, away: 0 }, { matchday: 1 }),
+      finishedMatch({ home: 1, away: 1 }, { matchday: 1 }),
     ]);
-    const m = matches[0]!;
-    localMatchIds.push(m.id);
+    const m1 = matches[0]!;
+    const m2 = matches[1]!;
+    localMatchIds.push(m1.id, m2.id);
 
-    // Mismo puntos (5.0), exactos (1), wager balance (0.0).
-    // User 0 se unió antes que User 1.
+    // Mismos puntos de predicción (5.0 exacto + 3.0 resultado = 8.0 pts)
+    // exactCount = 1, resultCount = 1
+    // User 0
     await seedPrediction({
       leagueId: fixture.league.id,
       userId: fixture.users[0]!.userId,
-      matchId: m.id,
+      matchId: m1.id,
+      home: 3,
+      away: 0,
+      multiplier: 1.0,
+      pointsEarned: 5.0,
+      evaluatedAt: new Date().toISOString(),
+    });
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[0]!.userId,
+      matchId: m2.id,
+      home: 2,
+      away: 2,
+      multiplier: 1.5,
+      pointsEarned: 3.0,
+      evaluatedAt: new Date().toISOString(),
+    });
+
+    // User 1
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[1]!.userId,
+      matchId: m1.id,
       home: 3,
       away: 0,
       multiplier: 1.0,
@@ -273,36 +425,121 @@ test.describe("Clasificación oficial (e2e)", () => {
     await seedPrediction({
       leagueId: fixture.league.id,
       userId: fixture.users[1]!.userId,
-      matchId: m.id,
-      home: 3,
-      away: 0,
-      multiplier: 1.0,
-      pointsEarned: 5.0,
+      matchId: m2.id,
+      home: 2,
+      away: 2,
+      multiplier: 1.5,
+      pointsEarned: 3.0,
       evaluatedAt: new Date().toISOString(),
     });
 
-    const earlyDate = "2026-06-01T00:00:00Z";
-    const lateDate = "2026-06-02T00:00:00Z";
+    // 1. Mismos premios especiales (Awards)
+    const candidate = await getCandidate("champion", { name: "Argentina" });
+    await admin.from("special_predictions").insert([
+      {
+        user_id: fixture.users[0]!.userId,
+        league_id: fixture.league.id,
+        category: "champion",
+        candidate_id: candidate.id,
+        // Nota: la base de datos tiene un trigger tr_touch_special_prediction que sobreescribe
+        // predicted_at con now() al insertar. Así que los puntos se calcularán según la fecha actual.
+        // No obstante, enviamos una fecha fija para documentar el diseño.
+        predicted_at: "2026-06-01T12:00:00Z",
+      },
+      {
+        user_id: fixture.users[1]!.userId,
+        league_id: fixture.league.id,
+        category: "champion",
+        candidate_id: candidate.id,
+        predicted_at: "2026-06-01T12:00:00Z",
+      },
+    ]);
+    await setWinner("champion", candidate.id);
 
-    await admin
-      .from("league_members")
-      .update({ joined_at: earlyDate })
-      .eq("league_id", fixture.league.id)
-      .eq("user_id", fixture.users[0]!.userId);
+    // 2. Mismos puntos de duelos
+    await admin.from("point_transactions").insert([
+      {
+        user_id: fixture.users[0]!.userId,
+        league_id: fixture.league.id,
+        amount: 20.0,
+        description: "challenge_payout",
+      },
+      {
+        user_id: fixture.users[1]!.userId,
+        league_id: fixture.league.id,
+        amount: 20.0,
+        description: "challenge_payout",
+      },
+    ]);
 
-    await admin
-      .from("league_members")
-      .update({ joined_at: lateDate })
+    // Consultamos los puntos reales de premios calculados por la base de datos para construir la aserción exacta
+    const { data: awardData0 } = await admin
+      .from("special_predictions_with_points")
+      .select("points")
       .eq("league_id", fixture.league.id)
-      .eq("user_id", fixture.users[1]!.userId);
+      .eq("user_id", fixture.users[0]!.userId)
+      .single();
+    const user0Awards = Number(awardData0?.points ?? 0);
+
+    const { data: awardData1 } = await admin
+      .from("special_predictions_with_points")
+      .select("points")
+      .eq("league_id", fixture.league.id)
+      .eq("user_id", fixture.users[1]!.userId)
+      .single();
+    const user1Awards = Number(awardData1?.points ?? 0);
+
+    const expectedPoints0 = (8.0 + user0Awards).toFixed(1);
+    const expectedPoints1 = (8.0 + user1Awards).toFixed(1);
 
     await page.goto("/standings");
 
+    await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+
     const rows = page.getByTestId("standings-row");
-    // Fila 1: User 0 (se unió antes)
-    await expect(rows.nth(0)).toContainText(fixture.users[0]!.displayName!);
-    // Fila 2: User 1 (se unió después)
-    await expect(rows.nth(1)).toContainText(fixture.users[1]!.displayName!);
+    
+    // Obtenemos los locators filtrados por el displayName de cada usuario para evitar asumir el orden físico de la lista
+    const rowUser0 = rows.filter({ hasText: fixture.users[0]!.displayName! });
+    const rowUser1 = rows.filter({ hasText: fixture.users[1]!.displayName! });
+
+    // Ambos deben compartir el rank visible "1"
+    await expect(rowUser0.getByTestId("standings-rank")).toHaveText("1");
+    await expect(rowUser1.getByTestId("standings-rank")).toHaveText("1");
+
+    // Ambos deben mostrar el badge de empate
+    await expect(rowUser0.getByTestId("standings-tie-badge")).toBeVisible();
+    await expect(rowUser1.getByTestId("standings-tie-badge")).toBeVisible();
+    await expect(rowUser0.getByTestId("standings-tie-badge")).toHaveText("Empate");
+    await expect(rowUser1.getByTestId("standings-tie-badge")).toHaveText("Empate");
+
+    // Verificar desglose completo de puntos en la UI para representar el escenario real
+    // User 0
+    await expect(rowUser0.getByTestId("standings-points")).toHaveText(expectedPoints0);
+    await expect(rowUser0.getByTestId("standings-exact")).toContainText("1 exactos");
+    await expect(rowUser0).toContainText("1 result.");
+    if (user0Awards > 0) {
+      await expect(rowUser0.getByTestId("standings-awards")).toContainText(`${user0Awards.toFixed(1)} pts premios`);
+    }
+    await expect(rowUser0).toContainText("20.0 pts duelos");
+
+    // User 1
+    await expect(rowUser1.getByTestId("standings-points")).toHaveText(expectedPoints1);
+    await expect(rowUser1.getByTestId("standings-exact")).toContainText("1 exactos");
+    await expect(rowUser1).toContainText("1 result.");
+    if (user1Awards > 0) {
+      await expect(rowUser1.getByTestId("standings-awards")).toContainText(`${user1Awards.toFixed(1)} pts premios`);
+    }
+    await expect(rowUser1).toContainText("20.0 pts duelos");
+
+    // Limpieza específica para este test
+    await admin
+      .from("point_transactions")
+      .delete()
+      .eq("league_id", fixture.league.id);
+    await admin
+      .from("special_predictions")
+      .delete()
+      .eq("league_id", fixture.league.id);
   });
 
   test("STD-05: Totales = Σ(base × multiplicador)", async () => {
@@ -341,11 +578,16 @@ test.describe("Clasificación oficial (e2e)", () => {
     });
 
     await page.goto("/standings");
-    const pointsLabel = page
+
+    await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+
+    const rowUser0 = page
       .getByTestId("standings-row")
-      .filter({ hasText: fixture.users[0]!.displayName! })
-      .getByTestId("standings-points");
-    await expect(pointsLabel).toHaveText("10.0");
+      .filter({ hasText: fixture.users[0]!.displayName! });
+
+    await expect(rowUser0.getByTestId("standings-points")).toHaveText("10.0");
+    await expect(rowUser0.getByTestId("standings-exact")).toContainText("1 exactos");
+    await expect(rowUser0).toContainText("1 result.");
   });
 
   test("STD-06: Suspendidos/cancelados excluidos", async () => {
@@ -369,11 +611,16 @@ test.describe("Clasificación oficial (e2e)", () => {
     });
 
     await page.goto("/standings");
-    const pointsLabel = page
+
+    await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+
+    const rowUser0 = page
       .getByTestId("standings-row")
-      .filter({ hasText: fixture.users[0]!.displayName! })
-      .getByTestId("standings-points");
-    await expect(pointsLabel).toHaveText("0.0");
+      .filter({ hasText: fixture.users[0]!.displayName! });
+
+    await expect(rowUser0.getByTestId("standings-points")).toHaveText("0.0");
+    await expect(rowUser0.getByTestId("standings-exact")).toContainText("0 exactos");
+    await expect(rowUser0).toContainText("0 result.");
   });
 
   test("STD-07: Filtro por jornada/fase", async () => {
@@ -412,6 +659,8 @@ test.describe("Clasificación oficial (e2e)", () => {
 
     await page.goto("/standings");
 
+    await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+
     // Tab General (Acumulada): debe sumar 5.0 + 3.0 = 8.0 pts
     const pointsGeneral = page
       .getByRole("main")
@@ -449,6 +698,8 @@ test.describe("Clasificación oficial (e2e)", () => {
     // Navegar con el usuario pendiente (User 0)
     await pagePending.goto("/standings");
 
+    await expect(pagePending.getByTestId("standings-skeleton")).toBeHidden();
+
     // Debería ver el banner de pago
     await expect(pagePending.getByTestId("payment-banner")).toBeVisible();
     await expect(pagePending.getByTestId("payment-banner")).toContainText("Tienes el pago pendiente");
@@ -466,6 +717,8 @@ test.describe("Clasificación oficial (e2e)", () => {
     // Navegar con el usuario pagado (User 1)
     await pagePaid.goto("/standings");
 
+    await expect(pagePaid.getByTestId("standings-skeleton")).toBeHidden();
+
     // NO debería ver el banner de pago
     await expect(pagePaid.getByTestId("payment-banner")).toHaveCount(0);
   });
@@ -476,20 +729,30 @@ test.describe("Clasificación oficial (e2e)", () => {
 
     const matches = await seedMatches([
       finishedMatch({ home: 3, away: 0 }, { matchday: 1 }),
+      editableMatch({ matchday: 1 }), // Scheduled future match (pre-kickoff)
     ]);
-    const m = matches[0]!;
-    localMatchIds.push(m.id);
+    const mFinished = matches[0]!;
+    const mScheduled = matches[1]!;
+    localMatchIds.push(mFinished.id, mScheduled.id);
 
-    // User B tiene una predicción de 3-0 en este partido finalizado
+    // User B tiene predicciones para ambos partidos
     await seedPrediction({
       leagueId: fixture.league.id,
       userId: userB.userId,
-      matchId: m.id,
+      matchId: mFinished.id,
       home: 3,
       away: 0,
       multiplier: 1.0,
       pointsEarned: 5.0,
       evaluatedAt: new Date().toISOString(),
+    });
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: userB.userId,
+      matchId: mScheduled.id,
+      home: 2,
+      away: 1,
+      multiplier: 1.0,
     });
 
     // User A consulta la API como un cliente de Supabase autenticado
@@ -501,17 +764,27 @@ test.describe("Clasificación oficial (e2e)", () => {
     expect(signInError).toBeNull();
 
     try {
-      // Como el partido está finalizado (post-kickoff), la predicción del rival debe ser visible para User A
-      const { data, error } = await clientA
+      // 1. Como el partido mFinished está finalizado (post-kickoff), la predicción del rival debe ser visible para User A
+      const { data: dataFinished, error: errorFinished } = await clientA
         .from("predictions")
         .select("home_score_pred, away_score_pred")
-        .eq("match_id", m.id)
+        .eq("match_id", mFinished.id)
         .eq("user_id", userB.userId);
 
-      expect(error).toBeNull();
-      expect(data).toHaveLength(1);
-      expect(data![0]!.home_score_pred).toBe(3);
-      expect(data![0]!.away_score_pred).toBe(0);
+      expect(errorFinished).toBeNull();
+      expect(dataFinished).toHaveLength(1);
+      expect(dataFinished![0]!.home_score_pred).toBe(3);
+      expect(dataFinished![0]!.away_score_pred).toBe(0);
+
+      // 2. Como el partido mScheduled no ha comenzado (pre-kickoff), la predicción del rival debe ser invisible para User A (RLS la oculta)
+      const { data: dataScheduled, error: errorScheduled } = await clientA
+        .from("predictions")
+        .select("home_score_pred, away_score_pred")
+        .eq("match_id", mScheduled.id)
+        .eq("user_id", userB.userId);
+
+      expect(errorScheduled).toBeNull();
+      expect(dataScheduled).toHaveLength(0);
     } finally {
       await clientA.auth.signOut();
     }

@@ -274,7 +274,17 @@ export function LiveStandingsBoard({
             nextMatches,
             nextSnapshot.predictions,
           );
-          const movers = findMovers(prevRows, nextRows);
+          const prevRankRows = prevRows.map((row, index) => ({
+            userId: row.userId,
+            displayName: row.displayName,
+            rank: index + 1,
+          }));
+          const nextRankRows = nextRows.map((row, index) => ({
+            userId: row.userId,
+            displayName: row.displayName,
+            rank: index + 1,
+          }));
+          const movers = findMovers(prevRankRows, nextRankRows);
           if (movers.length > 0) {
             for (const nextMatch of nextMatches) {
               const prevMatch = prevMatches.find((m) => m.id === nextMatch.id);
@@ -355,7 +365,17 @@ export function LiveStandingsBoard({
           nextMatches,
           current.predictions,
         );
-        const movers = findMovers(prevRows, nextRows);
+        const prevRankRows = prevRows.map((row, index) => ({
+          userId: row.userId,
+          displayName: row.displayName,
+          rank: index + 1,
+        }));
+        const nextRankRows = nextRows.map((row, index) => ({
+          userId: row.userId,
+          displayName: row.displayName,
+          rank: index + 1,
+        }));
+        const movers = findMovers(prevRankRows, nextRankRows);
         if (movers.length > 0) {
           const announced = selectAnnouncedMover(movers, currentUserId);
           if (announced) {
@@ -538,15 +558,22 @@ export function LiveStandingsBoard({
                 isFlashing && "border-accent bg-accent/15 ring-2 ring-accent",
               )}
             >
-              <span
-                className={cn(
-                  "w-6 shrink-0 text-center font-display text-lg font-bold",
-                  isLeader ? "text-accent" : "text-muted-foreground",
+              <div className="flex flex-col items-center shrink-0 w-8">
+                <span
+                  className={cn(
+                    "font-display text-lg font-bold text-center",
+                    isLeader ? "text-accent" : "text-muted-foreground",
+                  )}
+                  aria-label={`Posición ${row.rank}${row.isTie ? " empatada" : ""}`}
+                >
+                  {row.rank}
+                </span>
+                {row.isTie && (
+                  <span className="text-[10px] text-muted-foreground leading-none" data-testid="live-tie-badge">
+                    Empate
+                  </span>
                 )}
-                aria-label={`Posición ${row.rank}`}
-              >
-                {row.rank}
-              </span>
+              </div>
 
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
