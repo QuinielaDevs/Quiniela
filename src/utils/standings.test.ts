@@ -515,3 +515,90 @@ describe("puntos de premios especiales (BUG-004)", () => {
     expect(rows[0]).toMatchObject({ awardPoints: 0, totalPoints: 0 });
   });
 });
+
+describe("buildStandings — rankChange (tendencias)", () => {
+  it("asigna rankChange = 0 si no hay partidos finalizados", () => {
+    const members = [member("a"), member("b")];
+    const rows = buildStandings(members, [], []);
+    expect(rows[0]).toMatchObject({ userId: "a", rankChange: 0 });
+    expect(rows[1]).toMatchObject({ userId: "b", rankChange: 0 });
+  });
+
+  it("calcula rankChange contra la tabla vacía si hay solo 1 partido finalizado", () => {
+    // Orden inicial por joinedAt: a ("2026-06-01") antes que b ("2026-06-02")
+    const members = [
+      member("a", { joinedAt: "2026-06-01T00:00:00.000Z" }),
+      member("b", { joinedAt: "2026-06-02T00:00:00.000Z" }),
+    ];
+    // Rango base (vacío): ambos comparten rango 1 (empatados)
+    const matches = [match("m1", { homeScore: 2, awayScore: 1, updatedAt: "2026-06-14T12:00:00Z" })];
+    // b acierta exacto (5 pts) y a no predice (0 pts) -> b pasa a #1 (único), a a #2
+    const predictions = [prediction("b", "m1", { homeScorePred: 2, awayScorePred: 1 })];
+
+    const rows = buildStandings(members, matches, predictions);
+
+    // b: pasa de rango 1 (compartido) a 1 (único) -> rankChange = 1 - 1 = 0
+    expect(rows.find((r) => r.userId === "b")).toMatchObject({ rank: 1, rankChange: 0 });
+    // a: pasa de rango 1 (compartido) a 2 -> rankChange = 1 - 2 = -1
+    expect(rows.find((r) => r.userId === "a")).toMatchObject({ rank: 2, rankChange: -1 });
+  });
+
+  it("calcula rankChange excluyendo el partido finalizado más reciente (updatedAt)", () => {
+    const members = [
+      member("a", { joinedAt: "2026-06-01T00:00:00.000Z" }),
+      member("b", { joinedAt: "2026-06-02T00:00:00.000Z" }),
+    ];
+    // Dos partidos: m1 (anterior) y m2 (más reciente por updatedAt)
+    const matches = [
+      match("m1", { homeScore: 1, awayScore: 0, updatedAt: "2026-06-14T10:00:00Z" }),
+      match("m2", { homeScore: 2, awayScore: 1, updatedAt: "2026-06-14T11:00:00Z" }),
+    ];
+    
+    // Predicciones:
+    // En m1: a acierta (5 pts), b falla (0 pts) -> a es #1, b es #2 (Esta es la tabla anterior)
+    // En m2: b acierta (5 pts), a falla (0 pts) -> Ambos tienen 5 pts, pero a fue más rápido (joinedAt) -> a sigue siendo #1, b sigue siendo #2
+    // Qué pasa si en m2 b acierta con 2.0x (10 pts) -> b tiene 10 pts y a tiene 5 pts -> b pasa a #1, a a #2
+    const predictions = [
+      prediction("a", "m1", { homeScorePred: 1, awayScorePred: 0 }),
+      prediction("b", "m2", { homeScorePred: 2, awayScorePred: 1, multiplier: 2 }), // 10 pts
+    ];
+
+    const rows = buildStandings(members, matches, predictions);
+
+    // b: era #2 en la anterior (sólo m1 de las 10:00, donde tenía 0 pts vs 5 pts de a),
+    // y es #1 en la actual (10 pts vs 5 pts de a) -> rankChange = 2 - 1 = +1
+    expect(rows.find((r) => r.userId === "b")).toMatchObject({ rank: 1, rankChange: 1 });
+    // a: era #1 en la anterior, y es #2 en la actual -> rankChange = 1 - 2 = -1
+    expect(rows.find((r) => r.userId === "a")).toMatchObject({ rank: 2, rankChange: -1 });
+  });
+});
+
+describe("buildProjectedStandings — rankChange (tendencias live)", () => {
+  it("calcula rankChange comparando el rango proyectado (live) contra el rango oficial (sólo finished)", () => {
+    const members = [
+      member("a", { joinedAt: "2026-06-01T00:00:00.000Z" }),
+      member("b", { joinedAt: "2026-06-02T00:00:00.000Z" }),
+    ];
+    // Un partido finalizado m1, y un partido live m2
+    const matches = [
+      match("m1", { status: "finished", homeScore: 1, awayScore: 0 }),
+      match("m2", { status: "live", homeScore: 2, awayScore: 1 }),
+    ];
+
+    // Predicciones:
+    // En m1 (oficial): a acierta (5 pts), b falla (0) -> Oficial: a es #1, b es #2
+    // En m2 (live): b acierta (5 pts live), a falla (0) -> Proyectada: a tiene 5 pts, b tiene 5 pts. Desempate por joinedAt: a es #1, b es #2.
+    // Qué pasa si b tiene multiplicador 2.0x en m2 -> b tiene 10 pts live (Total 10 pts) -> Proyectada: b es #1 (10 pts), a es #2 (5 pts)
+    const predictions = [
+      prediction("a", "m1", { homeScorePred: 1, awayScorePred: 0 }),
+      prediction("b", "m2", { homeScorePred: 2, awayScorePred: 1, multiplier: 2 }),
+    ];
+
+    const rows = buildProjectedStandings(members, matches, predictions);
+
+    // b: Rango oficial = 2, Rango proyectado = 1 -> rankChange = 2 - 1 = +1
+    expect(rows.find((r) => r.userId === "b")).toMatchObject({ rank: 1, rankChange: 1 });
+    // a: Rango oficial = 1, Rango proyectado = 2 -> rankChange = 1 - 2 = -1
+    expect(rows.find((r) => r.userId === "a")).toMatchObject({ rank: 2, rankChange: -1 });
+  });
+});

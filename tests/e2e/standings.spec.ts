@@ -789,4 +789,88 @@ test.describe("Clasificación oficial (e2e)", () => {
       await clientA.auth.signOut();
     }
   });
+
+  test("STD-10: Tendencia de cambio de posición (subió/bajó)", async () => {
+    const page = fixture.users[0]!.page!;
+    
+    // Seed 2 matches resolved at different times
+    const matches = await seedMatches([
+      finishedMatch({ home: 1, away: 0 }, { matchday: 1, matchTime: new Date(Date.now() - 3600000).toISOString() }), // m1 (earlier)
+      finishedMatch({ home: 2, away: 1 }, { matchday: 1, matchTime: new Date().toISOString() }), // m2 (later)
+    ]);
+    const m1 = matches[0]!;
+    const m2 = matches[1]!;
+    localMatchIds.push(m1.id, m2.id);
+
+    // Update matches updated_at to ensure proper ordering
+    await admin
+      .from("matches")
+      .update({ updated_at: "2026-06-14T10:00:00Z" })
+      .eq("id", m1.id);
+    await admin
+      .from("matches")
+      .update({ updated_at: "2026-06-14T11:00:00Z" })
+      .eq("id", m2.id);
+
+    // Predictions:
+    // User 0 (admin / viewer) -> 0 pts on m1, 10 pts on m2 (Total 10 pts)
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[0]!.userId,
+      matchId: m1.id,
+      home: 0,
+      away: 5,
+      multiplier: 1.0,
+      pointsEarned: 0.0,
+      evaluatedAt: new Date().toISOString(),
+    });
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[0]!.userId,
+      matchId: m2.id,
+      home: 2,
+      away: 1,
+      multiplier: 2.0,
+      pointsEarned: 10.0,
+      evaluatedAt: new Date().toISOString(),
+    });
+
+    // User 1 (member) -> 5 pts on m1, 0 pts on m2 (Total 5 pts)
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[1]!.userId,
+      matchId: m1.id,
+      home: 1,
+      away: 0,
+      multiplier: 1.0,
+      pointsEarned: 5.0,
+      evaluatedAt: new Date().toISOString(),
+    });
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[1]!.userId,
+      matchId: m2.id,
+      home: 0,
+      away: 5,
+      multiplier: 1.0,
+      pointsEarned: 0.0,
+      evaluatedAt: new Date().toISOString(),
+    });
+
+    await page.goto("/standings");
+    await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+
+    const rowUser0 = page.getByTestId("standings-row").filter({ hasText: fixture.users[0]!.displayName! });
+    const rowUser1 = page.getByTestId("standings-row").filter({ hasText: fixture.users[1]!.displayName! });
+
+    // User 0: rank 1, rankChange +1 (was rank 2, now rank 1)
+    await expect(rowUser0.getByTestId("standings-rank")).toHaveText("1");
+    await expect(rowUser0.getByTestId("standings-trend")).toHaveAttribute("data-change", "1");
+    await expect(rowUser0.getByTestId("standings-trend")).toHaveAttribute("aria-label", "Subió 1 posición");
+
+    // User 1: rank 2, rankChange -1 (was rank 1, now rank 2)
+    await expect(rowUser1.getByTestId("standings-rank")).toHaveText("2");
+    await expect(rowUser1.getByTestId("standings-trend")).toHaveAttribute("data-change", "-1");
+    await expect(rowUser1.getByTestId("standings-trend")).toHaveAttribute("aria-label", "Bajó 1 posición");
+  });
 });

@@ -39,6 +39,7 @@ export type StandingMatch = {
   stage?: string | null;
   homeScore: number | null;
   awayScore: number | null;
+  updatedAt?: string; // timestamp ISO de actualización
 };
 
 export type StandingPrediction = {
@@ -60,10 +61,12 @@ export type StandingRow = {
   exactCount: number;
   /** Aciertos solo de resultado/ganador o empate (2 pts), sin el marcador exacto. */
   resultCount: number;
-  /** Saldo de puntos de duelos usado en el desempate y mostrado en General. */
+  /** Puntos ganados en duelos usados en el desempate y mostrados en General. */
   duelPoints: number;
   /** Puntos de premios especiales incluidos en totalPoints (solo General). */
   awardPoints: number;
+  /** Cambio de rango/posición respecto al partido/estado anterior. Positivo = subió, Negativo = bajó, 0 = igual. */
+  rankChange?: number;
   /** Indica si comparte el rank con otro miembro debido a un empate absoluto en los 5 criterios principales. */
   isTie: boolean;
 };
@@ -77,43 +80,24 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/**
- * Construye la tabla de posiciones para el alcance pedido.
- *
- * @param phaseKeyOrMatchday  undefined = acumulado (General); string/número = fase/jornada específica.
- *
- * Desempate: puntos desc → marcadores exactos desc → resultados desc → premios desc → puntos de duelos desc.
- * Si persiste el empate absoluto (mismos valores en todos los 5 criterios principales),
- * comparten la posición (rank) y se usa userId como orden determinista estable.
- */
-export function buildStandings(
+type BaseStandingCalculation = {
+  member: StandingMember;
+  totalPoints: number;
+  exactCount: number;
+  resultCount: number;
+  duelPoints: number;
+  awardPoints: number;
+};
+
+function computeBaseStandings(
   members: StandingMember[],
-  matches: StandingMatch[],
+  matchesInScope: StandingMatch[],
   predictions: StandingPrediction[],
-  phaseKeyOrMatchday?: string | number,
-): StandingRow[] {
-  const targetPhaseKey =
-    typeof phaseKeyOrMatchday === "number"
-      ? `jornada-${phaseKeyOrMatchday}`
-      : phaseKeyOrMatchday;
-
-  // Partidos en alcance: solo 'finished' y, si se filtra, de esa fase.
-  const matchesInScope = matches.filter((m) => {
-    if (m.status !== "finished") return false;
-    if (targetPhaseKey === undefined || targetPhaseKey === "general") return true;
-    
-    const mStage = m.stage ?? null;
-    return phaseKeyForMatch({ stage: mStage, matchday: m.matchday }) === targetPhaseKey;
-  });
-
+  includeAwards: boolean,
+): BaseStandingCalculation[] {
   const predictionByKey = new Map(
     predictions.map((p) => [`${p.userId}:${p.matchId}`, p]),
   );
-
-  // Los premios especiales no pertenecen a ninguna jornada/fase: solo entran
-  // en el acumulado General (BUG-004).
-  const includeAwards =
-    targetPhaseKey === undefined || targetPhaseKey === "general";
 
   const rows = members.map((member) => {
     let totalPoints = 0;
@@ -126,8 +110,6 @@ export function buildStandings(
 
       const base = calculateBasePoints(
         { home: pred.homeScorePred, away: pred.awayScorePred },
-        // homeScore/awayScore pueden ser null en un 'finished' corrupto;
-        // calculateBasePoints blinda no-finitos → 0.
         { home: match.homeScore as number, away: match.awayScore as number },
         "finished",
       );
@@ -143,7 +125,6 @@ export function buildStandings(
       totalPoints: round2(totalPoints + awardPoints),
       exactCount,
       resultCount,
-      // Puntos ganados en duelos de toda la liga. 4º criterio de desempate.
       duelPoints: member.duelPoints ?? 0,
       awardPoints,
     };
@@ -155,31 +136,109 @@ export function buildStandings(
     if (b.resultCount !== a.resultCount) return b.resultCount - a.resultCount;
     if (b.awardPoints !== a.awardPoints) return b.awardPoints - a.awardPoints;
     if (b.duelPoints !== a.duelPoints) return b.duelPoints - a.duelPoints;
-    // Clave final estable: ante empate TOTAL (puntos+exactos+resultados+awards+duelos),
-    // ordenar por userId garantiza un orden determinista en la lista interna.
     return a.member.userId.localeCompare(b.member.userId);
   });
 
-  const areRowsEqual = (r1: typeof rows[0] | undefined, r2: typeof rows[0] | undefined) => {
+  return rows;
+}
+
+export function buildStandings(
+  members: StandingMember[],
+  matches: StandingMatch[],
+  predictions: StandingPrediction[],
+  phaseKeyOrMatchday?: string | number,
+): StandingRow[] {
+  const targetPhaseKey =
+    typeof phaseKeyOrMatchday === "number"
+      ? `jornada-${phaseKeyOrMatchday}`
+      : phaseKeyOrMatchday;
+
+  // Partidos en alcance: solo 'finished' y, si se filtra, de esa fase.
+  const matchesInScope = matches.filter((m) => {
+    if (m.status !== "finished") return false;
+    if (targetPhaseKey === undefined || targetPhaseKey === "general")
+      return true;
+
+    const mStage = m.stage ?? null;
+    return (
+      phaseKeyForMatch({ stage: mStage, matchday: m.matchday }) ===
+      targetPhaseKey
+    );
+  });
+
+  const includeAwards =
+    targetPhaseKey === undefined || targetPhaseKey === "general";
+
+  // 1. Calcular clasificación actual
+  const currentRows = computeBaseStandings(
+    members,
+    matchesInScope,
+    predictions,
+    includeAwards,
+  );
+
+  const areRowsEqual = (
+    r1: BaseStandingCalculation | undefined,
+    r2: BaseStandingCalculation | undefined,
+  ) => {
     if (!r1 || !r2) return false;
-    return r1.totalPoints === r2.totalPoints &&
-           r1.exactCount === r2.exactCount &&
-           r1.resultCount === r2.resultCount &&
-           r1.awardPoints === r2.awardPoints &&
-           r1.duelPoints === r2.duelPoints;
+    return (
+      r1.totalPoints === r2.totalPoints &&
+      r1.exactCount === r2.exactCount &&
+      r1.resultCount === r2.resultCount &&
+      r1.awardPoints === r2.awardPoints &&
+      r1.duelPoints === r2.duelPoints
+    );
   };
 
+  // 2. Calcular clasificación anterior (excluyendo el partido finalizado más reciente)
+  const previousRanks = new Map<string, number>();
+  if (matchesInScope.length > 0) {
+    const sortedScope = [...matchesInScope].sort((a, b) => {
+      const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      if (timeB !== timeA) return timeB - timeA;
+      return b.id.localeCompare(a.id);
+    });
+    const lastMatch = sortedScope[0]!;
+    const previousMatches = matchesInScope.filter((m) => m.id !== lastMatch.id);
+    const previousRows = computeBaseStandings(
+      members,
+      previousMatches,
+      predictions,
+      includeAwards,
+    );
+    let prevRank = 1;
+    previousRows.forEach((row, index) => {
+      if (index > 0 && !areRowsEqual(row, previousRows[index - 1])) {
+        prevRank = index + 1;
+      }
+      previousRanks.set(row.member.userId, prevRank);
+    });
+  } else {
+    let prevRank = 1;
+    currentRows.forEach((row, index) => {
+      if (index > 0 && !areRowsEqual(row, currentRows[index - 1])) {
+        prevRank = index + 1;
+      }
+      previousRanks.set(row.member.userId, prevRank);
+    });
+  }
+
   let currentRank = 1;
-  return rows.map((row, index) => {
+  return currentRows.map((row, index) => {
     if (index > 0) {
-      const prev = rows[index - 1];
-      if (!areRowsEqual(row, prev)) {
+      if (!areRowsEqual(row, currentRows[index - 1])) {
         currentRank = index + 1;
       }
     }
 
-    const isTieWithPrev = index > 0 && areRowsEqual(row, rows[index - 1]);
-    const isTieWithNext = index < rows.length - 1 && areRowsEqual(row, rows[index + 1]);
+    const previousRank = previousRanks.get(row.member.userId) ?? currentRank;
+    const isTieWithPrev =
+      index > 0 && areRowsEqual(row, currentRows[index - 1]);
+    const isTieWithNext =
+      index < currentRows.length - 1 &&
+      areRowsEqual(row, currentRows[index + 1]);
     const isTie = isTieWithPrev || isTieWithNext;
 
     return {
@@ -193,30 +252,21 @@ export function buildStandings(
       resultCount: row.resultCount,
       duelPoints: row.duelPoints,
       awardPoints: row.awardPoints,
+      rankChange: previousRank - currentRank,
       isTie,
     };
   });
 }
 
-/**
- * Construye la tabla proyectada: finished + live. Los partidos live se calculan
- * como si su marcador momentaneo fuera el resultado final, pero solo para esta
- * vista. `buildStandings` sigue siendo la fuente de la clasificacion oficial y
- * solo cuenta partidos finished.
- */
-export function buildProjectedStandings(
-  members: StandingMember[],
-  matches: StandingMatch[],
-  predictions: StandingPrediction[],
-): ProjectedStandingRow[] {
-  const matchesInScope = matches.filter(
-    (m) =>
-      m.status === "finished" ||
-      (m.status === "live" &&
-        Number.isInteger(m.homeScore) &&
-        Number.isInteger(m.awayScore)),
-  );
+type BaseProjectedCalculation = BaseStandingCalculation & {
+  livePoints: number;
+};
 
+function computeBaseProjectedStandings(
+  members: StandingMember[],
+  matchesInScope: StandingMatch[],
+  predictions: StandingPrediction[],
+): BaseProjectedCalculation[] {
   const predictionByKey = new Map(
     predictions.map((p) => [`${p.userId}:${p.matchId}`, p]),
   );
@@ -231,8 +281,6 @@ export function buildProjectedStandings(
       const pred = predictionByKey.get(`${member.userId}:${match.id}`);
       if (!pred) continue;
 
-      // Para proyeccion, un live con marcador valido se evalua como snapshot
-      // virtual. La semantica oficial de scoring.ts para status live no cambia.
       const base = calculateBasePoints(
         { home: pred.homeScorePred, away: pred.awayScorePred },
         { home: match.homeScore as number, away: match.awayScore as number },
@@ -245,8 +293,6 @@ export function buildProjectedStandings(
       else if (base === POINTS_RESULT) resultCount += 1;
     }
 
-    // La proyectada es una vista del acumulado General: los premios siempre
-    // entran (BUG-004), igual que en buildStandings sin filtro de fase.
     const awardPoints = round2(member.awardPoints ?? 0);
 
     return {
@@ -269,26 +315,97 @@ export function buildProjectedStandings(
     return a.member.userId.localeCompare(b.member.userId);
   });
 
-  const areRowsEqual = (r1: typeof rows[0] | undefined, r2: typeof rows[0] | undefined) => {
+  return rows;
+}
+
+/**
+ * Construye la tabla proyectada: finished + live. Los partidos live se calculan
+ * como si su marcador momentaneo fuera el resultado final, pero solo para esta
+ * vista. `buildStandings` sigue siendo la fuente de la clasificacion oficial y
+ * solo cuenta partidos finished.
+ */
+export function buildProjectedStandings(
+  members: StandingMember[],
+  matches: StandingMatch[],
+  predictions: StandingPrediction[],
+): ProjectedStandingRow[] {
+  const matchesInScope = matches.filter(
+    (m) =>
+      m.status === "finished" ||
+      (m.status === "live" &&
+        Number.isInteger(m.homeScore) &&
+        Number.isInteger(m.awayScore)),
+  );
+
+  // 1. Calcular posiciones proyectadas actuales (incluyendo live)
+  const projectedRows = computeBaseProjectedStandings(
+    members,
+    matchesInScope,
+    predictions,
+  );
+
+  // 2. Calcular posiciones oficiales base (sólo finished)
+  const finishedMatches = matchesInScope.filter((m) => m.status === "finished");
+  const officialRows = computeBaseStandings(
+    members,
+    finishedMatches,
+    predictions,
+    true,
+  );
+  const officialRanks = new Map<string, number>();
+
+  const areBaseRowsEqual = (
+    r1: BaseStandingCalculation | undefined,
+    r2: BaseStandingCalculation | undefined,
+  ) => {
     if (!r1 || !r2) return false;
-    return r1.totalPoints === r2.totalPoints &&
-           r1.exactCount === r2.exactCount &&
-           r1.resultCount === r2.resultCount &&
-           r1.awardPoints === r2.awardPoints &&
-           r1.duelPoints === r2.duelPoints;
+    return (
+      r1.totalPoints === r2.totalPoints &&
+      r1.exactCount === r2.exactCount &&
+      r1.resultCount === r2.resultCount &&
+      r1.awardPoints === r2.awardPoints &&
+      r1.duelPoints === r2.duelPoints
+    );
+  };
+
+  let officialRank = 1;
+  officialRows.forEach((row, index) => {
+    if (index > 0) {
+      if (!areBaseRowsEqual(row, officialRows[index - 1])) {
+        officialRank = index + 1;
+      }
+    }
+    officialRanks.set(row.member.userId, officialRank);
+  });
+
+  const areProjectedRowsEqual = (
+    r1: BaseProjectedCalculation | undefined,
+    r2: BaseProjectedCalculation | undefined,
+  ) => {
+    if (!r1 || !r2) return false;
+    return (
+      r1.totalPoints === r2.totalPoints &&
+      r1.exactCount === r2.exactCount &&
+      r1.resultCount === r2.resultCount &&
+      r1.awardPoints === r2.awardPoints &&
+      r1.duelPoints === r2.duelPoints
+    );
   };
 
   let currentRank = 1;
-  return rows.map((row, index) => {
+  return projectedRows.map((row, index) => {
     if (index > 0) {
-      const prev = rows[index - 1];
-      if (!areRowsEqual(row, prev)) {
+      if (!areProjectedRowsEqual(row, projectedRows[index - 1])) {
         currentRank = index + 1;
       }
     }
 
-    const isTieWithPrev = index > 0 && areRowsEqual(row, rows[index - 1]);
-    const isTieWithNext = index < rows.length - 1 && areRowsEqual(row, rows[index + 1]);
+    const oRank = officialRanks.get(row.member.userId) ?? currentRank;
+    const isTieWithPrev =
+      index > 0 && areProjectedRowsEqual(row, projectedRows[index - 1]);
+    const isTieWithNext =
+      index < projectedRows.length - 1 &&
+      areProjectedRowsEqual(row, projectedRows[index + 1]);
     const isTie = isTieWithPrev || isTieWithNext;
 
     return {
@@ -303,6 +420,7 @@ export function buildProjectedStandings(
       duelPoints: row.duelPoints,
       awardPoints: row.awardPoints,
       livePoints: row.livePoints,
+      rankChange: oRank - currentRank,
       isTie,
     };
   });

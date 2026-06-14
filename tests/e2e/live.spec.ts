@@ -314,4 +314,65 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
     const pointSpans = page.locator(`[aria-label="${expectedPoints} puntos proyectados"]`);
     await expect(pointSpans).toHaveCount(3);
   });
+
+  // ── LIVE-08 ────────────────────────────────────────────────────────
+
+  test("LIVE-08: Tendencia proyectada vs oficial @realtime", async () => {
+    const page = fixture.users[0]!.page!;
+
+    // Volver a poner el partido en live
+    const { error: eLive } = await admin
+      .from("matches")
+      .update({ status: "live", home_score: 0, away_score: 0 })
+      .eq("id", matchId);
+    expect(eLive).toBeNull();
+
+    // Navegar y esperar carga
+    await page.goto("/live");
+    await expect(page.getByText("En vivo").first()).toBeVisible({ timeout: 15_000 });
+
+    const rows = page.getByTestId("live-row");
+    await expect(rows).toHaveCount(3);
+
+    // En 0-0, todos tienen 0 pts en la proyectada y 0 pts en la oficial -> sin cambios (0)
+    for (let i = 0; i < 3; i++) {
+      const trend = rows.nth(i).getByTestId("live-trend");
+      await expect(trend).toHaveAttribute("data-change", "0", { timeout: 5000 });
+    }
+
+    // Gol 1 (local): 0-0 -> 1-0 -> user1 (E2E Jugador 1) tiene exacto (5 pts projected)
+    // Oficial sigue vacío (todos rango oficial 1)
+    // Proyectada: user1 es #1 (5 pts), user0 es #2 (2 pts), user2 es #3 (0 pts)
+    // Tendencias proyectadas vs oficiales esperadas:
+    //   user1: oRank 1, pRank 1 -> trend = 0
+    //   user0: oRank 1, pRank 2 -> trend = -1
+    //   user2: oRank 1, pRank 3 -> trend = -2
+    const { error: eGoal } = await admin
+      .from("matches")
+      .update({ home_score: 1, away_score: 0 })
+      .eq("id", matchId);
+    expect(eGoal).toBeNull();
+
+    const rowUser1 = rows.filter({ hasText: "E2E Jugador 1" });
+    const rowUser0 = rows.filter({ hasText: "E2E Jugador 0" });
+    const rowUser2 = rows.filter({ hasText: "E2E Jugador 2" });
+
+    // Ranks oficiales (antes del partido live):
+    //   user0 (30 pts duelos) -> rank 1
+    //   user1 (20 pts duelos) -> rank 2
+    //   user2 (10 pts duelos) -> rank 3
+    //
+    // Ranks proyectados (1-0):
+    //   user1 (5 pts / exacto) -> rank 1
+    //   user0 (2 pts / resultado) -> rank 2
+    //   user2 (2 pts / resultado) -> rank 3 (user0 gana desempate por duelos 30 > 10)
+    //
+    // Cambios esperados (oRank - pRank):
+    //   user1: 2 - 1 = +1 ("1")
+    //   user0: 1 - 2 = -1 ("-1")
+    //   user2: 3 - 3 = 0  ("0")
+    await expect(rowUser1.getByTestId("live-trend")).toHaveAttribute("data-change", "1", { timeout: 15000 });
+    await expect(rowUser0.getByTestId("live-trend")).toHaveAttribute("data-change", "-1", { timeout: 15000 });
+    await expect(rowUser2.getByTestId("live-trend")).toHaveAttribute("data-change", "0", { timeout: 15000 });
+  });
 });

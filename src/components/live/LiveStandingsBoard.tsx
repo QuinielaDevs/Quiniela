@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 
 import { PaymentStatusBadge } from "@/components/standings/PaymentStatusBadge";
 import {
@@ -558,10 +559,10 @@ export function LiveStandingsBoard({
                 isFlashing && "border-accent bg-accent/15 ring-2 ring-accent",
               )}
             >
-              <div className="flex flex-col items-center shrink-0 w-8">
+              <div className="flex flex-col items-center justify-center w-8 shrink-0">
                 <span
                   className={cn(
-                    "font-display text-lg font-bold text-center",
+                    "font-display text-lg font-bold leading-none",
                     isLeader ? "text-accent" : "text-muted-foreground",
                   )}
                   aria-label={`Posición ${row.rank}${row.isTie ? " empatada" : ""}`}
@@ -569,9 +570,39 @@ export function LiveStandingsBoard({
                   {row.rank}
                 </span>
                 {row.isTie && (
-                  <span className="text-[10px] text-muted-foreground leading-none" data-testid="live-tie-badge">
+                  <span className="text-[10px] text-muted-foreground leading-none mt-1" data-testid="live-tie-badge">
                     Empate
                   </span>
+                )}
+                {row.rankChange !== undefined && (
+                  <div
+                    className={cn(
+                      "flex items-center text-[10px] font-bold mt-1.5 leading-none",
+                      row.rankChange > 0 && "text-success",
+                      row.rankChange < 0 && "text-destructive",
+                      row.rankChange === 0 && "text-muted-foreground/50",
+                    )}
+                    data-testid="live-trend"
+                    data-change={row.rankChange}
+                    aria-label={
+                      row.rankChange > 0
+                        ? `Subió ${row.rankChange} ${row.rankChange === 1 ? "posición" : "posiciones"}`
+                        : row.rankChange < 0
+                          ? `Bajó ${Math.abs(row.rankChange)} ${Math.abs(row.rankChange) === 1 ? "posición" : "posiciones"}`
+                          : "Sin cambios de posición"
+                    }
+                  >
+                    {row.rankChange > 0 ? (
+                      <ArrowUp className="size-3 shrink-0" aria-hidden="true" />
+                    ) : row.rankChange < 0 ? (
+                      <ArrowDown className="size-3 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <Minus className="size-3 shrink-0 text-muted-foreground/30" aria-hidden="true" />
+                    )}
+                    {row.rankChange !== 0 && (
+                      <span className="ml-0.5">{Math.abs(row.rankChange)}</span>
+                    )}
+                  </div>
                 )}
               </div>
 
