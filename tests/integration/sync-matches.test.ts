@@ -552,6 +552,47 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
       expect(result).toEqual({ status: "updated", updated: 0, changes: [] });
     });
 
+    it("salvaguarda: no sobreescribe marcadores locales ni degrada estado si la API retorna null", async () => {
+      // Configurar partido local como live y con marcador 5-1
+      await supabase
+        .from("matches")
+        .update({
+          status: "live",
+          home_score: 5,
+          away_score: 1,
+        })
+        .eq("id", groupMatchId);
+
+      const apiMatches = [
+        {
+          id: SYNC_GROUP_REF,
+          homeTeam: "España",
+          awayTeam: "Portugal",
+          homeScore: null,
+          awayScore: null,
+          result: null,
+          matchNo: 1,
+          kickoffUtc: "2026-06-11T19:00:00.000Z",
+        },
+      ];
+      const mockFetch = createMock200(apiMatches);
+
+      const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
+
+      // Ningún partido debería haberse actualizado (updated: 0) ya que se activó la salvaguarda
+      expect(result).toEqual({ status: "updated", updated: 0, changes: [] });
+
+      // Verificar que el partido local sigue intacto
+      const { data: match } = await supabase
+        .from("matches")
+        .select("home_score, away_score, status")
+        .eq("id", groupMatchId)
+        .single();
+      expect(match!.home_score).toBe(5);
+      expect(match!.away_score).toBe(1);
+      expect(match!.status).toBe("live");
+    });
+
     it("ignora partidos de la API que no existen en la DB local", async () => {
       const apiMatches = [
         {

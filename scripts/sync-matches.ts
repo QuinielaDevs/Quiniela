@@ -254,11 +254,21 @@ export async function syncMatches(
 
     const mappedStatus = deriveMatchStatus(apiMatch);
 
+    // Salvaguarda: No sobreescribir marcadores locales existentes con valores nulos de la API
+    const apiHomeScore = apiMatch.homeScore !== null ? apiMatch.homeScore : local.home_score;
+    const apiAwayScore = apiMatch.awayScore !== null ? apiMatch.awayScore : local.away_score;
+
+    // Salvaguarda: No degradar el estado local a 'scheduled' si ya está en 'live' o 'finished'
+    let finalStatus = mappedStatus;
+    if (mappedStatus === "scheduled" && (local.status === "live" || local.status === "finished")) {
+      finalStatus = local.status;
+    }
+
     // Detectar si hay cambios relevantes
     const scoreChanged =
-      local.home_score !== apiMatch.homeScore ||
-      local.away_score !== apiMatch.awayScore;
-    const statusChanged = local.status !== mappedStatus;
+      local.home_score !== apiHomeScore ||
+      local.away_score !== apiAwayScore;
+    const statusChanged = local.status !== finalStatus;
 
     // Detectar si el horario (match_time) cambió en la API
     const timeChanged = apiMatch.kickoffUtc
@@ -286,9 +296,9 @@ export async function syncMatches(
     // Construir objeto de actualización
     const updateData: { id: string; [key: string]: unknown } = {
       id: local.id,
-      home_score: apiMatch.homeScore,
-      away_score: apiMatch.awayScore,
-      status: mappedStatus,
+      home_score: apiHomeScore,
+      away_score: apiAwayScore,
+      status: finalStatus,
       updated_at: new Date().toISOString(),
     };
 
@@ -305,11 +315,11 @@ export async function syncMatches(
 
     const changesObj: Record<string, { from: unknown; to: unknown }> = {};
     if (scoreChanged) {
-      changesObj.home_score = { from: local.home_score, to: apiMatch.homeScore };
-      changesObj.away_score = { from: local.away_score, to: apiMatch.awayScore };
+      changesObj.home_score = { from: local.home_score, to: apiHomeScore };
+      changesObj.away_score = { from: local.away_score, to: apiAwayScore };
     }
     if (statusChanged) {
-      changesObj.status = { from: local.status, to: mappedStatus };
+      changesObj.status = { from: local.status, to: finalStatus };
     }
     if (timeChanged && apiMatch.kickoffUtc) {
       changesObj.match_time = { from: local.match_time, to: apiMatch.kickoffUtc };
@@ -395,18 +405,18 @@ export async function shouldRunSync(
   }
 
   const nowMs = now.getTime();
-  const tenMinutesInMs = 10 * 60 * 1000;
-  const hundredMinutesInMs = 100 * 60 * 1000;
+  const twoMinutesInMs = 2 * 60 * 1000;
+  const oneHundredTwentyMinutesInMs = 120 * 60 * 1000;
   const limitInMs = 210 * 60 * 1000; // 3 horas y 30 minutos
 
   for (const match of matches) {
     const matchTimeMs = new Date(match.match_time).getTime();
 
-    // Condición A: Faltan 10 minutos o menos para el inicio
-    const isJustBeforeKickoff = nowMs >= matchTimeMs - tenMinutesInMs && nowMs < matchTimeMs;
+    // Condición A: Faltan 2 minutos o menos para el inicio
+    const isJustBeforeKickoff = nowMs >= matchTimeMs - twoMinutesInMs && nowMs < matchTimeMs;
 
-    // Condición B: Ya pasaron entre 100 y 210 minutos desde el inicio y sigue sin finalizar localmente
-    const isPostMatchPolling = nowMs >= matchTimeMs + hundredMinutesInMs && nowMs < matchTimeMs + limitInMs;
+    // Condición B: Ya pasaron entre 120 y 210 minutos desde el inicio y sigue sin finalizar localmente
+    const isPostMatchPolling = nowMs >= matchTimeMs + oneHundredTwentyMinutesInMs && nowMs < matchTimeMs + limitInMs;
 
     if (isJustBeforeKickoff || isPostMatchPolling) {
       console.log(
