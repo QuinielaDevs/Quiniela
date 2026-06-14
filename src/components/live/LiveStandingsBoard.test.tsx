@@ -606,4 +606,47 @@ describe("LiveStandingsBoard", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByTestId("live-row")[0]).toHaveAttribute("data-flash", "gold");
   });
+
+  it("muestra el indicador de tendencia de posición proyectada vs oficial", async () => {
+    const mock = makeSupabaseMock();
+    createClient.mockReturnValue(mock.supabase);
+
+    render(
+      <LiveStandingsBoard
+        leagueId="L1"
+        currentUserId="ana"
+        members={members}
+        initialMatches={initialMatches}
+        initialPredictions={predictions}
+      />,
+    );
+
+    // Initial matches: live-1 at 0-0. Predictions: Ana 1-0 (0 pts), Beto 0-1 (0 pts).
+    // Both tied at rank 1. Trend should show no changes (0).
+    expect(screen.getAllByTestId("live-trend")[0]).toHaveAttribute("data-change", "0");
+    expect(screen.getAllByTestId("live-trend")[1]).toHaveAttribute("data-change", "0");
+
+    // Realtime update: live-1 becomes 0-1 (Beto got it exact -> 5 pts projected. Ana got 0).
+    // Official is still empty (no finished matches yet) -> both tied at rank 1 officially.
+    // Projected standings: Beto is #1, Ana is #2.
+    // Beto: official rank 1, projected rank 1 -> rankChange = 1 - 1 = 0.
+    // Ana: official rank 1, projected rank 2 -> rankChange = 1 - 2 = -1.
+    await act(async () => {
+      mock.getPostgresHandler()?.({
+        new: {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          home_score: 0,
+          away_score: 1,
+        },
+      });
+    });
+
+    const trends = screen.getAllByTestId("live-trend");
+    // Fila 0 es Beto (rango 1, rankChange 0)
+    expect(trends[0]).toHaveAttribute("data-change", "0");
+    // Fila 1 es Ana (rango 2, rankChange -1)
+    expect(trends[1]).toHaveAttribute("data-change", "-1");
+  });
 });

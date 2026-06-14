@@ -100,6 +100,37 @@ describe("StandingsTable", () => {
     );
     expect(screen.getByText("Aún no hay participantes")).toBeInTheDocument();
   });
+
+  it("muestra el indicador de tendencia de posición (subió, bajó, sin cambios)", () => {
+    const members: StandingMember[] = [
+      { userId: "a", displayName: "Ana", avatarUrl: "", paymentStatus: "paid", joinedAt: "2026-06-01T00:00:00Z" },
+      { userId: "b", displayName: "Beto", avatarUrl: "", paymentStatus: "paid", joinedAt: "2026-06-02T00:00:00Z" },
+    ];
+    const matches: StandingMatch[] = [
+      { id: "m1", status: "finished", matchday: 1, homeScore: 1, awayScore: 0, updatedAt: "2026-06-14T10:00:00Z" },
+      { id: "m2", status: "finished", matchday: 1, homeScore: 2, awayScore: 0, updatedAt: "2026-06-14T11:00:00Z" },
+    ];
+    const predictions: StandingPrediction[] = [
+      { userId: "b", matchId: "m1", homeScorePred: 1, awayScorePred: 0, multiplier: 1 },
+      { userId: "a", matchId: "m2", homeScorePred: 2, awayScorePred: 0, multiplier: 2 },
+    ];
+
+    render(
+      <StandingsTable
+        members={members}
+        matches={matches}
+        predictions={predictions}
+      />
+    );
+
+    const trendAna = screen.getByLabelText("Subió 1 posición");
+    expect(trendAna).toBeInTheDocument();
+    expect(trendAna).toHaveAttribute("data-change", "1");
+
+    const trendBeto = screen.getByLabelText("Bajó 1 posición");
+    expect(trendBeto).toBeInTheDocument();
+    expect(trendBeto).toHaveAttribute("data-change", "-1");
+  });
 });
 
 describe("PaymentBanner", () => {
