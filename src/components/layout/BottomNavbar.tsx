@@ -19,18 +19,19 @@ export function BottomNavbar() {
       className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card lg:hidden"
     >
       <ul className="mx-auto flex w-full max-w-md items-stretch">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter(
+          (item) =>
+            item.enabled &&
+            (item.href !== "/duels" ||
+              process.env.NEXT_PUBLIC_ENABLE_DUELS === "true"),
+        ).map((item) => {
           const Icon = item.icon;
-          const isActive = item.enabled && isNavItemActive(pathname, item.href);
+          const isActive = isNavItemActive(pathname, item.href);
           const content = (
             <span
               className={cn(
                 "flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
-                isActive
-                  ? "text-accent"
-                  : item.enabled
-                    ? "text-muted-foreground"
-                    : "text-muted-foreground/40",
+                isActive ? "text-accent" : "text-muted-foreground",
               )}
             >
               <Icon className="size-5" aria-hidden="true" />
@@ -40,26 +41,15 @@ export function BottomNavbar() {
 
           return (
             <li key={item.href} className="flex-1">
-              {item.enabled ? (
-                <Link
-                  href={item.href}
-                  aria-current={isActive ? "page" : undefined}
-                  data-testid="nav-item"
-                  data-route={item.href}
-                  className="block"
-                >
-                  {content}
-                </Link>
-              ) : (
-                <span
-                  aria-disabled="true"
-                  data-testid="nav-item"
-                  data-route={item.href}
-                  className="block cursor-not-allowed"
-                >
-                  {content}
-                </span>
-              )}
+              <Link
+                href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                data-testid="nav-item"
+                data-route={item.href}
+                className="block"
+              >
+                {content}
+              </Link>
             </li>
           );
         })}

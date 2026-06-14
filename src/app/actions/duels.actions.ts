@@ -69,6 +69,13 @@ function getDuelsErrorMessage(error: unknown): string {
 export async function createChallenge(
   input: CreateChallengeInput,
 ): Promise<ServerActionResult<string>> {
+  if (process.env.NEXT_PUBLIC_ENABLE_DUELS !== "true") {
+    return {
+      success: false,
+      data: null,
+      error: "La funcionalidad de duelos está desactivada temporalmente.",
+    };
+  }
   try {
     const parsed = createChallengeSchema.safeParse(input);
     if (!parsed.success) {
@@ -119,6 +126,13 @@ export async function createChallenge(
 export async function acceptChallenge(
   input: AcceptChallengeInput,
 ): Promise<ServerActionResult<void>> {
+  if (process.env.NEXT_PUBLIC_ENABLE_DUELS !== "true") {
+    return {
+      success: false,
+      data: null,
+      error: "La funcionalidad de duelos está desactivada temporalmente.",
+    };
+  }
   try {
     const parsed = acceptChallengeSchema.safeParse(input);
     if (!parsed.success) {
@@ -165,6 +179,13 @@ export async function acceptChallenge(
 export async function rejectChallenge(
   input: ChallengeIdInput,
 ): Promise<ServerActionResult<void>> {
+  if (process.env.NEXT_PUBLIC_ENABLE_DUELS !== "true") {
+    return {
+      success: false,
+      data: null,
+      error: "La funcionalidad de duelos está desactivada temporalmente.",
+    };
+  }
   try {
     const parsed = challengeIdSchema.safeParse(input);
     if (!parsed.success) {
@@ -209,6 +230,13 @@ export async function rejectChallenge(
 export async function cancelChallenge(
   input: ChallengeIdInput,
 ): Promise<ServerActionResult<void>> {
+  if (process.env.NEXT_PUBLIC_ENABLE_DUELS !== "true") {
+    return {
+      success: false,
+      data: null,
+      error: "La funcionalidad de duelos está desactivada temporalmente.",
+    };
+  }
   try {
     const parsed = challengeIdSchema.safeParse(input);
     if (!parsed.success) {

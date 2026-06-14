@@ -31,9 +31,14 @@ export function TopNav({ brandWord = "PIJA" }: TopNavProps) {
         </Link>
 
         <ul className="flex items-center gap-1">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter(
+            (item) =>
+              item.enabled &&
+              (item.href !== "/duels" ||
+                process.env.NEXT_PUBLIC_ENABLE_DUELS === "true"),
+          ).map((item) => {
             const Icon = item.icon;
-            const isActive = item.enabled && isNavItemActive(pathname, item.href);
+            const isActive = isNavItemActive(pathname, item.href);
 
             return (
               <li key={item.href}>

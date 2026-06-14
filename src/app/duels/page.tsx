@@ -98,6 +98,8 @@ function BoardSkeleton() {
 }
 
 export default function DuelsPage() {
+  const isEnabled = process.env.NEXT_PUBLIC_ENABLE_DUELS === "true";
+
   return (
     <>
       <AppTopNav />
@@ -108,9 +110,34 @@ export default function DuelsPage() {
             <h1 className="font-display text-2xl font-bold lg:text-4xl">Duelos y Apuestas</h1>
           </header>
 
-          <Suspense fallback={<BoardSkeleton />}>
-            <DuelsBoard />
-          </Suspense>
+          {isEnabled ? (
+            <Suspense fallback={<BoardSkeleton />}>
+              <DuelsBoard />
+            </Suspense>
+          ) : (
+            <div className="rounded-lg border border-border bg-card/50 backdrop-blur-sm p-8 text-center shadow-lg">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent/10 text-accent mb-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="size-6"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636"
+                  />
+                </svg>
+              </div>
+              <h2 className="font-display text-lg font-bold text-white mb-2">Duelos Inactivos</h2>
+              <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                La funcionalidad de duelos de puntos no está activa en esta liga. Pronostica partidos para sumar puntos en la tabla de posiciones.
+              </p>
+            </div>
+          )}
         </div>
 
         <BottomNavbar />

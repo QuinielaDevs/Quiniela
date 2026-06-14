@@ -6,6 +6,9 @@ import { defineConfig, devices } from "@playwright/test";
 config({ path: ".env.test.local" });
 config({ path: ".env" });
 
+// Forzar habilitación de duelos para que los tests E2E de regresión corran correctamente
+process.env.NEXT_PUBLIC_ENABLE_DUELS = "true";
+
 // Puerto dedicado para E2E (evita el 3000, que en este entorno puede estar
 // ocupado por el backend de Docker Desktop).
 const PORT = Number(process.env.E2E_PORT ?? 3100);
@@ -63,5 +66,8 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      NEXT_PUBLIC_ENABLE_DUELS: "true",
+    },
   },
 });
