@@ -25,11 +25,11 @@ BEGIN
   FROM matches
   WHERE status IN ('scheduled', 'live')
     AND (
-      -- A) Faltan 10 minutos o menos para el inicio del partido
-      (now() >= match_time - interval '10 minutes' AND now() < match_time)
+      -- A) Faltan 2 minutos o menos para el inicio del partido
+      (now() >= match_time - interval '2 minutes' AND now() < match_time)
       OR
-      -- B) Han pasado entre 100 y 210 minutos desde el inicio del partido
-      (now() >= match_time + interval '100 minutes' AND now() < match_time + interval '210 minutes')
+      -- B) Han pasado entre 120 y 210 minutos desde el inicio del partido
+      (now() >= match_time + interval '120 minutes' AND now() < match_time + interval '210 minutes')
     );
 
   IF v_active_matches > 0 THEN
