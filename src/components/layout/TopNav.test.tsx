@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TopNav } from "@/components/layout/TopNav";
 
@@ -8,7 +8,12 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("TopNav", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_DUELS", "true");
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     cleanup();
   });
 
@@ -29,6 +34,14 @@ describe("TopNav", () => {
     const rules = screen.getByRole("link", { name: /reglas/i });
     expect(rules).toHaveAttribute("href", "/rules");
     expect(rules).not.toHaveAttribute("aria-current", "page");
+  });
+
+  it("oculta el link de Duelos cuando están deshabilitados", () => {
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_DUELS", "false");
+    render(<TopNav />);
+
+    const duels = screen.queryByRole("link", { name: /duelos/i });
+    expect(duels).toBeNull();
   });
 
   it("usa 'PIJA' como primera palabra del brand por defecto", () => {
