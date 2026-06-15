@@ -33,6 +33,7 @@ const initialMatches: LiveMatch[] = [
     id: "live-1",
     status: "live",
     matchday: 1,
+    stage: "group",
     homeScore: 0,
     awayScore: 0,
     homeTeam: "Local FC",
@@ -648,5 +649,99 @@ describe("LiveStandingsBoard", () => {
     expect(trends[0]).toHaveAttribute("data-change", "0");
     // Fila 1 es Ana (rango 2, rankChange -1)
     expect(trends[1]).toHaveAttribute("data-change", "-1");
+  });
+
+  describe("Accordion – desglose de puntos en vivo", () => {
+    function renderBoard() {
+      const finishedMatches: LiveMatch[] = [
+        {
+          id: "fin-1",
+          status: "finished",
+          matchday: 1,
+          stage: "group",
+          homeScore: 1,
+          awayScore: 0,
+          homeTeam: "México",
+          awayTeam: "Canadá",
+        },
+        {
+          id: "live-2",
+          status: "live",
+          matchday: 2,
+          stage: "group",
+          homeScore: 2,
+          awayScore: 1,
+          homeTeam: "Brasil",
+          awayTeam: "Argentina",
+        },
+      ];
+
+      const preds: StandingPrediction[] = [
+        { userId: "ana", matchId: "fin-1", homeScorePred: 1, awayScorePred: 0, multiplier: 1 },
+        { userId: "ana", matchId: "live-2", homeScorePred: 2, awayScorePred: 1, multiplier: 1.5 },
+      ];
+
+      const mock = makeSupabaseMock();
+      createClient.mockReturnValue(mock.supabase);
+
+      render(
+        <LiveStandingsBoard
+          leagueId="L1"
+          currentUserId="ana"
+          members={members}
+          initialMatches={finishedMatches}
+          initialPredictions={preds}
+        />,
+      );
+
+      return mock;
+    }
+
+    it("expande el desglose al hacer clic y colapsa al clicar de nuevo", () => {
+      renderBoard();
+      expect(screen.queryByTestId("live-accordion")).not.toBeInTheDocument();
+
+      const toggles = screen.getAllByTestId("live-row-toggle");
+      fireEvent.click(toggles[0]!);
+      expect(screen.getByTestId("live-accordion")).toBeInTheDocument();
+
+      fireEvent.click(toggles[0]!);
+      expect(screen.queryByTestId("live-accordion")).not.toBeInTheDocument();
+    });
+
+    it("muestra el banner resumen con Base y Mults", () => {
+      renderBoard();
+      const toggles = screen.getAllByTestId("live-row-toggle");
+      fireEvent.click(toggles[0]!); // Ana
+
+      // fin-1: exacto 5 base * 1x = 5 (bonus 0)
+      // live-2: exacto 5 base * 1.5x = 7.5 (bonus 2.5)
+      // Total base = 10, total bonus = 2.5
+      expect(screen.getByTestId("live-summary-base")).toHaveTextContent("10.0");
+      expect(screen.getByTestId("live-summary-mults")).toHaveTextContent("+2.5");
+    });
+
+    it("muestra partidos con badge 'live' para partidos en vivo", () => {
+      renderBoard();
+      const toggles = screen.getAllByTestId("live-row-toggle");
+      fireEvent.click(toggles[0]!); // Ana
+
+      expect(screen.getByText(/Brasil vs Argentina/)).toBeInTheDocument();
+      // Check for the live badge
+      const matchDetails = screen.getAllByTestId("live-match-detail");
+      expect(matchDetails.length).toBe(2);
+    });
+
+    it("agrupa partidos por jornada con encabezados de fase", () => {
+      renderBoard();
+      const toggles = screen.getAllByTestId("live-row-toggle");
+      fireEvent.click(toggles[0]!);
+
+      const phaseHeaders = screen.getAllByTestId("live-phase-header");
+      expect(phaseHeaders.length).toBe(2);
+      // Orden descendente: Jornada 2 primero
+      expect(phaseHeaders[0]).toHaveTextContent("Jornada 2");
+      expect(phaseHeaders[1]).toHaveTextContent("Jornada 1");
+    });
   });
 });

@@ -37,8 +37,8 @@ const MEMBERS: StandingMember[] = [
 ];
 
 const MATCHES: StandingMatch[] = [
-  { id: "m1", status: "finished", matchday: 1, homeScore: 1, awayScore: 0 },
-  { id: "m2", status: "finished", matchday: 2, homeScore: 0, awayScore: 2 },
+  { id: "m1", status: "finished", matchday: 1, stage: "group", homeScore: 1, awayScore: 0, homeTeam: "México", awayTeam: "Canadá" },
+  { id: "m2", status: "finished", matchday: 2, stage: "group", homeScore: 0, awayScore: 2, homeTeam: "Brasil", awayTeam: "Argentina" },
 ];
 
 const PREDICTIONS: StandingPrediction[] = [
@@ -130,6 +130,92 @@ describe("StandingsTable", () => {
     const trendBeto = screen.getByLabelText("Bajó 1 posición");
     expect(trendBeto).toBeInTheDocument();
     expect(trendBeto).toHaveAttribute("data-change", "-1");
+  });
+
+  describe("Accordion – desglose de puntos", () => {
+    it("expande el desglose al hacer clic en una fila y colapsa al clicar de nuevo", () => {
+      renderTable();
+      // Inicialmente sin acordeón
+      expect(screen.queryByTestId("standings-accordion")).not.toBeInTheDocument();
+
+      // Expandir la fila de Ana
+      const rows = screen.getAllByTestId("standings-row-toggle");
+      fireEvent.click(rows[0]!);
+      expect(screen.getByTestId("standings-accordion")).toBeInTheDocument();
+
+      // Colapsar
+      fireEvent.click(rows[0]!);
+      expect(screen.queryByTestId("standings-accordion")).not.toBeInTheDocument();
+    });
+
+    it("muestra el banner resumen con Base y Mults correctos", () => {
+      renderTable();
+      const rows = screen.getAllByTestId("standings-row-toggle");
+      fireEvent.click(rows[0]!); // Ana
+
+      // Ana: m1 exacto (5 base * 1x = 5), m2 exacto (5 base * 1x = 5). Base total = 10, Mults bonus = 0
+      expect(screen.getByTestId("summary-base")).toHaveTextContent("10.0");
+      expect(screen.getByTestId("summary-mults")).toHaveTextContent("+0.0");
+    });
+
+    it("muestra los partidos con nombres de equipos y desglose de predicción", () => {
+      renderTable();
+      const rows = screen.getAllByTestId("standings-row-toggle");
+      fireEvent.click(rows[0]!); // Ana
+
+      expect(screen.getByText(/México vs Canadá/)).toBeInTheDocument();
+      expect(screen.getByText(/Brasil vs Argentina/)).toBeInTheDocument();
+
+      // Ambos partidos son "Exacto" para Ana
+      const exactLabels = screen.getAllByText(/Exacto/);
+      expect(exactLabels.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("agrupa partidos por jornada con encabezados de fase", () => {
+      renderTable();
+      const rows = screen.getAllByTestId("standings-row-toggle");
+      fireEvent.click(rows[0]!); // Ana
+
+      const phaseHeaders = screen.getAllByTestId("standings-phase-header");
+      // Dos jornadas distintas (Jornada 1, Jornada 2), orden descendente
+      expect(phaseHeaders.length).toBe(2);
+      expect(phaseHeaders[0]).toHaveTextContent("Jornada 2");
+      expect(phaseHeaders[1]).toHaveTextContent("Jornada 1");
+    });
+
+    it("muestra multiplicadores en detalle de partido (con x2 badge)", () => {
+      const predsWithMult: StandingPrediction[] = [
+        { userId: "a", matchId: "m1", homeScorePred: 1, awayScorePred: 0, multiplier: 2 },
+      ];
+      render(
+        <StandingsTable
+          members={[MEMBERS[0]!]}
+          matches={[MATCHES[0]!]}
+          predictions={predsWithMult}
+        />,
+      );
+      const rows = screen.getAllByTestId("standings-row-toggle");
+      fireEvent.click(rows[0]!);
+
+      // Ana: base 5 * 2x = 10 pts. Summary base = 5, mult bonus = 5
+      expect(screen.getByTestId("summary-base")).toHaveTextContent("5.0");
+      expect(screen.getByTestId("summary-mults")).toHaveTextContent("+5.0");
+      expect(screen.getByTestId("match-points-earned")).toHaveTextContent("10.0 pts");
+    });
+
+    it("solo expande una fila a la vez", () => {
+      renderTable();
+      const rows = screen.getAllByTestId("standings-row-toggle");
+
+      // Expandir Ana
+      fireEvent.click(rows[0]!);
+      expect(screen.getAllByTestId("standings-accordion").length).toBe(1);
+
+      // Expandir Beto → Ana se colapsa
+      fireEvent.click(rows[1]!);
+      expect(screen.getAllByTestId("standings-accordion").length).toBe(1);
+      expect(screen.getByText(/México vs Canadá/)).toBeInTheDocument();
+    });
   });
 });
 

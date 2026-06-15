@@ -40,6 +40,8 @@ export type StandingMatch = {
   homeScore: number | null;
   awayScore: number | null;
   updatedAt?: string; // timestamp ISO de actualización
+  homeTeam?: string | null;
+  awayTeam?: string | null;
 };
 
 export type StandingPrediction = {

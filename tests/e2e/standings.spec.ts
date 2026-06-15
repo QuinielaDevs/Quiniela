@@ -873,4 +873,80 @@ test.describe("Clasificación oficial (e2e)", () => {
     await expect(rowUser1.getByTestId("standings-trend")).toHaveAttribute("data-change", "-1");
     await expect(rowUser1.getByTestId("standings-trend")).toHaveAttribute("aria-label", "Bajó 1 posición");
   });
+  test("STD-09: Acordeón de desglose de puntos (UI/UX)", async () => {
+    const page = fixture.users[0]!.page!;
+    const matches = await seedMatches([
+      finishedMatch({ home: 2, away: 0 }, { matchday: 1, home: "Team A", away: "Team B", rawTeamNames: true, stage: "group" }),
+      finishedMatch({ home: 1, away: 1 }, { matchday: 2, home: "Team C", away: "Team D", rawTeamNames: true, stage: "group" }),
+      finishedMatch({ home: 0, away: 2 }, { matchday: 2, home: "Team E", away: "Team F", rawTeamNames: true, stage: "group" }),
+    ]);
+    localMatchIds.push(...matches.map((m) => m.id));
+
+    // Sembrar predicciones para el User 0
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[0]!.userId,
+      matchId: matches[0]!.id,
+      home: 2,
+      away: 0,
+      multiplier: 1.0,
+      pointsEarned: 5.0,
+      evaluatedAt: new Date().toISOString(),
+    });
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[0]!.userId,
+      matchId: matches[1]!.id,
+      home: 2,
+      away: 2,
+      multiplier: 2.0,
+      pointsEarned: 4.0, // Parcial (2 pts base) * 2
+      evaluatedAt: new Date().toISOString(),
+    });
+    await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[0]!.userId,
+      matchId: matches[2]!.id,
+      home: 1,
+      away: 0,
+      multiplier: 1.0,
+      pointsEarned: 0.0, // Fallido (0 pts base)
+      evaluatedAt: new Date().toISOString(),
+    });
+
+    await page.goto("/standings");
+    await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+
+    const rowUser0 = page.getByTestId("standings-row").filter({ hasText: fixture.users[0]!.displayName! });
+
+    // Verificar que el acordeón no está visible inicialmente
+    await expect(rowUser0.getByTestId("standings-accordion")).toBeHidden();
+
+    // Expandir el acordeón
+    await rowUser0.getByTestId("standings-row-toggle").click();
+    await expect(rowUser0.getByTestId("standings-accordion")).toBeVisible();
+
+    // Verificar los banners resumen (5 exacto + 2 parcial + 0 fallido = 7.0)
+    await expect(rowUser0.getByTestId("summary-base")).toHaveText("7.0");
+    await expect(rowUser0.getByTestId("summary-mults")).toHaveText("+2.0");
+
+    // Verificar desglose por fases (orden cronológico inverso: J2 primero, luego J1)
+    const phaseHeaders = rowUser0.getByTestId("standings-phase-header");
+    await expect(phaseHeaders).toHaveCount(2);
+    await expect(phaseHeaders.nth(0)).toHaveText("Jornada 2");
+    await expect(phaseHeaders.nth(1)).toHaveText("Jornada 1");
+
+    // Verificar contenido de partidos (nombres de equipos, exacto/parcial/fallido)
+    await expect(rowUser0.getByText("Team A vs Team B")).toBeVisible();
+    await expect(rowUser0.getByText("Team C vs Team D")).toBeVisible();
+    await expect(rowUser0.getByText("Team E vs Team F")).toBeVisible();
+    const matchDetails = rowUser0.getByTestId("standings-match-detail");
+    await expect(matchDetails.getByText("Exacto")).toBeVisible();
+    await expect(matchDetails.getByText("Parcial")).toBeVisible();
+    await expect(matchDetails.getByText("Fallido")).toBeVisible();
+    
+    // Colapsar el acordeón
+    await rowUser0.getByTestId("standings-row-toggle").click();
+    await expect(rowUser0.getByTestId("standings-accordion")).toBeHidden();
+  });
 });

@@ -59,7 +59,7 @@ export async function StandingsBoard() {
         .eq("league_id", leagueId),
       supabase
         .from("matches")
-        .select("id, status, matchday, stage, home_score, away_score, updated_at")
+        .select("id, status, matchday, stage, home_score, away_score, updated_at, home_team, away_team")
         .eq("status", "finished"),
       supabase
         .from("leagues")
@@ -90,6 +90,8 @@ export async function StandingsBoard() {
     homeScore: m.home_score,
     awayScore: m.away_score,
     updatedAt: m.updated_at,
+    homeTeam: m.home_team,
+    awayTeam: m.away_team,
   }));
   const finishedIds = finishedMatches.map((m) => m.id);
 

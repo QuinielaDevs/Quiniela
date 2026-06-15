@@ -375,4 +375,45 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
     await expect(rowUser0.getByTestId("live-trend")).toHaveAttribute("data-change", "-1", { timeout: 15000 });
     await expect(rowUser2.getByTestId("live-trend")).toHaveAttribute("data-change", "0", { timeout: 15000 });
   });
+  test("LIVE-09: Acordeón de desglose de puntos en vivo (UI/UX)", async () => {
+    const page = fixture.users[0]!.page!;
+
+    // Asegurar que el partido está en live y con marcador 1-0
+    const { error: eGoal } = await admin
+      .from("matches")
+      .update({ status: "live", home_score: 1, away_score: 0 })
+      .eq("id", matchId);
+    expect(eGoal).toBeNull();
+
+    await page.goto("/live");
+    await expect(page.getByText("En vivo").first()).toBeVisible({ timeout: 15_000 });
+
+    const rowUser1 = page.getByTestId("live-row").filter({ hasText: "E2E Jugador 1" });
+
+    // Verificar que el acordeón no está visible inicialmente
+    await expect(rowUser1.getByTestId("live-accordion")).toBeHidden();
+
+    // Expandir el acordeón
+    await rowUser1.getByTestId("live-row-toggle").click();
+    await expect(rowUser1.getByTestId("live-accordion")).toBeVisible();
+
+    // Verificar los banners resumen (User 1 tiene exacto en este partido, 5pts * 1 = 5 base)
+    // + premios/duelos pueden sumar a total, pero focus on base/mult
+    await expect(rowUser1.getByTestId("live-summary-base")).toHaveText("5.0");
+    await expect(rowUser1.getByTestId("live-summary-mults")).toHaveText("+0.0");
+
+    // Verificar desglose de fase
+    const phaseHeaders = rowUser1.getByTestId("live-phase-header");
+    await expect(phaseHeaders).toHaveCount(1); // 1 fase en vivo
+    await expect(phaseHeaders.first()).toBeVisible();
+
+    // Verificar contenido de partidos (nombres de equipos, badge en vivo)
+    await expect(rowUser1.getByTestId("live-match-detail")).toBeVisible();
+    await expect(rowUser1.getByTestId("live-match-detail").getByText("live", { exact: true })).toBeVisible();
+    await expect(rowUser1.getByText("Exacto")).toBeVisible();
+
+    // Colapsar el acordeón
+    await rowUser1.getByTestId("live-row-toggle").click();
+    await expect(rowUser1.getByTestId("live-accordion")).toBeHidden();
+  });
 });

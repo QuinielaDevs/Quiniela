@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Minus } from "lucide-react";
 
 import { PaymentStatusBadge } from "@/components/standings/PaymentStatusBadge";
 import {
@@ -30,6 +30,11 @@ import {
   type StandingMember,
   type StandingPrediction,
 } from "@/utils/standings";
+import {
+  calculateBasePoints,
+  calculatePredictionPoints,
+} from "@/utils/scoring";
+import { phaseKeyForMatch, stageLabel } from "@/utils/tournament";
 import { cn } from "@/utils/utils";
 
 const POLLING_INTERVAL_MS = 60_000;
@@ -55,6 +60,7 @@ type MatchPayload = {
   id?: unknown;
   status?: unknown;
   matchday?: unknown;
+  stage?: unknown;
   home_team?: unknown;
   away_team?: unknown;
   home_score?: unknown;
@@ -78,6 +84,7 @@ function mapPayloadToMatch(payload: MatchPayload): LiveMatch | null {
     id: payload.id,
     status: payload.status,
     matchday: toNullableNumber(payload.matchday),
+    stage: toNullableString(payload.stage),
     homeScore: toNullableNumber(payload.home_score),
     awayScore: toNullableNumber(payload.away_score),
     homeTeam: toNullableString(payload.home_team),
@@ -95,6 +102,127 @@ function statusClass(status: ConnectionState): string {
   if (status === "live") return "border-success bg-success/15 text-success";
   if (status === "polling") return "border-accent bg-accent/15 text-accent";
   return "border-accent bg-accent/15 text-accent";
+}
+
+// ────── Accordion helpers ──────
+
+function phaseLabelForKey(key: string): string {
+  const jornadaMatch = /^jornada-(\d+)$/.exec(key);
+  if (jornadaMatch) return `Jornada ${jornadaMatch[1]}`;
+  return stageLabel(key);
+}
+
+function phaseOrdinalDesc(key: string): number {
+  const knockoutOrder: Record<string, number> = {
+    final: 100,
+    "third-place": 99,
+    semi: 98,
+    quarter: 97,
+    "round-16": 96,
+    "round-32": 95,
+  };
+  if (knockoutOrder[key] != null) return knockoutOrder[key];
+  const jornadaMatch = /^jornada-(\d+)$/.exec(key);
+  if (jornadaMatch) return Number(jornadaMatch[1]);
+  return 0;
+}
+
+type MatchDetail = {
+  matchId: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  predHome: number | null;
+  predAway: number | null;
+  multiplier: number;
+  basePoints: number;
+  earnedPoints: number;
+  phaseKey: string;
+  isLive: boolean;
+};
+
+function computeLiveBreakdown(
+  userId: string,
+  allMatches: LiveMatch[],
+  predByKey: Map<string, StandingPrediction>,
+): MatchDetail[] {
+  const details: MatchDetail[] = [];
+
+  for (const match of allMatches) {
+    if (match.status !== "finished" && match.status !== "live") continue;
+    if (match.homeScore == null || match.awayScore == null) continue;
+
+    const pred = predByKey.get(`${userId}:${match.id}`);
+    const base = pred
+      ? calculateBasePoints(
+          { home: pred.homeScorePred, away: pred.awayScorePred },
+          { home: match.homeScore, away: match.awayScore },
+          "finished",
+        )
+      : 0;
+    const earned = pred ? calculatePredictionPoints(base, pred.multiplier) : 0;
+
+    details.push({
+      matchId: match.id,
+      homeTeam: match.homeTeam ?? "Local",
+      awayTeam: match.awayTeam ?? "Visitante",
+      homeScore: match.homeScore,
+      awayScore: match.awayScore,
+      predHome: pred?.homeScorePred ?? null,
+      predAway: pred?.awayScorePred ?? null,
+      multiplier: pred?.multiplier ?? 1,
+      basePoints: base,
+      earnedPoints: earned,
+      phaseKey: phaseKeyForMatch({
+        stage: match.stage ?? null,
+        matchday: match.matchday,
+      }),
+      isLive: match.status === "live",
+    });
+  }
+
+  return details;
+}
+
+function groupByPhaseDesc(
+  details: MatchDetail[],
+): { label: string; matches: MatchDetail[] }[] {
+  const grouped = new Map<string, MatchDetail[]>();
+  for (const d of details) {
+    const bucket = grouped.get(d.phaseKey);
+    if (bucket) bucket.push(d);
+    else grouped.set(d.phaseKey, [d]);
+  }
+
+  return [...grouped.entries()]
+    .sort(([a], [b]) => phaseOrdinalDesc(b) - phaseOrdinalDesc(a))
+    .map(([key, matches]) => ({
+      label: phaseLabelForKey(key),
+      matches,
+    }));
+}
+
+function renderOutcomeBadge(base: number) {
+  if (base === 5) {
+    return (
+      <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+        Exacto
+      </span>
+    );
+  }
+  if (base === 2) {
+    return (
+      <span className="rounded bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+        Parcial
+      </span>
+    );
+  }
+  return (
+    <span className="rounded bg-muted border border-border px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+      Fallido
+    </span>
+  );
 }
 
 export function LiveStandingsBoard({
@@ -125,6 +253,7 @@ export function LiveStandingsBoard({
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [toasts, setToasts] = useState<GoalToastModel[]>([]);
   const [flashedUsers, setFlashedUsers] = useState<Set<string>>(new Set());
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const { matches, predictions } = snapshot;
 
   const rows = useMemo(
@@ -132,6 +261,12 @@ export function LiveStandingsBoard({
     [members, matches, predictions],
   );
   const hasLiveMatches = matches.some((match) => match.status === "live");
+
+  // Mapa de predicciones para búsqueda O(1) en el acordeón.
+  const predByKey = useMemo(
+    () => new Map(predictions.map((p) => [`${p.userId}:${p.matchId}`, p])),
+    [predictions],
+  );
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -196,7 +331,7 @@ export function LiveStandingsBoard({
 
       const { data: matchRows, error: matchError } = await supabase
         .from("matches")
-        .select("id, status, matchday, home_team, away_team, home_score, away_score")
+        .select("id, status, matchday, stage, home_team, away_team, home_score, away_score")
         .in("status", ["finished", "live"])
         .order("match_time", { ascending: true });
       if (matchError || latestRefreshRef.current !== requestId) return;
@@ -205,6 +340,7 @@ export function LiveStandingsBoard({
         id: match.id,
         status: match.status,
         matchday: match.matchday,
+        stage: match.stage ?? null,
         homeScore: match.home_score,
         awayScore: match.away_score,
         homeTeam: match.home_team ?? null,
@@ -520,13 +656,19 @@ export function LiveStandingsBoard({
       <GoalToastStack toasts={toasts} onDismiss={dismissToast} />
 
       <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card p-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="font-display text-lg font-bold">Tabla en Vivo</p>
-          <p className="text-sm text-muted-foreground">
-            {hasLiveMatches
-              ? "Puntos proyectados con marcadores actuales."
-              : "No hay partidos en vivo ahora."}
-          </p>
+          <div className="text-sm text-muted-foreground flex flex-col gap-0.5 mt-0.5">
+            <p>
+              {hasLiveMatches
+                ? "Puntos proyectados con marcadores actuales."
+                : "No hay partidos en vivo ahora."}
+            </p>
+            <p className="text-[11px] text-accent/80 font-medium flex items-center gap-1 mt-0.5">
+              <span>💡</span>
+              <span>Toca o pasa el cursor sobre cualquier fila para ver el desglose en vivo.</span>
+            </p>
+          </div>
         </div>
         <span
           className={cn(
@@ -542,6 +684,21 @@ export function LiveStandingsBoard({
         {rows.map((row) => {
           const isLeader = row.rank === 1;
           const isFlashing = flashedUsers.has(row.userId);
+          const isExpanded = expandedUserId === row.userId;
+
+          // Cálculo del desglose lazy (solo cuando se expande).
+          const details = isExpanded
+            ? computeLiveBreakdown(row.userId, matches, predByKey)
+            : [];
+          const grouped = isExpanded ? groupByPhaseDesc(details) : [];
+
+          // Totales del banner resumen.
+          const totalBase = details.reduce((sum, d) => sum + d.basePoints, 0);
+          const totalMultBonus = details.reduce(
+            (sum, d) => sum + (d.earnedPoints - d.basePoints),
+            0,
+          );
+
           return (
             <li
               key={row.userId}
@@ -552,87 +709,224 @@ export function LiveStandingsBoard({
                 else rowRefs.current.delete(row.userId);
               }}
               className={cn(
-                "flex items-center gap-3 rounded-md border bg-card p-3 transition-[transform,opacity,border-color,box-shadow,background-color] duration-300 motion-reduce:transition-none",
+                "flex flex-col rounded-md border bg-card p-3 transition-[transform,opacity,border-color,box-shadow,background-color] duration-300 motion-reduce:transition-none hover:bg-muted/30",
                 isLeader ? "border-accent" : "border-border",
-                // Destello dorado (Championship Gold) en la fila que sube; vía
-                // tokens, aditivo al reordenamiento FLIP existente.
                 isFlashing && "border-accent bg-accent/15 ring-2 ring-accent",
               )}
             >
-              <div className="flex flex-col items-center justify-center w-8 shrink-0">
-                <span
-                  className={cn(
-                    "font-display text-lg font-bold leading-none",
-                    isLeader ? "text-accent" : "text-muted-foreground",
-                  )}
-                  aria-label={`Posición ${row.rank}${row.isTie ? " empatada" : ""}`}
-                >
-                  {row.rank}
-                </span>
-                {row.isTie && (
-                  <span className="text-[10px] text-muted-foreground leading-none mt-1" data-testid="live-tie-badge">
-                    Empate
-                  </span>
-                )}
-                {row.rankChange !== undefined && (
-                  <div
+              <button
+                type="button"
+                className="group flex w-full items-center gap-3 text-left"
+                aria-expanded={isExpanded}
+                data-testid="live-row-toggle"
+                onClick={() =>
+                  setExpandedUserId(isExpanded ? null : row.userId)
+                }
+              >
+                <div className="flex flex-col items-center justify-center w-8 shrink-0">
+                  <span
                     className={cn(
-                      "flex items-center text-[10px] font-bold mt-1.5 leading-none",
-                      row.rankChange > 0 && "text-success",
-                      row.rankChange < 0 && "text-destructive",
-                      row.rankChange === 0 && "text-muted-foreground/50",
+                      "font-display text-lg font-bold leading-none",
+                      isLeader ? "text-accent" : "text-muted-foreground",
                     )}
-                    data-testid="live-trend"
-                    data-change={row.rankChange}
-                    aria-label={
-                      row.rankChange > 0
-                        ? `Subió ${row.rankChange} ${row.rankChange === 1 ? "posición" : "posiciones"}`
-                        : row.rankChange < 0
-                          ? `Bajó ${Math.abs(row.rankChange)} ${Math.abs(row.rankChange) === 1 ? "posición" : "posiciones"}`
-                          : "Sin cambios de posición"
-                    }
+                    aria-label={`Posición ${row.rank}${row.isTie ? " empatada" : ""}`}
                   >
-                    {row.rankChange > 0 ? (
-                      <ArrowUp className="size-3 shrink-0" aria-hidden="true" />
-                    ) : row.rankChange < 0 ? (
-                      <ArrowDown className="size-3 shrink-0" aria-hidden="true" />
-                    ) : (
-                      <Minus className="size-3 shrink-0 text-muted-foreground/30" aria-hidden="true" />
-                    )}
-                    {row.rankChange !== 0 && (
-                      <span className="ml-0.5">{Math.abs(row.rankChange)}</span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={row.avatarUrl || "/assets/avatars/default-player.svg"}
-                alt=""
-                className="size-9 shrink-0 rounded-full border border-border object-cover"
-              />
-
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-semibold">
-                  {row.displayName}
-                </span>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <PaymentStatusBadge status={row.paymentStatus} />
-                  {row.livePoints > 0 && (
-                    <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
-                      +{row.livePoints.toFixed(1)} live
+                    {row.rank}
+                  </span>
+                  {row.isTie && (
+                    <span className="text-[10px] text-muted-foreground leading-none mt-1" data-testid="live-tie-badge">
+                      Empate
                     </span>
                   )}
+                  {row.rankChange !== undefined && (
+                    <div
+                      className={cn(
+                        "flex items-center text-[10px] font-bold mt-1.5 leading-none",
+                        row.rankChange > 0 && "text-success",
+                        row.rankChange < 0 && "text-destructive",
+                        row.rankChange === 0 && "text-muted-foreground/50",
+                      )}
+                      data-testid="live-trend"
+                      data-change={row.rankChange}
+                      aria-label={
+                        row.rankChange > 0
+                          ? `Subió ${row.rankChange} ${row.rankChange === 1 ? "posición" : "posiciones"}`
+                          : row.rankChange < 0
+                            ? `Bajó ${Math.abs(row.rankChange)} ${Math.abs(row.rankChange) === 1 ? "posición" : "posiciones"}`
+                            : "Sin cambios de posición"
+                      }
+                    >
+                      {row.rankChange > 0 ? (
+                        <ArrowUp className="size-3 shrink-0" aria-hidden="true" />
+                      ) : row.rankChange < 0 ? (
+                        <ArrowDown className="size-3 shrink-0" aria-hidden="true" />
+                      ) : (
+                        <Minus className="size-3 shrink-0 text-muted-foreground/30" aria-hidden="true" />
+                      )}
+                      {row.rankChange !== 0 && (
+                        <span className="ml-0.5">{Math.abs(row.rankChange)}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              <span
-                className="shrink-0 font-display text-lg font-bold text-accent"
-                aria-label={`${row.totalPoints} puntos proyectados`}
-              >
-                {row.totalPoints.toFixed(1)}
-              </span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={row.avatarUrl || "/assets/avatars/default-player.svg"}
+                  alt=""
+                  className="size-9 shrink-0 rounded-full border border-border object-cover"
+                />
+
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-semibold">
+                    {row.displayName}
+                  </span>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <PaymentStatusBadge status={row.paymentStatus} />
+                    {row.livePoints > 0 && (
+                      <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                        +{row.livePoints.toFixed(1)} live
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-1">
+                  <span
+                    className="font-display text-lg font-bold text-accent"
+                    aria-label={`${row.totalPoints} puntos proyectados`}
+                  >
+                    {row.totalPoints.toFixed(1)}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "size-4 text-muted-foreground transition-all duration-300 group-hover:text-accent",
+                      isExpanded
+                        ? "rotate-180 group-hover:-translate-y-0.5"
+                        : "group-hover:translate-y-0.5",
+                    )}
+                    aria-hidden="true"
+                  />
+                </div>
+              </button>
+
+              {/* Detalle del Acordeón */}
+              {isExpanded && (
+                <div
+                  className="mt-3 border-t border-border pt-3 flex flex-col gap-2"
+                  data-testid="live-accordion"
+                >
+                  {/* Banner Resumen */}
+                  <div
+                    className="grid grid-cols-4 gap-1 rounded-md border border-dashed border-border bg-background/50 p-2 text-center"
+                    data-testid="live-summary"
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-muted-foreground">Base</span>
+                      <span className="text-xs font-bold" data-testid="live-summary-base">
+                        {totalBase.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-muted-foreground">Mults.</span>
+                      <span className="text-xs font-bold" data-testid="live-summary-mults">
+                        +{totalMultBonus.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-muted-foreground">Premios</span>
+                      <span className="text-xs font-bold" data-testid="live-summary-awards">
+                        +{row.awardPoints.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-muted-foreground">Duelos</span>
+                      <span
+                        className={cn(
+                          "text-xs font-bold",
+                          row.duelPoints < 0 && "text-destructive",
+                        )}
+                        data-testid="live-summary-duels"
+                      >
+                        {row.duelPoints >= 0 ? "+" : ""}{row.duelPoints.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Lista de Partidos con scroll interno y agrupación */}
+                  <div
+                    className="max-h-64 overflow-y-auto flex flex-col gap-1 pr-1"
+                    data-testid="live-match-list"
+                  >
+                    {grouped.map((group) => (
+                      <div key={group.label}>
+                        <div
+                          className="mt-1 mb-1 border-l-2 border-accent bg-accent/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-accent"
+                          data-testid="live-phase-header"
+                        >
+                          {group.label}
+                        </div>
+                        {group.matches.map((d) => (
+                          <div
+                            key={d.matchId}
+                            className={cn(
+                              "flex items-center justify-between rounded border border-border/30 bg-card/50 px-2 py-1.5 text-xs mb-1",
+                              d.isLive && "border-accent/40 bg-accent/5",
+                            )}
+                            data-testid="live-match-detail"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-foreground flex items-center gap-1.5 flex-wrap">
+                                <span>{d.homeTeam} vs {d.awayTeam}</span>
+                                {d.isLive && (
+                                  <span className="rounded-full bg-red-500/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-red-500 animate-pulse">
+                                    live
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[10px] text-muted-foreground">
+                                <span className="flex items-center gap-1 rounded bg-muted/40 border border-border/20 px-1.5 py-0.5">
+                                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">Real:</span>
+                                  <span className="font-bold text-foreground">{d.homeScore}-{d.awayScore}</span>
+                                </span>
+                                <span className="flex items-center gap-1 rounded bg-muted/40 border border-border/20 px-1.5 py-0.5">
+                                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">Pred:</span>
+                                  <span className="font-bold text-foreground">
+                                    {d.predHome !== null ? `${d.predHome}-${d.predAway}` : "—"}
+                                  </span>
+                                </span>
+                                {d.predHome !== null ? (
+                                  renderOutcomeBadge(d.basePoints)
+                                ) : (
+                                  <span className="rounded bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 text-[9px] font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider">
+                                    Sin pronóstico
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="shrink-0 text-right ml-2">
+                              <span className="text-[10px] text-muted-foreground">
+                                {d.basePoints} ×{" "}
+                                <span className="rounded bg-accent px-1 py-px text-[9px] font-extrabold text-accent-foreground">
+                                  x{d.multiplier.toFixed(d.multiplier % 1 === 0 ? 1 : 2)}
+                                </span>
+                              </span>
+                              <span className="block text-xs font-bold text-accent mt-0.5" data-testid="live-match-points-earned">
+                                {d.earnedPoints.toFixed(1)} pts
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    {grouped.length === 0 && (
+                      <p className="py-2 text-center text-xs text-muted-foreground">
+                        Sin partidos con marcador disponible.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </li>
           );
         })}
