@@ -47,7 +47,7 @@ export async function LiveBoard() {
       supabase
         .from("matches")
         .select(
-          "id, status, matchday, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time",
+          "id, status, matchday, stage, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time",
         )
         .in("status", ["finished", "live"])
         .order("match_time", { ascending: true }),
@@ -71,6 +71,7 @@ export async function LiveBoard() {
     id: match.id,
     status: match.status,
     matchday: match.matchday,
+    stage: match.stage ?? null,
     homeScore: match.home_score,
     awayScore: match.away_score,
     homeTeam: match.home_team ?? null,
