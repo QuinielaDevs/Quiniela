@@ -16,6 +16,10 @@ import type { StandingMatch } from "@/utils/standings";
 export type LiveMatch = StandingMatch & {
   homeTeam: string | null;
   awayTeam: string | null;
+  homeTeamCode?: string | null;
+  awayTeamCode?: string | null;
+  stage?: string | null;
+  groupLabel?: string | null;
 };
 
 /** Fila mínima necesaria para detectar movimientos (subconjunto de ProjectedStandingRow). */

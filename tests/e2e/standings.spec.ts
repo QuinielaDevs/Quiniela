@@ -346,15 +346,14 @@ test.describe("Clasificación oficial (e2e)", () => {
     await page.goto("/standings");
 
     await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+    await expect(page.getByTestId("standings-row")).toHaveCount(4);
 
-    const rows = page.getByTestId("standings-row");
-    
-    // Obtenemos los locators filtrados por displayName
-    const rowUser0 = rows.filter({ hasText: fixture.users[0]!.displayName! });
-    const rowUser1 = rows.filter({ hasText: fixture.users[1]!.displayName! });
+    // Obtenemos los locators filtrados por data-user-id
+    const rowUser0 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`).first();
+    const rowUser1 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[1]!.userId}"]`).first();
 
     // Fila 1 debe ser User 0 (puesto 1 por desempate de duelos: 50.0 > 10.0)
-    await expect(rows.nth(0)).toContainText(fixture.users[0]!.displayName!);
+    await expect(page.getByTestId("standings-row").nth(0)).toContainText(fixture.users[0]!.displayName!);
     await expect(rowUser0.getByTestId("standings-rank")).toHaveText("1");
     await expect(rowUser0.getByTestId("standings-points")).toHaveText("5.0");
     await expect(rowUser0.getByTestId("standings-exact")).toContainText("1 exactos");
@@ -362,7 +361,7 @@ test.describe("Clasificación oficial (e2e)", () => {
     await expect(rowUser0).toContainText("50.0 pts duelos");
 
     // Fila 2 debe ser User 1 (puesto 2)
-    await expect(rows.nth(1)).toContainText(fixture.users[1]!.displayName!);
+    await expect(page.getByTestId("standings-row").nth(1)).toContainText(fixture.users[1]!.displayName!);
     await expect(rowUser1.getByTestId("standings-rank")).toHaveText("2");
     await expect(rowUser1.getByTestId("standings-points")).toHaveText("5.0");
     await expect(rowUser1.getByTestId("standings-exact")).toContainText("1 exactos");
@@ -496,11 +495,11 @@ test.describe("Clasificación oficial (e2e)", () => {
 
     await expect(page.getByTestId("standings-skeleton")).toBeHidden();
 
-    const rows = page.getByTestId("standings-row");
+    await expect(page.getByTestId("standings-row")).toHaveCount(4);
     
-    // Obtenemos los locators filtrados por el displayName de cada usuario para evitar asumir el orden físico de la lista
-    const rowUser0 = rows.filter({ hasText: fixture.users[0]!.displayName! });
-    const rowUser1 = rows.filter({ hasText: fixture.users[1]!.displayName! });
+    // Obtenemos los locators filtrados por data-user-id
+    const rowUser0 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`).first();
+    const rowUser1 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[1]!.userId}"]`).first();
 
     // Ambos deben compartir el rank visible "1"
     await expect(rowUser0.getByTestId("standings-rank")).toHaveText("1");
@@ -580,10 +579,11 @@ test.describe("Clasificación oficial (e2e)", () => {
     await page.goto("/standings");
 
     await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+    await expect(page.getByTestId("standings-row")).toHaveCount(4);
 
     const rowUser0 = page
-      .getByTestId("standings-row")
-      .filter({ hasText: fixture.users[0]!.displayName! });
+      .locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`)
+      .first();
 
     await expect(rowUser0.getByTestId("standings-points")).toHaveText("10.0");
     await expect(rowUser0.getByTestId("standings-exact")).toContainText("1 exactos");
@@ -613,10 +613,11 @@ test.describe("Clasificación oficial (e2e)", () => {
     await page.goto("/standings");
 
     await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+    await expect(page.getByTestId("standings-row")).toHaveCount(4);
 
     const rowUser0 = page
-      .getByTestId("standings-row")
-      .filter({ hasText: fixture.users[0]!.displayName! });
+      .locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`)
+      .first();
 
     await expect(rowUser0.getByTestId("standings-points")).toHaveText("0.0");
     await expect(rowUser0.getByTestId("standings-exact")).toContainText("0 exactos");
@@ -660,12 +661,13 @@ test.describe("Clasificación oficial (e2e)", () => {
     await page.goto("/standings");
 
     await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+    await expect(page.getByTestId("standings-row")).toHaveCount(4);
 
     // Tab General (Acumulada): debe sumar 5.0 + 3.0 = 8.0 pts
     const pointsGeneral = page
       .getByRole("main")
-      .getByTestId("standings-row")
-      .filter({ hasText: fixture.users[0]!.displayName! })
+      .locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`)
+      .first()
       .getByTestId("standings-points");
     await expect(pointsGeneral).toHaveText("8.0");
 
@@ -706,11 +708,12 @@ test.describe("Clasificación oficial (e2e)", () => {
     await expect(pagePending.getByTestId("payment-banner")).toContainText("$100 USD");
 
     // Badges en las filas
-    const rowUser0 = pagePending.getByTestId("standings-row").filter({ hasText: fixture.users[0]!.displayName! });
+    await expect(pagePending.getByTestId("standings-row")).toHaveCount(4);
+    const rowUser0 = pagePending.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`).first();
     await expect(rowUser0.getByTestId("payment-status-badge")).toHaveAttribute("data-status", "pending");
     await expect(rowUser0.getByTestId("payment-status-badge")).toHaveText("Pendiente");
 
-    const rowUser1 = pagePending.getByTestId("standings-row").filter({ hasText: fixture.users[1]!.displayName! });
+    const rowUser1 = pagePending.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[1]!.userId}"]`).first();
     await expect(rowUser1.getByTestId("payment-status-badge")).toHaveAttribute("data-status", "paid");
     await expect(rowUser1.getByTestId("payment-status-badge")).toHaveText("Pagado");
 
@@ -859,9 +862,10 @@ test.describe("Clasificación oficial (e2e)", () => {
 
     await page.goto("/standings");
     await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+    await expect(page.getByTestId("standings-row")).toHaveCount(4);
 
-    const rowUser0 = page.getByTestId("standings-row").filter({ hasText: fixture.users[0]!.displayName! });
-    const rowUser1 = page.getByTestId("standings-row").filter({ hasText: fixture.users[1]!.displayName! });
+    const rowUser0 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`).first();
+    const rowUser1 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[1]!.userId}"]`).first();
 
     // User 0: rank 1, rankChange +1 (was rank 2, now rank 1)
     await expect(rowUser0.getByTestId("standings-rank")).toHaveText("1");
@@ -916,8 +920,9 @@ test.describe("Clasificación oficial (e2e)", () => {
 
     await page.goto("/standings");
     await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+    await expect(page.getByTestId("standings-row")).toHaveCount(4);
 
-    const rowUser0 = page.getByTestId("standings-row").filter({ hasText: fixture.users[0]!.displayName! });
+    const rowUser0 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`).first();
 
     // Verificar que el acordeón no está visible inicialmente
     await expect(rowUser0.getByTestId("standings-accordion")).toBeHidden();

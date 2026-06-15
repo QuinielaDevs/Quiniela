@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Minus, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { PaymentStatusBadge } from "@/components/standings/PaymentStatusBadge";
 import {
@@ -36,6 +36,7 @@ import {
 } from "@/utils/scoring";
 import { phaseKeyForMatch, stageLabel } from "@/utils/tournament";
 import { cn } from "@/utils/utils";
+import { flagForTeamCode } from "@/utils/team-flags";
 
 const POLLING_INTERVAL_MS = 60_000;
 const FLASH_DURATION_MS = 1500;
@@ -61,8 +62,11 @@ type MatchPayload = {
   status?: unknown;
   matchday?: unknown;
   stage?: unknown;
+  group_label?: unknown;
   home_team?: unknown;
   away_team?: unknown;
+  home_team_code?: unknown;
+  away_team_code?: unknown;
   home_score?: unknown;
   away_score?: unknown;
 };
@@ -89,19 +93,153 @@ function mapPayloadToMatch(payload: MatchPayload): LiveMatch | null {
     awayScore: toNullableNumber(payload.away_score),
     homeTeam: toNullableString(payload.home_team),
     awayTeam: toNullableString(payload.away_team),
+    homeTeamCode: toNullableString(payload.home_team_code),
+    awayTeamCode: toNullableString(payload.away_team_code),
+    groupLabel: toNullableString(payload.group_label),
   };
 }
 
-function statusLabel(status: ConnectionState): string {
-  if (status === "live") return "En vivo";
-  if (status === "polling") return "Polling";
-  return "Reconectando...";
-}
 
-function statusClass(status: ConnectionState): string {
-  if (status === "live") return "border-success bg-success/15 text-success";
-  if (status === "polling") return "border-accent bg-accent/15 text-accent";
-  return "border-accent bg-accent/15 text-accent";
+function LiveMatchesCarousel({ matches }: { matches: LiveMatch[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      const isScrollable = scrollWidth > clientWidth + 5;
+      setShowLeftArrow(isScrollable && scrollLeft > 5);
+      setShowRightArrow(isScrollable && scrollLeft < scrollWidth - clientWidth - 5);
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.addEventListener("scroll", checkScroll, { passive: true });
+      checkScroll();
+
+      const resizeObserver = new ResizeObserver(() => checkScroll());
+      resizeObserver.observe(el);
+
+      return () => {
+        el.removeEventListener("scroll", checkScroll);
+        resizeObserver.disconnect();
+      };
+    }
+  }, [matches, checkScroll]);
+
+  const scroll = (direction: "left" | "right") => {
+    if (scrollRef.current) {
+      const amount = direction === "left" ? -200 : 200;
+      scrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
+    }
+  };
+
+  if (matches.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2" data-testid="live-matches-section">
+      <div className="flex items-center gap-2 px-1">
+        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          Partidos en juego
+        </span>
+      </div>
+      <div className="relative group w-full">
+        {showLeftArrow && (
+          <button
+            onClick={() => scroll("left")}
+            data-testid="carousel-scroll-left"
+            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card/85 text-foreground shadow-md backdrop-blur-sm transition-all hover:bg-card active:scale-95"
+            aria-label="Desplazar a la izquierda"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+        )}
+        {showRightArrow && (
+          <button
+            onClick={() => scroll("right")}
+            data-testid="carousel-scroll-right"
+            className="absolute right-1 top-1/2 -translate-y-1/2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card/85 text-foreground shadow-md backdrop-blur-sm transition-all hover:bg-card active:scale-95"
+            aria-label="Desplazar a la derecha"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        )}
+        <div
+          ref={scrollRef}
+          className="flex w-full gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x snap-mandatory"
+        >
+          {matches.map((match) => {
+            const homeFlag = flagForTeamCode(match.homeTeamCode);
+            const awayFlag = flagForTeamCode(match.awayTeamCode);
+            const homeName = match.homeTeamCode || match.homeTeam || "TBD";
+            const awayName = match.awayTeamCode || match.awayTeam || "TBD";
+
+            let metaLabel = "";
+            if (match.stage === "group" || (!match.stage && match.matchday)) {
+              const groupSuffix = match.groupLabel ? ` · Grupo ${match.groupLabel}` : "";
+              metaLabel = `Jornada ${match.matchday}${groupSuffix}`;
+            } else if (match.stage) {
+              metaLabel = stageLabel(match.stage);
+            } else {
+              metaLabel = "Mundial";
+            }
+
+            return (
+              <div
+                key={match.id}
+                className="min-w-[190px] w-[190px] shrink-0 snap-align-none rounded-lg border border-border bg-card/65 backdrop-blur-sm p-3 shadow-sm transition-all hover:bg-card/90"
+                data-testid="live-match-card"
+                data-match-id={match.id}
+              >
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground font-bold">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-destructive"></span>
+                    </span>
+                    <span className="uppercase tracking-wider">{metaLabel}</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        {homeFlag && <span className="text-sm shrink-0">{homeFlag}</span>}
+                        <span className="truncate text-xs font-semibold text-card-foreground">
+                          {homeName}
+                        </span>
+                      </span>
+                      <span
+                        data-testid="live-match-home-score"
+                        className="text-xs font-bold tabular-nums text-accent bg-secondary px-1.5 py-0.5 rounded"
+                      >
+                        {match.homeScore ?? 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        {awayFlag && <span className="text-sm shrink-0">{awayFlag}</span>}
+                        <span className="truncate text-xs font-semibold text-card-foreground">
+                          {awayName}
+                        </span>
+                      </span>
+                      <span
+                        data-testid="live-match-away-score"
+                        className="text-xs font-bold tabular-nums text-accent bg-secondary px-1.5 py-0.5 rounded"
+                      >
+                        {match.awayScore ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ────── Accordion helpers ──────
@@ -261,6 +399,10 @@ export function LiveStandingsBoard({
     [members, matches, predictions],
   );
   const hasLiveMatches = matches.some((match) => match.status === "live");
+  const liveMatches = useMemo(
+    () => matches.filter((match) => match.status === "live"),
+    [matches],
+  );
 
   // Mapa de predicciones para búsqueda O(1) en el acordeón.
   const predByKey = useMemo(
@@ -331,7 +473,7 @@ export function LiveStandingsBoard({
 
       const { data: matchRows, error: matchError } = await supabase
         .from("matches")
-        .select("id, status, matchday, stage, home_team, away_team, home_score, away_score")
+        .select("id, status, matchday, stage, group_label, home_team, away_team, home_team_code, away_team_code, home_score, away_score")
         .in("status", ["finished", "live"])
         .order("match_time", { ascending: true });
       if (matchError || latestRefreshRef.current !== requestId) return;
@@ -345,6 +487,9 @@ export function LiveStandingsBoard({
         awayScore: match.away_score,
         homeTeam: match.home_team ?? null,
         awayTeam: match.away_team ?? null,
+        homeTeamCode: match.home_team_code ?? null,
+        awayTeamCode: match.away_team_code ?? null,
+        groupLabel: match.group_label ?? null,
       }));
 
       const matchIds = nextMatches.map((match) => match.id);
@@ -652,33 +797,26 @@ export function LiveStandingsBoard({
   }, []);
 
   return (
-    <section className="flex flex-col gap-3" data-testid="live-board">
+    <section
+      className="flex flex-col gap-3"
+      data-testid="live-board"
+      data-connection={connection}
+    >
       <GoalToastStack toasts={toasts} onDismiss={dismissToast} />
 
-      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card p-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-lg font-bold">Tabla en Vivo</p>
-          <div className="text-sm text-muted-foreground flex flex-col gap-0.5 mt-0.5">
-            <p>
-              {hasLiveMatches
-                ? "Puntos proyectados con marcadores actuales."
-                : "No hay partidos en vivo ahora."}
-            </p>
-            <p className="text-[11px] text-accent/80 font-medium flex items-center gap-1 mt-0.5">
-              <span>💡</span>
-              <span>Toca o pasa el cursor sobre cualquier fila para ver el desglose en vivo.</span>
-            </p>
-          </div>
+      {liveMatches.length > 0 && <LiveMatchesCarousel matches={liveMatches} />}
+
+      {!hasLiveMatches && (
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-card/40 px-3 py-2 text-xs text-muted-foreground">
+          <span>💤</span>
+          <span>No hay partidos en juego en este momento. Las posiciones proyectadas coinciden con la tabla oficial.</span>
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-full border px-3 py-1 text-xs font-semibold",
-            statusClass(connection),
-          )}
-        >
-          {statusLabel(connection)}
-        </span>
-      </div>
+      )}
+
+      <p className="text-[11px] text-accent/80 font-medium flex items-center gap-1 px-1">
+        <span>💡</span>
+        <span>Toca cualquier fila para ver el desglose en vivo.</span>
+      </p>
 
       <ol className="flex flex-col gap-2">
         {rows.map((row) => {

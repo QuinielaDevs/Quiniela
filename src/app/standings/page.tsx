@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Radio, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 
 import { createClient } from "@/utils/supabase/server";
 import { StandingsTable } from "@/components/standings/StandingsTable";
@@ -131,6 +131,39 @@ export async function StandingsBoard() {
 
   return (
     <>
+      <header className="flex items-center justify-between gap-3 px-1">
+        <div className="min-w-0 flex-1">
+          <BrandEyebrow />
+          <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl lg:text-4xl truncate">
+            Clasificación
+          </h1>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Link
+            href="/live"
+            aria-label="Ver tabla en vivo"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-accent bg-accent/15 px-3 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/25 sm:px-3.5 sm:text-xs"
+          >
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent"></span>
+            </span>
+            En vivo
+          </Link>
+
+          {isAdmin && (
+            <Link
+              href="/standings/manage"
+              aria-label="Gestionar liga"
+              className="inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground sm:px-3.5 sm:text-xs sm:gap-1.5"
+            >
+              <Settings className="size-3 sm:size-3.5" aria-hidden="true" />
+              Gestionar
+            </Link>
+          )}
+        </div>
+      </header>
+
       {showPaymentBanner && league && (
         <PaymentBanner
           leagueId={leagueId}
@@ -139,28 +172,6 @@ export async function StandingsBoard() {
           instructions={league.payment_instructions}
         />
       )}
-
-      <div className="flex justify-end gap-2">
-        <Link
-          href="/live"
-          aria-label="Ver tabla en vivo"
-          className="inline-flex h-12 items-center gap-2 rounded-full border border-accent bg-accent/15 px-4 text-sm font-semibold text-accent"
-        >
-          <Radio className="size-5" aria-hidden="true" />
-          En vivo
-        </Link>
-
-        {isAdmin && (
-          <Link
-            href="/standings/manage"
-            aria-label="Gestionar liga"
-            className="inline-flex h-12 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-semibold text-muted-foreground"
-          >
-            <Settings className="size-5" aria-hidden="true" />
-            Gestionar
-          </Link>
-        )}
-      </div>
 
       <StandingsTable
         members={members}
@@ -190,11 +201,6 @@ export default function StandingsPage() {
       <AppTopNav />
       <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pb-10">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
-          <header className="space-y-1">
-            <BrandEyebrow />
-            <h1 className="font-display text-2xl font-bold lg:text-4xl">Posiciones</h1>
-          </header>
-
           <Suspense fallback={<BoardSkeleton />}>
             <StandingsBoard />
           </Suspense>

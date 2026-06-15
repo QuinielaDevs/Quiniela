@@ -300,12 +300,12 @@ describe("LiveStandingsBoard", () => {
     await act(async () => {
       mock.getStatusHandler()?.("SUBSCRIBED");
     });
-    expect(screen.getByText("En vivo")).toBeInTheDocument();
+    expect(screen.getByTestId("live-board")).toHaveAttribute("data-connection", "live");
 
     await act(async () => {
       mock.getStatusHandler()?.("CHANNEL_ERROR");
     });
-    expect(screen.getByText("Reconectando...")).toBeInTheDocument();
+    expect(screen.getByTestId("live-board")).toHaveAttribute("data-connection", "reconnecting");
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
@@ -318,7 +318,7 @@ describe("LiveStandingsBoard", () => {
     await act(async () => {
       mock.getStatusHandler()?.("SUBSCRIBED");
     });
-    expect(screen.getByText("En vivo")).toBeInTheDocument();
+    expect(screen.getByTestId("live-board")).toHaveAttribute("data-connection", "live");
 
     unmount();
 
@@ -596,7 +596,7 @@ describe("LiveStandingsBoard", () => {
     await act(async () => {
       mock.getStatusHandler()?.("CHANNEL_ERROR");
     });
-    expect(screen.getByText("Reconectando...")).toBeInTheDocument();
+    expect(screen.getByTestId("live-board")).toHaveAttribute("data-connection", "reconnecting");
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
@@ -742,6 +742,91 @@ describe("LiveStandingsBoard", () => {
       // Orden descendente: Jornada 2 primero
       expect(phaseHeaders[0]).toHaveTextContent("Jornada 2");
       expect(phaseHeaders[1]).toHaveTextContent("Jornada 1");
+    });
+  });
+
+  describe("LiveMatchesCarousel", () => {
+    it("renderiza el carrusel de partidos en juego con metadatos enriquecidos y oculta redundancias", () => {
+      const mock = makeSupabaseMock();
+      createClient.mockReturnValue(mock.supabase);
+
+      const matchesWithCodes: LiveMatch[] = [
+        {
+          id: "live-1",
+          status: "live",
+          matchday: 1,
+          homeScore: 2,
+          awayScore: 1,
+          homeTeam: "España",
+          awayTeam: "Alemania",
+          homeTeamCode: "ESP",
+          awayTeamCode: "GER",
+          stage: "group",
+          groupLabel: "A",
+        },
+      ];
+
+      render(
+        <LiveStandingsBoard
+          leagueId="L1"
+          currentUserId="ana"
+          members={members}
+          initialMatches={matchesWithCodes}
+          initialPredictions={predictions}
+        />,
+      );
+
+      // Debe mostrar la sección de partidos en juego
+      expect(screen.getByTestId("live-matches-section")).toBeInTheDocument();
+      expect(screen.getByText("Partidos en juego")).toBeInTheDocument();
+      
+      // Debe mostrar la tarjeta y el metadato enriquecido (Jornada y Grupo)
+      expect(screen.getByTestId("live-match-card")).toBeInTheDocument();
+      expect(screen.getByText("Jornada 1 · Grupo A")).toBeInTheDocument();
+      
+      // Debe mostrar las banderas y códigos correspondientes
+      expect(screen.getByText("🇪🇸")).toBeInTheDocument();
+      expect(screen.getByText("ESP")).toBeInTheDocument();
+      expect(screen.getByTestId("live-match-home-score")).toHaveTextContent("2");
+      expect(screen.getByText("🇩🇪")).toBeInTheDocument();
+      expect(screen.getByText("GER")).toBeInTheDocument();
+      expect(screen.getByTestId("live-match-away-score")).toHaveTextContent("1");
+
+      // No debe haber textos "EN VIVO" dentro de la tarjeta
+      expect(screen.queryByText("EN VIVO")).not.toBeInTheDocument();
+    });
+
+    it("no renderiza el carrusel cuando no hay partidos en juego", () => {
+      const mock = makeSupabaseMock();
+      createClient.mockReturnValue(mock.supabase);
+
+      const noLiveMatches: LiveMatch[] = [
+        {
+          id: "finished-1",
+          status: "finished",
+          matchday: 1,
+          homeScore: 1,
+          awayScore: 1,
+          homeTeam: "España",
+          awayTeam: "Alemania",
+          homeTeamCode: "ESP",
+          awayTeamCode: "GER",
+          stage: "group",
+          groupLabel: "A",
+        },
+      ];
+
+      render(
+        <LiveStandingsBoard
+          leagueId="L1"
+          currentUserId="ana"
+          members={members}
+          initialMatches={noLiveMatches}
+          initialPredictions={predictions}
+        />,
+      );
+
+      expect(screen.queryByTestId("live-matches-section")).not.toBeInTheDocument();
     });
   });
 });

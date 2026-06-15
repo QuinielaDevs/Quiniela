@@ -184,7 +184,7 @@ test.describe("Webhooks Zafronix E2E (e2e)", () => {
     // [WHK-12 Verification] El board reacciona en tiempo real.
     // Como el partido finalizó, ya no hay partidos live -> se muestra el fallback en el board
     await expect(
-      page.getByText("No hay partidos en vivo ahora.").first()
+      page.getByText("No hay partidos en juego en este momento.").first()
     ).toBeVisible({ timeout: 15_000 });
 
     // [WHK-01 Verification]
@@ -200,16 +200,12 @@ test.describe("Webhooks Zafronix E2E (e2e)", () => {
     // User 1 (predijo 1-0): resultado -> 2.0 pts
     // User 2 (predijo 0-2): miss -> 0.0 pts
     await page.goto("/standings");
-    const rows = page.getByTestId("standings-row");
-    await expect(rows).toHaveCount(3);
-
-    const row0 = rows.filter({ hasText: fixture.users[0]!.displayName! });
+    await expect(page.getByTestId("standings-row")).toHaveCount(3);
+    const row0 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`).first();
+    const row1 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[1]!.userId}"]`).first();
+    const row2 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[2]!.userId}"]`).first();
     await expect(row0.getByTestId("standings-points")).toHaveText("5.0");
-
-    const row1 = rows.filter({ hasText: fixture.users[1]!.displayName! });
     await expect(row1.getByTestId("standings-points")).toHaveText("2.0");
-
-    const row2 = rows.filter({ hasText: fixture.users[2]!.displayName! });
     await expect(row2.getByTestId("standings-points")).toHaveText("0.0");
 
     // 3. UI: Ir a /predictions y verificar la card del partido
@@ -361,9 +357,11 @@ test.describe("Webhooks Zafronix E2E (e2e)", () => {
 
     // 5. UI Check: Standings actualizados
     await page.goto("/standings");
-    const rows = page.getByTestId("standings-row");
-    await expect(rows.filter({ hasText: fixture.users[0]!.displayName! }).getByTestId("standings-points")).toHaveText("0.0");
-    await expect(rows.filter({ hasText: fixture.users[1]!.displayName! }).getByTestId("standings-points")).toHaveText("0.0");
+    await expect(page.getByTestId("standings-row")).toHaveCount(3);
+    const rowUser0 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`).first();
+    const rowUser1 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[1]!.userId}"]`).first();
+    await expect(rowUser0.getByTestId("standings-points")).toHaveText("0.0");
+    await expect(rowUser1.getByTestId("standings-points")).toHaveText("0.0");
   });
 
   // ── WHK-05 ──────────────────────────────────────────────────────────

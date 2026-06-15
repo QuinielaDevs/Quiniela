@@ -47,7 +47,7 @@ export async function LiveBoard() {
       supabase
         .from("matches")
         .select(
-          "id, status, matchday, stage, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time",
+          "id, status, matchday, stage, group_label, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time",
         )
         .in("status", ["finished", "live"])
         .order("match_time", { ascending: true }),
@@ -76,6 +76,9 @@ export async function LiveBoard() {
     awayScore: match.away_score,
     homeTeam: match.home_team ?? null,
     awayTeam: match.away_team ?? null,
+    homeTeamCode: match.home_team_code ?? null,
+    awayTeamCode: match.away_team_code ?? null,
+    groupLabel: match.group_label ?? null,
   }));
   const matchIds = matches.map((match) => match.id);
 
@@ -138,14 +141,25 @@ export default function LivePage() {
       <AppTopNav />
       <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pb-10">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
-          <header className="flex items-center justify-between">
-            <div className="space-y-1">
+          <header className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1 flex flex-col">
               <BrandEyebrow />
-              <h1 className="font-display text-2xl font-bold lg:text-4xl">Tabla en Vivo</h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl lg:text-4xl truncate">
+                  Clasificación
+                </h1>
+                <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 text-[10px] font-bold uppercase tracking-wider text-destructive px-2 py-0.5 border border-destructive/20 shrink-0">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-destructive"></span>
+                  </span>
+                  En vivo
+                </span>
+              </div>
             </div>
             <Link
               href="/standings"
-              className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors shrink-0"
             >
               Volver
             </Link>
