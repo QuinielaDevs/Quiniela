@@ -23,7 +23,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 import { createAdminClient } from "./helpers/admin";
 import { createCleanupStack } from "./helpers/cleanup";
-import { deleteMatches, liveMatch, seedMatches } from "./helpers/seed/matches";
+import { deleteAllTestMatches, deleteMatches, liveMatch, seedMatches } from "./helpers/seed/matches";
 import { seedPrediction } from "./helpers/seed/predictions";
 import { createLeagueWithUsers, type LeagueWithUsers } from "./helpers/users";
 
@@ -55,6 +55,9 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
   let homeTeamName = "";
 
   test.beforeAll(async ({ browser }) => {
+    // Limpiar cualquier partido de test residual de ejecuciones anteriores
+    await deleteAllTestMatches();
+
     // Liga de 3 usuarios; solo el primero (viewer) lleva contexto abierto.
     fixture = await createLeagueWithUsers(browser, {
       members: 3,
@@ -126,7 +129,8 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
     // Navegar el viewer a /live y esperar suscripción Realtime activa
     const page = fixture.users[0]!.page!;
     await navigateToLivePage(page);
-    await expect(page.getByText("En vivo").first()).toBeVisible({ timeout: 15_000 });
+    await navigateToLivePage(page);
+    await expect(page.getByTestId("live-board").first()).toHaveAttribute("data-connection", "live", { timeout: 15_000 });
   });
 
   test.afterAll(async () => {
@@ -223,6 +227,13 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
     // Debe haber al menos 2 toasts visibles en el stack
     const toasts = page.getByTestId("goal-toast");
     await expect(toasts.nth(1)).toBeVisible({ timeout: 15_000 });
+
+    // Esperar a que la tabla se actualice con la puntuación de 2-1
+    // (E2E Jugador 2 sube al puesto #1 con 5.0 pts por exacto)
+    const rows = page.getByTestId("live-row");
+    await expect(rows.nth(0)).toContainText("E2E Jugador 2", { timeout: 15_000 });
+    await expect(rows.nth(1)).toContainText("E2E Jugador 0");
+    await expect(rows.nth(2)).toContainText("E2E Jugador 1");
   });
 
   // ── LIVE-05 ────────────────────────────────────────────────────────
@@ -231,6 +242,22 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
     // BUG-005 corregido: el pointerdown sobre el botón de descarte ya no inicia
     // el swipe ni captura el puntero, así que el click del botón llega.
     const page = fixture.users[0]!.page!;
+
+    // Asegurar que el marcador de partida es 2-1 antes de la transición a 3-1,
+    // en caso de que este test se corra de forma aislada.
+    const { error: ePre } = await admin
+      .from("matches")
+      .update({ home_score: 2, away_score: 1 })
+      .eq("id", matchId);
+    expect(ePre).toBeNull();
+
+    // Esperar a que la tabla se actualice con la puntuación de 2-1
+    // (E2E Jugador 2 en el puesto #1 con 5.0 pts)
+    const rows = page.getByTestId("live-row");
+    await expect(rows.nth(0)).toContainText("E2E Jugador 2", { timeout: 15_000 });
+
+    // Esperar a que el estado y render anterior se asienten
+    await page.waitForTimeout(2000);
 
     // Gol 4: 2-1 → 3-1 (genera toast fresco en caso de que los anteriores
     // se hayan auto-descartado tras los 5.5 s de AUTO_DISMISS_MS).
@@ -270,10 +297,9 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
       .eq("id", matchId);
     expect(error).toBeNull();
 
-    // El board debe consolidar: ya no hay partidos live →
-    // el texto cambia a "No hay partidos en vivo ahora." (copiado de LiveStandingsBoard.tsx)
+    // El board debe consolidar: ya no hay partidos live
     await expect(
-      page.getByText("No hay partidos en vivo ahora.").first(),
+      page.getByText("No hay partidos en juego en este momento.").first(),
     ).toBeVisible({ timeout: 15_000 });
 
     // Las filas siguen presentes (el partido finished está en el cálculo)
@@ -329,7 +355,7 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
 
     // Navegar y esperar carga
     await page.goto("/live");
-    await expect(page.getByText("En vivo").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("live-board").first()).toHaveAttribute("data-connection", "live", { timeout: 15_000 });
 
     const rows = page.getByTestId("live-row");
     await expect(rows).toHaveCount(3);
@@ -386,7 +412,7 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
     expect(eGoal).toBeNull();
 
     await page.goto("/live");
-    await expect(page.getByText("En vivo").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("live-board").first()).toHaveAttribute("data-connection", "live", { timeout: 15_000 });
 
     const rowUser1 = page.getByTestId("live-row").filter({ hasText: "E2E Jugador 1" });
 
@@ -415,5 +441,74 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
     // Colapsar el acordeón
     await rowUser1.getByTestId("live-row-toggle").click();
     await expect(rowUser1.getByTestId("live-accordion")).toBeHidden();
+  });
+
+  test("LIVE-10: Carrusel de partidos en juego (UI/UX) y Scroll Horizontal", async () => {
+    const page = fixture.users[0]!.page!;
+
+    // 1. Crear múltiples partidos en vivo para forzar scroll horizontal
+    const seeded = await seedMatches([
+      liveMatch({ home: 0, away: 0 }, { matchday: 1, homeTeamCode: "ESP", awayTeamCode: "GER" }),
+      liveMatch({ home: 1, away: 1 }, { matchday: 1, homeTeamCode: "FRA", awayTeamCode: "POR" }),
+      liveMatch({ home: 2, away: 0 }, { matchday: 2, homeTeamCode: "ARG", awayTeamCode: "BRA" }),
+      liveMatch({ home: 0, away: 3 }, { matchday: 2, homeTeamCode: "USA", awayTeamCode: "MEX" }),
+    ]);
+    const m1 = seeded[0]!;
+    const m2 = seeded[1]!;
+    const m3 = seeded[2]!;
+    const m4 = seeded[3]!;
+    stack.add(() => deleteMatches([m1.id, m2.id, m3.id, m4.id]));
+
+    await page.goto("/live");
+    await expect(page.getByTestId("live-board").first()).toHaveAttribute("data-connection", "live", { timeout: 15_000 });
+
+    // Verificar sección del carrusel y título
+    const carouselSection = page.getByTestId("live-matches-section").first();
+    await expect(carouselSection).toBeVisible();
+    await expect(carouselSection.getByText("Partidos en juego")).toBeVisible();
+
+    // Verificar tarjeta de partido de España vs Alemania
+    const espMatchCard = page.locator('[data-testid="live-match-card"]').filter({ hasText: "ESP" }).first();
+    await expect(espMatchCard).toBeVisible();
+    await expect(espMatchCard.getByText("Jornada 1 · Grupo C")).toBeVisible(); // liveMatch usa Grupo C por defecto
+    await expect(espMatchCard.getByText("EN VIVO")).toBeHidden(); // No debe haber texto redundante "EN VIVO"
+    await expect(espMatchCard.getByText("🇪🇸")).toBeVisible();
+    await expect(espMatchCard.getByText("🇩🇪")).toBeVisible();
+
+    // Marcadores correctos
+    await expect(espMatchCard.getByTestId("live-match-home-score")).toHaveText("0");
+    await expect(espMatchCard.getByTestId("live-match-away-score")).toHaveText("0");
+
+    // 2. Verificar y probar el scroll horizontal con las flechas
+    const leftArrow = page.getByTestId("carousel-scroll-left");
+    const rightArrow = page.getByTestId("carousel-scroll-right");
+
+    // Inicialmente al inicio: flecha izquierda oculta, flecha derecha visible
+    await expect(leftArrow).toBeHidden();
+    await expect(rightArrow).toBeVisible();
+
+    // Hacer clic en la flecha derecha para desplazar horizontalmente
+    await rightArrow.click();
+    await page.waitForTimeout(600); // Esperar a que termine la animación de desplazamiento suave
+
+    // Ahora la flecha izquierda debería ser visible
+    await expect(leftArrow).toBeVisible();
+
+    // 3. Si eliminamos todos los partidos activos del test actual
+    await deleteMatches([m1.id, m2.id, m3.id, m4.id]);
+
+    await page.goto("/live");
+    await expect(page.getByTestId("live-board").first()).toHaveAttribute("data-connection", "live", { timeout: 15_000 });
+
+    // El carrusel no debe renderizarse si solo queda el match original de beforeAll (el cual se cambia a finished para limpiar)
+    const { error: eCleanup } = await admin
+      .from("matches")
+      .update({ status: "finished" })
+      .eq("id", matchId);
+    expect(eCleanup).toBeNull();
+
+    await page.goto("/live");
+    await expect(page.getByTestId("live-board").first()).toHaveAttribute("data-connection", "live", { timeout: 15_000 });
+    await expect(page.getByTestId("live-matches-section")).toBeHidden();
   });
 });

@@ -154,10 +154,12 @@ test.describe("Panel de administración (e2e)", () => {
 
     // (a) Verificar que standings refleja los puntos nuevos (User 2: exacto 5.0 pts, User 1: resultado 2.0 pts)
     await page.goto("/standings");
-    const rowUser2 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[2]!.userId}"]`);
+    await expect(page.getByTestId("standings-row")).toHaveCount(3);
+
+    const rowUser2 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[2]!.userId}"]`).first();
     await expect(rowUser2.getByTestId("standings-points")).toHaveText("5.0");
 
-    const rowUser1 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[1]!.userId}"]`);
+    const rowUser1 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[1]!.userId}"]`).first();
     await expect(rowUser1.getByTestId("standings-points")).toHaveText("2.0");
 
     // (b) BD: predictions.points_earned y evaluated_at poblados

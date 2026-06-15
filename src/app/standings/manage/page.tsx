@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/server";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
@@ -155,14 +156,24 @@ export default function ManageLeaguePage() {
       <AppTopNav />
       <main className="min-h-svh bg-background px-4 py-6 pb-24 text-foreground lg:px-8 lg:pb-10">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4 lg:max-w-5xl lg:gap-6">
-          <header className="flex items-start justify-between gap-2">
-            <div className="space-y-1">
+          <header className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1 flex flex-col">
               <BrandEyebrow />
-              <h1 className="font-display text-2xl font-bold lg:text-4xl">Gestión de liga</h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl lg:text-4xl truncate">
+                  Gestión de liga
+                </h1>
+                <span className="rounded-sm border border-primary bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary shrink-0">
+                  Admin
+                </span>
+              </div>
             </div>
-            <span className="mt-1 rounded-sm border border-primary bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
-              Admin
-            </span>
+            <Link
+              href="/standings"
+              className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              Volver
+            </Link>
           </header>
 
           <Suspense fallback={<BoardSkeleton />}>
