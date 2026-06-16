@@ -1051,7 +1051,7 @@ export function LiveStandingsBoard({
                             </div>
                             <div className="shrink-0 text-right ml-2">
                               <span className="text-[10px] text-muted-foreground">
-                                {d.basePoints}{" "}
+                                {d.basePoints} ·{" "}
                                 <span className="rounded bg-accent px-1 py-px text-[9px] font-extrabold text-accent-foreground">
                                   x{d.multiplier.toFixed(d.multiplier % 1 === 0 ? 1 : 2)}
                                 </span>
