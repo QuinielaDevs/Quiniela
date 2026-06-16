@@ -37,8 +37,8 @@ const MEMBERS: StandingMember[] = [
 ];
 
 const MATCHES: StandingMatch[] = [
-  { id: "m1", status: "finished", matchday: 1, stage: "group", homeScore: 1, awayScore: 0, homeTeam: "México", awayTeam: "Canadá" },
-  { id: "m2", status: "finished", matchday: 2, stage: "group", homeScore: 0, awayScore: 2, homeTeam: "Brasil", awayTeam: "Argentina" },
+  { id: "m1", status: "finished", matchday: 1, stage: "group", homeScore: 1, awayScore: 0, homeTeam: "México", awayTeam: "Canadá", matchTime: "2026-06-15T15:00:00Z" },
+  { id: "m2", status: "finished", matchday: 2, stage: "group", homeScore: 0, awayScore: 2, homeTeam: "Brasil", awayTeam: "Argentina", matchTime: "2026-06-16T18:00:00Z" },
 ];
 
 const PREDICTIONS: StandingPrediction[] = [
@@ -201,6 +201,66 @@ describe("StandingsTable", () => {
       expect(screen.getByTestId("summary-base")).toHaveTextContent("5.0");
       expect(screen.getByTestId("summary-mults")).toHaveTextContent("+5.0");
       expect(screen.getByTestId("match-points-earned")).toHaveTextContent("10.0 pts");
+    });
+
+    it("ordena los partidos dentro de la misma jornada de más reciente a más antiguo", () => {
+      const matches: StandingMatch[] = [
+        { id: "j1-a", status: "finished", matchday: 1, stage: "group", homeScore: 1, awayScore: 0, homeTeam: "España", awayTeam: "Croacia", matchTime: "2026-06-15T15:00:00Z" },
+        { id: "j1-b", status: "finished", matchday: 1, stage: "group", homeScore: 2, awayScore: 1, homeTeam: "Francia", awayTeam: "Bélgica", matchTime: "2026-06-15T18:00:00Z" },
+        { id: "j1-c", status: "finished", matchday: 1, stage: "group", homeScore: 0, awayScore: 0, homeTeam: "Alemania", awayTeam: "Italia", matchTime: "2026-06-15T21:00:00Z" },
+      ];
+      const preds: StandingPrediction[] = [
+        { userId: "a", matchId: "j1-a", homeScorePred: 1, awayScorePred: 0, multiplier: 1 },
+        { userId: "a", matchId: "j1-b", homeScorePred: 2, awayScorePred: 1, multiplier: 1 },
+        { userId: "a", matchId: "j1-c", homeScorePred: 0, awayScorePred: 0, multiplier: 1 },
+      ];
+      render(
+        <StandingsTable
+          members={[MEMBERS[0]!]}
+          matches={matches}
+          predictions={preds}
+        />,
+      );
+      fireEvent.click(screen.getAllByTestId("standings-row-toggle")[0]!);
+
+      const matchDetails = screen.getAllByTestId("standings-match-detail");
+      // Orden esperado: 21h → 18h → 15h (más reciente primero)
+      expect(matchDetails[0]).toHaveTextContent("Alemania vs Italia");
+      expect(matchDetails[1]).toHaveTextContent("Francia vs Bélgica");
+      expect(matchDetails[2]).toHaveTextContent("España vs Croacia");
+    });
+
+    it("ordena las fases descendentemente y dentro de cada fase por match_time desc", () => {
+      const matches: StandingMatch[] = [
+        { id: "j1-early", status: "finished", matchday: 1, stage: "group", homeScore: 1, awayScore: 0, homeTeam: "Equipo-A", awayTeam: "Equipo-B", matchTime: "2026-06-10T15:00:00Z" },
+        { id: "j1-late",  status: "finished", matchday: 1, stage: "group", homeScore: 2, awayScore: 1, homeTeam: "Equipo-C", awayTeam: "Equipo-D", matchTime: "2026-06-10T20:00:00Z" },
+        { id: "j2-only",  status: "finished", matchday: 2, stage: "group", homeScore: 0, awayScore: 2, homeTeam: "Equipo-E", awayTeam: "Equipo-F", matchTime: "2026-06-17T18:00:00Z" },
+      ];
+      const preds: StandingPrediction[] = [
+        { userId: "a", matchId: "j1-early", homeScorePred: 1, awayScorePred: 0, multiplier: 1 },
+        { userId: "a", matchId: "j1-late",  homeScorePred: 2, awayScorePred: 1, multiplier: 1 },
+        { userId: "a", matchId: "j2-only",  homeScorePred: 0, awayScorePred: 2, multiplier: 1 },
+      ];
+      render(
+        <StandingsTable
+          members={[MEMBERS[0]!]}
+          matches={matches}
+          predictions={preds}
+        />,
+      );
+      fireEvent.click(screen.getAllByTestId("standings-row-toggle")[0]!);
+
+      const phaseHeaders = screen.getAllByTestId("standings-phase-header");
+      // Jornada 2 (más reciente) primero, luego Jornada 1
+      expect(phaseHeaders[0]).toHaveTextContent("Jornada 2");
+      expect(phaseHeaders[1]).toHaveTextContent("Jornada 1");
+
+      const matchDetails = screen.getAllByTestId("standings-match-detail");
+      // J2: solo Equipo-E vs Equipo-F
+      expect(matchDetails[0]).toHaveTextContent("Equipo-E vs Equipo-F");
+      // J1: primero el de las 20h, luego el de las 15h
+      expect(matchDetails[1]).toHaveTextContent("Equipo-C vs Equipo-D");
+      expect(matchDetails[2]).toHaveTextContent("Equipo-A vs Equipo-B");
     });
 
     it("solo expande una fila a la vez", () => {

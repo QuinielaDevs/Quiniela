@@ -40,6 +40,7 @@ export type StandingMatch = {
   homeScore: number | null;
   awayScore: number | null;
   updatedAt?: string; // timestamp ISO de actualización
+  matchTime?: string; // timestamp ISO de kick-off (para ordenar dentro de la fase)
   homeTeam?: string | null;
   awayTeam?: string | null;
 };

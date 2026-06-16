@@ -74,6 +74,7 @@ export async function LiveBoard() {
     stage: match.stage ?? null,
     homeScore: match.home_score,
     awayScore: match.away_score,
+    matchTime: match.match_time,
     homeTeam: match.home_team ?? null,
     awayTeam: match.away_team ?? null,
     homeTeamCode: match.home_team_code ?? null,

@@ -278,6 +278,7 @@ type MatchDetail = {
   earnedPoints: number;
   phaseKey: string;
   isLive: boolean;
+  matchTime?: string;
 };
 
 function computeLiveBreakdown(
@@ -317,6 +318,7 @@ function computeLiveBreakdown(
         matchday: match.matchday,
       }),
       isLive: match.status === "live",
+      matchTime: match.matchTime,
     });
   }
 
@@ -337,7 +339,12 @@ function groupByPhaseDesc(
     .sort(([a], [b]) => phaseOrdinalDesc(b) - phaseOrdinalDesc(a))
     .map(([key, matches]) => ({
       label: phaseLabelForKey(key),
-      matches,
+      matches: [...matches].sort((a, b) => {
+        const tA = a.matchTime ? new Date(a.matchTime).getTime() : 0;
+        const tB = b.matchTime ? new Date(b.matchTime).getTime() : 0;
+        if (tB !== tA) return tB - tA;
+        return b.matchId.localeCompare(a.matchId);
+      }),
     }));
 }
 
@@ -1044,7 +1051,7 @@ export function LiveStandingsBoard({
                             </div>
                             <div className="shrink-0 text-right ml-2">
                               <span className="text-[10px] text-muted-foreground">
-                                {d.basePoints} ×{" "}
+                                {d.basePoints}{" "}
                                 <span className="rounded bg-accent px-1 py-px text-[9px] font-extrabold text-accent-foreground">
                                   x{d.multiplier.toFixed(d.multiplier % 1 === 0 ? 1 : 2)}
                                 </span>

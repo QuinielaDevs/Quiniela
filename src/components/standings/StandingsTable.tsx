@@ -61,6 +61,7 @@ type MatchDetail = {
   basePoints: number;
   earnedPoints: number;
   phaseKey: string;
+  matchTime?: string;
 };
 
 /** Calcula el desglose de puntos de un usuario para los partidos en alcance. */
@@ -97,13 +98,15 @@ function computeUserBreakdown(
         stage: match.stage ?? null,
         matchday: match.matchday,
       }),
+      matchTime: match.matchTime,
     });
   }
 
   return details;
 }
 
-/** Agrupa partidos por fase, ordenados descendentemente (fases más recientes primero). */
+/** Agrupa partidos por fase, ordenados descendentemente (fases más recientes primero).
+ *  Dentro de cada fase los partidos se ordenan por match_time descendente (más reciente primero). */
 function groupByPhaseDesc(details: MatchDetail[]): { label: string; matches: MatchDetail[] }[] {
   const grouped = new Map<string, MatchDetail[]>();
   for (const d of details) {
@@ -116,7 +119,12 @@ function groupByPhaseDesc(details: MatchDetail[]): { label: string; matches: Mat
     .sort(([a], [b]) => phaseOrdinalDesc(b) - phaseOrdinalDesc(a))
     .map(([key, matches]) => ({
       label: phaseLabelForKey(key),
-      matches,
+      matches: [...matches].sort((a, b) => {
+        const tA = a.matchTime ? new Date(a.matchTime).getTime() : 0;
+        const tB = b.matchTime ? new Date(b.matchTime).getTime() : 0;
+        if (tB !== tA) return tB - tA;
+        return b.matchId.localeCompare(a.matchId);
+      }),
     }));
 }
 
@@ -473,7 +481,7 @@ export function StandingsTable({
                             </div>
                             <div className="shrink-0 text-right ml-2">
                               <span className="text-[10px] text-muted-foreground">
-                                {d.basePoints} ×{" "}
+                                {d.basePoints} ·{" "}
                                 <span className="rounded bg-accent px-1 py-px text-[9px] font-extrabold text-accent-foreground">
                                   x{d.multiplier.toFixed(d.multiplier % 1 === 0 ? 1 : 2)}
                                 </span>
