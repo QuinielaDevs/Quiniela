@@ -157,6 +157,13 @@ describe("Pin del Schema Canónico (REST API GET /matches)", () => {
       expect(result.success).toBe(true);
     });
 
+    it("acepta referee como objeto { name, country } con country null", () => {
+      const result = zafronixMatchSchema.safeParse(
+        makeMatch({ referee: { name: "John Doe", country: null } as unknown as string }),
+      );
+      expect(result.success).toBe(true);
+    });
+
     it("acepta referee null", () => {
       const result = zafronixMatchSchema.safeParse(makeMatch({ referee: null }));
       expect(result.success).toBe(true);

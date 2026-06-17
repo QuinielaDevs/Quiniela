@@ -53,7 +53,7 @@ export const zafronixMatchSchema = z.object({
   referee: z
     .union([
       z.string(),
-      z.object({ name: z.string(), country: z.string().optional() }),
+      z.object({ name: z.string(), country: z.string().nullable().optional() }),
     ])
     .nullable()
     .optional(),

@@ -548,8 +548,8 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
 
       const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
 
-      // Ningún partido debería haberse actualizado
-      expect(result).toEqual({ status: "updated", updated: 0, changes: [] });
+      // La API devolvió 200 pero sin diferencias reales → no_changes
+      expect(result).toEqual({ status: "no_changes", updated: 0, changes: [] });
     });
 
     it("salvaguarda: no sobreescribe marcadores locales ni degrada estado si la API retorna null", async () => {
@@ -579,8 +579,8 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
 
       const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
 
-      // Ningún partido debería haberse actualizado (updated: 0) ya que se activó la salvaguarda
-      expect(result).toEqual({ status: "updated", updated: 0, changes: [] });
+      // Ningún partido debería haberse actualizado (updated: 0) ya que se activó la salvaguarda → no_changes
+      expect(result).toEqual({ status: "no_changes", updated: 0, changes: [] });
 
       // Verificar que el partido local sigue intacto
       const { data: match } = await supabase
@@ -610,7 +610,8 @@ describe("sync-matches — Sincronización de Respaldo con ETags", () => {
 
       const result = await syncMatches(supabase, TEST_API_KEY, mockFetch);
 
-      expect(result).toEqual({ status: "updated", updated: 0, changes: [] });
+      // Partido no encontrado en la DB → no hay nada que actualizar → no_changes
+      expect(result).toEqual({ status: "no_changes", updated: 0, changes: [] });
     });
   });
 

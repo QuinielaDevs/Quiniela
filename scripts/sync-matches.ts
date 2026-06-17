@@ -118,6 +118,7 @@ export async function syncMatches(
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<
   | { status: "not_modified"; changes: never[] }
+  | { status: "no_changes"; updated: 0; changes: never[] }
   | {
       status: "updated";
       updated: number;
@@ -258,16 +259,40 @@ export async function syncMatches(
     const apiHomeScore = apiMatch.homeScore !== null ? apiMatch.homeScore : local.home_score;
     const apiAwayScore = apiMatch.awayScore !== null ? apiMatch.awayScore : local.away_score;
 
-    // Salvaguarda: No degradar el estado local a 'scheduled' si ya está en 'live' o 'finished'
+    // Salvaguarda: No degradar el estado local a un estado de menor peso.
+    // Jerarquía: finished > live > scheduled (canceled/suspended son terminales igual que finished)
+    // Un partido finalizado nunca puede volver a 'live' o 'scheduled'.
+    // Un partido en vivo nunca puede volver a 'scheduled'.
+    const STATUS_WEIGHT: Record<string, number> = {
+      scheduled: 0,
+      live: 1,
+      finished: 2,
+      suspended: 2,
+      canceled: 2,
+    };
     let finalStatus = mappedStatus;
-    if (mappedStatus === "scheduled" && (local.status === "live" || local.status === "finished")) {
+    const localWeight = STATUS_WEIGHT[local.status] ?? 0;
+    const mappedWeight = STATUS_WEIGHT[mappedStatus] ?? 0;
+    if (mappedWeight < localWeight) {
       finalStatus = local.status;
     }
 
+    // Salvaguarda: No sobreescribir marcadores de un partido ya finalizado localmente
+    // a menos que la API también lo reporte como finished (tiene result string).
+    // Esto evita que un estado inconsistente temporal de la API (scores sin result) 
+    // corrompa un resultado ya guardado. Las correcciones legítimas llegan vía webhook (match.patched).
+    const apiReportsFinished = mappedStatus === "finished";
+    const effectiveHomeScore = (local.status === "finished" && !apiReportsFinished)
+      ? local.home_score
+      : apiHomeScore;
+    const effectiveAwayScore = (local.status === "finished" && !apiReportsFinished)
+      ? local.away_score
+      : apiAwayScore;
+
     // Detectar si hay cambios relevantes
     const scoreChanged =
-      local.home_score !== apiHomeScore ||
-      local.away_score !== apiAwayScore;
+      local.home_score !== effectiveHomeScore ||
+      local.away_score !== effectiveAwayScore;
     const statusChanged = local.status !== finalStatus;
 
     // Detectar si el horario (match_time) cambió en la API
@@ -296,8 +321,8 @@ export async function syncMatches(
     // Construir objeto de actualización
     const updateData: { id: string; [key: string]: unknown } = {
       id: local.id,
-      home_score: apiHomeScore,
-      away_score: apiAwayScore,
+      home_score: effectiveHomeScore,
+      away_score: effectiveAwayScore,
       status: finalStatus,
       updated_at: new Date().toISOString(),
     };
@@ -315,8 +340,8 @@ export async function syncMatches(
 
     const changesObj: Record<string, { from: unknown; to: unknown }> = {};
     if (scoreChanged) {
-      changesObj.home_score = { from: local.home_score, to: apiHomeScore };
-      changesObj.away_score = { from: local.away_score, to: apiAwayScore };
+      changesObj.home_score = { from: local.home_score, to: effectiveHomeScore };
+      changesObj.away_score = { from: local.away_score, to: effectiveAwayScore };
     }
     if (statusChanged) {
       changesObj.status = { from: local.status, to: finalStatus };
@@ -359,6 +384,15 @@ export async function syncMatches(
     await saveETag(supabase, newETag);
   } else if (!allUpdatesSucceeded) {
     console.warn("⚠️ Algunas actualizaciones de partidos fallaron. No se guardará el nuevo ETag para reintentar.");
+  }
+
+  // Si la API devolvió 200 pero ningún partido tuvo diferencias reales, indicarlo explícitamente
+  if (updateDataList.length === 0) {
+    console.log(
+      `✅ Sincronización completada. La API retornó datos nuevos (200) pero sin diferencias aplicables en la DB. ` +
+        `ETag actualizado: ${newETag && allUpdatesSucceeded ? newETag : "(no actualizado)"}`,
+    );
+    return { status: "no_changes", updated: 0, changes: [] };
   }
 
   console.log(
