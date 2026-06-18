@@ -44,11 +44,11 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
     // tab por defecto.
     const page = context.page;
     await page.goto("/predictions");
-    const activeTab = page.locator('[role="tab"][aria-selected="true"]');
+    const activeTabs = page.locator('[role="tab"][aria-selected="true"]');
     // toHaveCount(1) absorbe el duplicado transitorio del tablist en dev
     // (ver helpers/ui.ts) antes de assertear el texto del tab activo.
-    await expect(activeTab).toHaveCount(1);
-    await expect(activeTab).toContainText("Jornada 1");
+    await expect(activeTabs).toHaveCount(1);
+    await expect(activeTabs.first()).toContainText("Jornada 1");
   });
 
   test("puede navegar a tabs de fases pasadas (Jornada 1)", async () => {
@@ -455,7 +455,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
 
       await admin
         .from("matches")
-        .update({ match_time: pastTimeStr, status: "live" })
+        .update({ match_time: pastTimeStr, status: "live", matchday: 2 })
         .eq("id", j1KickoffMatch.id);
 
       // Recargar la página para limpiar estado de cookies/sesión
@@ -508,7 +508,7 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
         }
         await admin
           .from("matches")
-          .update({ status, match_time })
+          .update({ status, match_time, matchday: m.matchday })
           .eq("id", m.id);
       }
 

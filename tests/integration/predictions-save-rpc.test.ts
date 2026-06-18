@@ -270,6 +270,75 @@ describe("fn_save_prediction: multiplicador y upsert", () => {
     expect(Number(asPrediction(data).multiplier)).toBe(1.25);
   });
 
+  it("Jornada 3 escala por distancia pre-torneo (J3 → 1.50)", async () => {
+    const matchId = await insertMatchWithMatchday(
+      new Date(Date.now() + 40 * DAY_MS).toISOString(),
+      3,
+    );
+    const clientA = createAuthedClient(userA.token);
+
+    const { data, error } = await clientA
+      .rpc("fn_save_prediction", {
+        p_league_id: leagueId,
+        p_match_id: matchId,
+        p_home_score_pred: 0,
+        p_away_score_pred: 0,
+      })
+      .single();
+    expect(error).toBeNull();
+    expect(Number(asPrediction(data).multiplier)).toBe(1.50);
+  });
+
+  it("Jornada 3 se devalúa a 1.25 cuando la jornada en curso avanza a la Jornada 2", async () => {
+    // 1) Crear el partido de Jornada 3
+    const j3MatchId = await insertMatchWithMatchday(
+      new Date(Date.now() + 40 * DAY_MS).toISOString(),
+      3,
+    );
+
+    // 2) Crear un partido de Jornada 2 que simulará el kickoff
+    const j2MatchId = await insertMatchWithMatchday(
+      new Date(Date.now() + 40 * DAY_MS).toISOString(),
+      2,
+    );
+
+    const clientA = createAuthedClient(userA.token);
+
+    // 3) Guardar predicción para J3 pre-torneo (debe ser 1.50)
+    const { data: dataPre, error: errPre } = await clientA
+      .rpc("fn_save_prediction", {
+        p_league_id: leagueId,
+        p_match_id: j3MatchId,
+        p_home_score_pred: 0,
+        p_away_score_pred: 0,
+      })
+      .single();
+    expect(errPre).toBeNull();
+    expect(Number(asPrediction(dataPre).multiplier)).toBe(1.50);
+
+    // 4) Avanzar el torneo a la Jornada 2: ponemos el partido de J2 en el pasado y en estado 'live'
+    await admin
+      .from("matches")
+      .update({
+        match_time: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        status: "live"
+      })
+      .eq("id", j2MatchId);
+
+    // 5) Volver a guardar/editar la predicción de J3 durante la Jornada 2.
+    // Como el torneo avanzó a J2, la distancia a J3 es 1, por lo que el multiplicador debe bajar a 1.25.
+    const { data: dataPost, error: errPost } = await clientA
+      .rpc("fn_save_prediction", {
+        p_league_id: leagueId,
+        p_match_id: j3MatchId,
+        p_home_score_pred: 1,
+        p_away_score_pred: 0,
+      })
+      .single();
+    expect(errPost).toBeNull();
+    expect(Number(asPrediction(dataPost).multiplier)).toBe(1.25);
+  });
+
   it("el dueño conserva la lectura de su propia prediccion", async () => {
     const matchId = await insertMatch(
       new Date(Date.now() + 20 * DAY_MS).toISOString(),
