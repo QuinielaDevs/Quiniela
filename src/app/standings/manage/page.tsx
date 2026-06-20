@@ -114,6 +114,16 @@ export async function ManageBoard() {
     }),
   );
 
+  const now = Date.now();
+  const sortedMatches = [...matches].sort((a, b) => {
+    const diffA = Math.abs(new Date(a.matchTime).getTime() - now);
+    const diffB = Math.abs(new Date(b.matchTime).getTime() - now);
+    if (diffA !== diffB) {
+      return diffA - diffB;
+    }
+    return new Date(a.matchTime).getTime() - new Date(b.matchTime).getTime();
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-3">
@@ -131,7 +141,7 @@ export async function ManageBoard() {
         <h2 className="font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">
           Resultados de partidos
         </h2>
-        <MatchAdminList matches={matches} />
+        <MatchAdminList matches={sortedMatches} />
       </section>
     </div>
   );
