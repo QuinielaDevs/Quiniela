@@ -49,7 +49,7 @@ export async function recalculateTournamentAdvancement(): Promise<
     const { data: matches, error: matchesError } = await supabase
       .from("matches")
       .select(MATCH_ADVANCEMENT_SELECT)
-      .like("external_ref", "wc2026:%")
+      .like("external_ref", "2026-%")
       .order("match_time", { ascending: true });
 
     if (matchesError) {
