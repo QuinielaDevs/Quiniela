@@ -29,6 +29,9 @@ function makeMatch(overrides: Partial<AdminMatchView> = {}): AdminMatchView {
     awayScore: null,
     groupLabel: "A",
     matchday: 1,
+    bracketSlot: null,
+    penaltiesHomeScore: null,
+    penaltiesAwayScore: null,
     ...overrides,
   };
 }
@@ -90,6 +93,8 @@ describe("MatchAdminList", () => {
         homeScore: 2,
         awayScore: 1,
         status: "finished",
+        penaltiesHomeScore: null,
+        penaltiesAwayScore: null,
       });
     });
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -162,6 +167,52 @@ describe("MatchAdminList", () => {
         homeScore: 2,
         awayScore: 0,
         status: "live",
+        penaltiesHomeScore: null,
+        penaltiesAwayScore: null,
+      });
+    });
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
+
+  it("muestra selectores de penales para partido de knockout finalizado en empate y guarda", async () => {
+    const user = userEvent.setup();
+    render(
+      <MatchAdminList
+        matches={[
+          makeMatch({
+            id: "M2",
+            bracketSlot: 74,
+            status: "finished",
+            homeScore: 1,
+            awayScore: 1,
+          }),
+        ]}
+      />,
+    );
+
+    // Deben aparecer los selectores de penales
+    expect(screen.getByText("Tanda de Penales (Desempate)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Incrementar goles de Penales México")).toBeInTheDocument();
+    expect(screen.getByLabelText("Incrementar goles de Penales Sudáfrica")).toBeInTheDocument();
+
+    // Modificar penales: México 3 - 2 Sudáfrica
+    await user.click(screen.getByLabelText("Incrementar goles de Penales México"));
+    await user.click(screen.getByLabelText("Incrementar goles de Penales México"));
+    await user.click(screen.getByLabelText("Incrementar goles de Penales México"));
+    await user.click(screen.getByLabelText("Incrementar goles de Penales Sudáfrica"));
+    await user.click(screen.getByLabelText("Incrementar goles de Penales Sudáfrica"));
+
+    // Guardar
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => {
+      expect(setMatchResult).toHaveBeenCalledWith({
+        matchId: "M2",
+        homeScore: 1,
+        awayScore: 1,
+        status: "finished",
+        penaltiesHomeScore: 3,
+        penaltiesAwayScore: 2,
       });
     });
     await waitFor(() => expect(refresh).toHaveBeenCalled());

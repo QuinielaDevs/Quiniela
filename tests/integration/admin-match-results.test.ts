@@ -327,7 +327,7 @@ describe("fn_admin_set_match_result", () => {
     expect(error?.code).toBe(INVALID_INPUT);
   });
 
-  it("bloquea empate finished en knockout hasta modelar penales", async () => {
+  it("bloquea empate finished en knockout si no se proveen penales", async () => {
     const adminUser = await createAuthedUser();
     await seedLeague(adminUser);
     const matchId = await seedMatch({
@@ -346,6 +346,29 @@ describe("fn_admin_set_match_result", () => {
     });
 
     expect(error?.code).toBe(INVALID_INPUT);
+  });
+
+  it("permite empate finished en knockout si se proveen penales validos", async () => {
+    const adminUser = await createAuthedUser();
+    await seedLeague(adminUser);
+    const matchId = await seedMatch({
+      status: "scheduled",
+      bracketSlot: 902,
+      homeTeamCode: "AAA",
+      awayTeamCode: "BBB",
+    });
+    const client = createAuthedClient(adminUser.token);
+
+    const { error } = await client.rpc("fn_admin_set_match_result", {
+      p_match_id: matchId,
+      p_home_score: 1,
+      p_away_score: 1,
+      p_status: "finished",
+      p_penalties_home_score: 4,
+      p_penalties_away_score: 3,
+    });
+
+    expect(error).toBeNull();
   });
 
   it("partido inexistente → P0002", async () => {

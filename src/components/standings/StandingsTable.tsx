@@ -62,6 +62,8 @@ type MatchDetail = {
   earnedPoints: number;
   phaseKey: string;
   matchTime?: string;
+  penaltiesHomeScore?: number | null;
+  penaltiesAwayScore?: number | null;
 };
 
 /** Calcula el desglose de puntos de un usuario para los partidos en alcance. */
@@ -99,6 +101,8 @@ function computeUserBreakdown(
         matchday: match.matchday,
       }),
       matchTime: match.matchTime,
+      penaltiesHomeScore: match.penaltiesHomeScore ?? null,
+      penaltiesAwayScore: match.penaltiesAwayScore ?? null,
     });
   }
 
@@ -462,7 +466,14 @@ export function StandingsTable({
                               <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[10px] text-muted-foreground">
                                 <span className="flex items-center gap-1 rounded bg-muted/40 border border-border/20 px-1.5 py-0.5">
                                   <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">Real:</span>
-                                  <span className="font-bold text-foreground">{d.homeScore}-{d.awayScore}</span>
+                                  <span className="font-bold text-foreground">
+                                    {d.homeScore}-{d.awayScore}
+                                    {d.penaltiesHomeScore !== null && d.penaltiesAwayScore !== null && (
+                                      <span className="text-[10px] text-muted-foreground ml-1">
+                                        ({d.penaltiesHomeScore}-{d.penaltiesAwayScore} pen.)
+                                      </span>
+                                    )}
+                                  </span>
                                 </span>
                                 <span className="flex items-center gap-1 rounded bg-muted/40 border border-border/20 px-1.5 py-0.5">
                                   <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">Pred:</span>

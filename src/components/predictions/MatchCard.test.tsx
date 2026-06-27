@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MatchCard } from "@/components/predictions/MatchCard";
+import { MatchCard, type MatchCardMatch } from "@/components/predictions/MatchCard";
 import {
   revertPrediction,
   savePrediction,
@@ -900,6 +900,39 @@ describe("MatchCard", () => {
       expect(screen.getByTestId("actual-home-score")).toHaveTextContent("2");
       expect(screen.getByTestId("actual-away-score")).toHaveTextContent("1");
       expect(screen.getByTestId("result-divider")).toHaveTextContent("Resultado");
+    });
+
+    it("muestra la tanda de penales en el result-divider si el partido finalizó empatado en eliminatoria con penales", () => {
+      const matchWithPenalties: MatchCardMatch = {
+        id: "m_pen_card",
+        home_team: "Argentina",
+        away_team: "Brasil",
+        home_team_code: "ARG",
+        away_team_code: "BRA",
+        match_time: "2026-06-25T20:00:00Z",
+        status: "finished",
+        stage: "final",
+        matchday: null,
+        home_source: null,
+        away_source: null,
+        bracket_slot: 104,
+        venue: "MetLife Stadium",
+        group_label: null,
+        home_score: 1,
+        away_score: 1,
+        penalties_home_score: 4,
+        penalties_away_score: 3,
+      };
+
+      render(
+        <MatchCard
+          match={matchWithPenalties}
+          leagueId="league-1"
+          initialPrediction={{ homeScorePred: 1, awayScorePred: 1, multiplier: 1 }}
+        />,
+      );
+
+      expect(screen.getByTestId("result-divider")).toHaveTextContent("Resultado(4-3 pen.)");
     });
 
     it("muestra la predicción del usuario junto al resultado", () => {

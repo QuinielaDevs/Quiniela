@@ -270,7 +270,7 @@ async function handleMatchFinalized(
     );
   }
 
-  const { homeTeam, awayTeam, homeScore, awayScore } = payloadResult.data;
+  const { homeTeam, awayTeam, homeScore, awayScore, penalties } = payloadResult.data;
 
   // Buscar el partido usando el helper de mapeo
   const { data: match, error: findError } = await findLocalMatch(
@@ -310,11 +310,25 @@ async function handleMatchFinalized(
     }
   }
 
+  let penHome: number | null = null;
+  let penAway: number | null = null;
+  if (penalties && typeof penalties === "string") {
+    const parts = penalties.split("-");
+    const h = parseInt(parts[0] ?? "", 10);
+    const a = parseInt(parts[1] ?? "", 10);
+    if (Number.isInteger(h) && Number.isInteger(a)) {
+      penHome = h;
+      penAway = a;
+    }
+  }
+
   // Preparar la actualización
   const updateData: Record<string, unknown> = {
     home_score: homeScore,
     away_score: awayScore,
     status: "finished",
+    penalties_home_score: penHome,
+    penalties_away_score: penAway,
     updated_at: new Date().toISOString(),
     external_last_sync_at: event.ts,
   };
@@ -429,6 +443,26 @@ async function handleMatchPatched(
       );
     }
     updateData.away_score = val;
+  }
+  if (changes.penalties) {
+    const val = changes.penalties.to;
+    if (val === null) {
+      updateData.penalties_home_score = null;
+      updateData.penalties_away_score = null;
+    } else if (typeof val === "string") {
+      const parts = val.split("-");
+      const h = parseInt(parts[0] ?? "", 10);
+      const a = parseInt(parts[1] ?? "", 10);
+      if (Number.isInteger(h) && Number.isInteger(a)) {
+        updateData.penalties_home_score = h;
+        updateData.penalties_away_score = a;
+      } else {
+        return NextResponse.json(
+          { error: "validation_failed", message: "Invalid penalties correction value" },
+          { status: 400 },
+        );
+      }
+    }
   }
 
   // AC #4: Si es eliminatoria, actualizar equipos si se proveen y no son placeholders

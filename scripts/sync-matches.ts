@@ -194,7 +194,7 @@ export async function syncMatches(
   const { data: localMatches, error: fetchError } = await supabase
     .from("matches")
     .select(
-      "id, external_ref, home_score, away_score, status, home_team, away_team, bracket_slot, match_time",
+      "id, external_ref, home_score, away_score, penalties_home_score, penalties_away_score, status, home_team, away_team, bracket_slot, match_time",
     );
 
   if (fetchError) {
@@ -289,11 +289,27 @@ export async function syncMatches(
       ? local.away_score
       : apiAwayScore;
 
+    // Parsear penales de la API en enteros
+    let penHome: number | null = null;
+    let penAway: number | null = null;
+    if (apiMatch.penalties && typeof apiMatch.penalties === "string") {
+      const parts = apiMatch.penalties.split("-");
+      const h = parseInt(parts[0] ?? "", 10);
+      const a = parseInt(parts[1] ?? "", 10);
+      if (Number.isInteger(h) && Number.isInteger(a)) {
+        penHome = h;
+        penAway = a;
+      }
+    }
+
     // Detectar si hay cambios relevantes
     const scoreChanged =
       local.home_score !== effectiveHomeScore ||
       local.away_score !== effectiveAwayScore;
     const statusChanged = local.status !== finalStatus;
+    const penaltiesChanged =
+      local.penalties_home_score !== penHome ||
+      local.penalties_away_score !== penAway;
 
     // Detectar si el horario (match_time) cambió en la API
     const timeChanged = apiMatch.kickoffUtc
@@ -314,7 +330,7 @@ export async function syncMatches(
       (local.home_team !== apiMatch.homeTeam ||
         local.away_team !== apiMatch.awayTeam);
 
-    if (!scoreChanged && !statusChanged && !teamsChanged && !timeChanged) {
+    if (!scoreChanged && !statusChanged && !teamsChanged && !timeChanged && !penaltiesChanged) {
       continue;
     }
 
@@ -324,6 +340,8 @@ export async function syncMatches(
       home_score: effectiveHomeScore,
       away_score: effectiveAwayScore,
       status: finalStatus,
+      penalties_home_score: penHome,
+      penalties_away_score: penAway,
       updated_at: new Date().toISOString(),
     };
 
@@ -352,6 +370,10 @@ export async function syncMatches(
     if (teamsChanged) {
       changesObj.home_team = { from: local.home_team, to: apiMatch.homeTeam };
       changesObj.away_team = { from: local.away_team, to: apiMatch.awayTeam };
+    }
+    if (penaltiesChanged) {
+      changesObj.penalties_home_score = { from: local.penalties_home_score, to: penHome };
+      changesObj.penalties_away_score = { from: local.penalties_away_score, to: penAway };
     }
 
     changesList.push({

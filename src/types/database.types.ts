@@ -289,6 +289,8 @@ export type Database = {
           id: string
           match_time: string
           matchday: number | null
+          penalties_away_score: number | null
+          penalties_home_score: number | null
           stage: string | null
           status: string
           updated_at: string
@@ -310,6 +312,8 @@ export type Database = {
           id?: string
           match_time: string
           matchday?: number | null
+          penalties_away_score?: number | null
+          penalties_home_score?: number | null
           stage?: string | null
           status?: string
           updated_at?: string
@@ -331,6 +335,8 @@ export type Database = {
           id?: string
           match_time?: string
           matchday?: number | null
+          penalties_away_score?: number | null
+          penalties_home_score?: number | null
           stage?: string | null
           status?: string
           updated_at?: string
@@ -809,6 +815,8 @@ export type Database = {
           p_home_score: number
           p_match_id: string
           p_status: string
+          p_penalties_away_score?: number | null
+          p_penalties_home_score?: number | null
         }
         Returns: {
           away_score: number | null
@@ -826,6 +834,8 @@ export type Database = {
           id: string
           match_time: string
           matchday: number | null
+          penalties_away_score: number | null
+          penalties_home_score: number | null
           stage: string | null
           status: string
           updated_at: string

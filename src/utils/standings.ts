@@ -43,6 +43,8 @@ export type StandingMatch = {
   matchTime?: string; // timestamp ISO de kick-off (para ordenar dentro de la fase)
   homeTeam?: string | null;
   awayTeam?: string | null;
+  penaltiesHomeScore?: number | null;
+  penaltiesAwayScore?: number | null;
 };
 
 export type StandingPrediction = {

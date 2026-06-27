@@ -29,6 +29,20 @@ export const setMatchResultSchema = z
     status: z.enum(["scheduled", "live", "finished", "suspended", "canceled"], {
       message: "Estado de partido inválido.",
     }),
+    penaltiesHomeScore: z
+      .number()
+      .int("El marcador de penales debe ser un número entero.")
+      .nonnegative("El marcador de penales no puede ser negativo.")
+      .max(99, "El marcador de penales es demasiado alto.")
+      .nullable()
+      .optional(),
+    penaltiesAwayScore: z
+      .number()
+      .int("El marcador de penales debe ser un número entero.")
+      .nonnegative("El marcador de penales no puede ser negativo.")
+      .max(99, "El marcador de penales es demasiado alto.")
+      .nullable()
+      .optional(),
   })
   .superRefine((data, ctx) => {
     if (data.status !== "live" && data.status !== "finished") return;
@@ -45,6 +59,28 @@ export const setMatchResultSchema = z
         path: ["awayScore"],
         message: "Indica el marcador visitante.",
       });
+    }
+
+    if (
+      data.status === "finished" &&
+      data.homeScore !== null &&
+      data.awayScore !== null &&
+      data.homeScore === data.awayScore
+    ) {
+      if (
+        data.penaltiesHomeScore !== undefined &&
+        data.penaltiesHomeScore !== null &&
+        data.penaltiesAwayScore !== undefined &&
+        data.penaltiesAwayScore !== null
+      ) {
+        if (data.penaltiesHomeScore === data.penaltiesAwayScore) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["penaltiesHomeScore"],
+            message: "La tanda de penales no puede terminar en empate.",
+          });
+        }
+      }
     }
   });
 
