@@ -29,6 +29,8 @@ function groupMatch(
     away_team_code: `${group}${away}`,
     home_score: homeScore,
     away_score: awayScore,
+    penalties_home_score: null,
+    penalties_away_score: null,
     match_time: `2026-06-${String(10 + idx).padStart(2, "0")}T12:00:00.000Z`,
     status: "finished",
     matchday: idx,
@@ -56,6 +58,8 @@ function knockoutMatch(
     away_team_code: null,
     home_score: null,
     away_score: null,
+    penalties_home_score: null,
+    penalties_away_score: null,
     match_time: `2026-07-${String(slot - 72).padStart(2, "0")}T12:00:00.000Z`,
     status: "scheduled",
     matchday: null,
@@ -343,6 +347,35 @@ describe("tournament advancement motor", () => {
     expect(incomplete.knockoutSlots[0]).toMatchObject({
       homeTeam: "Por definir",
       homeTeamCode: null,
+      awayTeam: "Por definir",
+      awayTeamCode: null,
+    });
+  });
+
+  it("resuelve ganador por penales en partidos de eliminatoria empatados", () => {
+    const result = calculateTournamentAdvancement([
+      ...completeTournamentGroups(),
+      {
+        ...knockoutMatch(74, "1E", "3A/B/C/D/F"),
+        home_team: "Equipo Uno",
+        away_team: "Equipo Dos",
+        home_team_code: "UNO",
+        away_team_code: "DOS",
+        home_score: 1,
+        away_score: 1,
+        penalties_home_score: 5,
+        penalties_away_score: 4,
+        status: "finished",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as TournamentMatch,
+      knockoutMatch(89, "W74", "W77", "round-16"),
+    ]);
+
+    const bySlot = new Map(result.knockoutSlots.map((slot) => [slot.bracketSlot, slot]));
+    expect(bySlot.get(89)).toMatchObject({
+      homeTeam: "Equipo Uno",
+      homeTeamCode: "UNO",
       awayTeam: "Por definir",
       awayTeamCode: null,
     });

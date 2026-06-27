@@ -157,10 +157,10 @@ test.describe("Smoke — rutas autenticadas", () => {
     stack.add(() => fixture.cleanup());
 
     const matches = await seedMatches([
-      editableMatch(),
-      liveMatch({ home: 1, away: 0 }),
-      finishedMatch({ home: 2, away: 1 }),
-      suspendedMatch(),
+      editableMatch({ homeTeamCode: "USA", awayTeamCode: "MEX" }),
+      liveMatch({ home: 1, away: 0 }, { homeTeamCode: "USA", awayTeamCode: "MEX" }),
+      finishedMatch({ home: 2, away: 1 }, { homeTeamCode: "USA", awayTeamCode: "MEX" }),
+      suspendedMatch({ homeTeamCode: "USA", awayTeamCode: "MEX" }),
     ]);
     stack.add(() => deleteMatches(matches.map((m) => m.id)));
   });

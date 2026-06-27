@@ -447,6 +447,18 @@ test.describe("Gran tour multi-usuario (e2e)", () => {
       expect(error).toBeNull();
 
       await pageAna.goto("/predictions");
+      // Cerrar welcome-payment-modal si aparece
+      await pageAna
+        .getByTestId("welcome-payment-close")
+        .click({ timeout: 2500 })
+        .catch(() => {});
+
+      // Asegurar que seleccionamos la pestaña correcta (Jornada 1)
+      const tab = pageAna.getByRole("tab", { name: "Jornada 1", exact: true });
+      await expect(tab).toHaveCount(1);
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+
       await expect(cardFor(pageAna, partido1.id).getByText("En vivo")).toBeVisible({
         timeout: 15_000,
       });

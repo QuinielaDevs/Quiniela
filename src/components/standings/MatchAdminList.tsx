@@ -23,6 +23,9 @@ export type AdminMatchView = {
   awayScore: number | null;
   groupLabel: string | null;
   matchday: number | null;
+  bracketSlot: number | null;
+  penaltiesHomeScore: number | null;
+  penaltiesAwayScore: number | null;
 };
 
 type MatchAdminListProps = {
@@ -86,13 +89,28 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
   const [status, setStatus] = useState<MatchStatus>(match.status);
   const [homeScore, setHomeScore] = useState<number>(match.homeScore ?? 0);
   const [awayScore, setAwayScore] = useState<number>(match.awayScore ?? 0);
+  const [penaltiesHomeScore, setPenaltiesHomeScore] = useState<number>(
+    match.penaltiesHomeScore ?? 0,
+  );
+  const [penaltiesAwayScore, setPenaltiesAwayScore] = useState<number>(
+    match.penaltiesAwayScore ?? 0,
+  );
 
   useEffect(() => {
     if (isPending) return;
     setStatus(match.status);
     setHomeScore(match.homeScore ?? 0);
     setAwayScore(match.awayScore ?? 0);
-  }, [match.status, match.homeScore, match.awayScore, isPending]);
+    setPenaltiesHomeScore(match.penaltiesHomeScore ?? 0);
+    setPenaltiesAwayScore(match.penaltiesAwayScore ?? 0);
+  }, [
+    match.status,
+    match.homeScore,
+    match.awayScore,
+    match.penaltiesHomeScore,
+    match.penaltiesAwayScore,
+    isPending,
+  ]);
 
   // Destinos válidos relativos al estado PERSISTIDO (origen).
   const statusOptions = useMemo(
@@ -113,11 +131,20 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
     [match.matchTime],
   );
 
+  const showPenalties =
+    showScore &&
+    match.bracketSlot !== null &&
+    homeScore === awayScore &&
+    status === "finished";
+
   const dirty =
     status !== match.status ||
     (showScore &&
       (homeScore !== (match.homeScore ?? 0) ||
-        awayScore !== (match.awayScore ?? 0)));
+        awayScore !== (match.awayScore ?? 0))) ||
+    (showPenalties &&
+      (penaltiesHomeScore !== (match.penaltiesHomeScore ?? 0) ||
+        penaltiesAwayScore !== (match.penaltiesAwayScore ?? 0)));
 
   function executeSave() {
     setError(null);
@@ -128,6 +155,8 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
         homeScore: showScore ? homeScore : null,
         awayScore: showScore ? awayScore : null,
         status,
+        penaltiesHomeScore: showPenalties ? penaltiesHomeScore : null,
+        penaltiesAwayScore: showPenalties ? penaltiesAwayScore : null,
       });
       if (!result.success) {
         setError(result.error);
@@ -234,6 +263,36 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
             side="away"
             testId="admin-away-score"
           />
+        </div>
+      )}
+
+      {/* Editor de penales (solo si el partido es knockout finalizado en empate) */}
+      {showPenalties && (
+        <div className="flex flex-col gap-2 border-t border-border/50 pt-3 mt-1 items-center">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            Tanda de Penales (Desempate)
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <GoalPicker
+              value={penaltiesHomeScore}
+              onChange={setPenaltiesHomeScore}
+              label={`Penales ${match.homeTeam}`}
+              disabled={isPending}
+              max={99}
+              side="home"
+              testId="admin-penalties-home-score"
+            />
+            <span className="font-display text-lg text-muted-foreground">–</span>
+            <GoalPicker
+              value={penaltiesAwayScore}
+              onChange={setPenaltiesAwayScore}
+              label={`Penales ${match.awayTeam}`}
+              disabled={isPending}
+              max={99}
+              side="away"
+              testId="admin-penalties-away-score"
+            />
+          </div>
         </div>
       )}
 

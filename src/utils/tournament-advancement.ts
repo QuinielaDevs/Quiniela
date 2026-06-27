@@ -22,6 +22,8 @@ export type TournamentMatch = {
   away_team_code: string | null;
   home_score: number | null;
   away_score: number | null;
+  penalties_home_score: number | null;
+  penalties_away_score: number | null;
   match_time: string;
   status: string;
   matchday: number | null;
@@ -291,15 +293,33 @@ function teamFromRow(row: GroupStandingRow | undefined): TeamRef | null {
 
 function resolveWinnerLoser(match: TournamentMatch, wantWinner: boolean): TeamRef | null {
   if (!isFinishedWithScore(match)) return null;
-  if (match.home_score === match.away_score) return null;
-  const homeWins = match.home_score! > match.away_score!;
-  const useHome = wantWinner ? homeWins : !homeWins;
-  const teamCode = useHome ? match.home_team_code : match.away_team_code;
-  if (!teamCode) return null;
-  return {
-    teamCode,
-    teamName: useHome ? match.home_team : match.away_team,
-  };
+  
+  if (match.home_score !== match.away_score) {
+    const homeWins = match.home_score! > match.away_score!;
+    const useHome = wantWinner ? homeWins : !homeWins;
+    const teamCode = useHome ? match.home_team_code : match.away_team_code;
+    if (!teamCode) return null;
+    return {
+      teamCode,
+      teamName: useHome ? match.home_team : match.away_team,
+    };
+  }
+
+  // Si hay empate reglamentario, resolver por goles de la tanda de penales
+  const penHome = match.penalties_home_score;
+  const penAway = match.penalties_away_score;
+  if (penHome !== null && penAway !== null && penHome !== penAway) {
+    const homeWins = penHome > penAway;
+    const useHome = wantWinner ? homeWins : !homeWins;
+    const teamCode = useHome ? match.home_team_code : match.away_team_code;
+    if (!teamCode) return null;
+    return {
+      teamCode,
+      teamName: useHome ? match.home_team : match.away_team,
+    };
+  }
+
+  return null;
 }
 
 type ResolveContext = {
