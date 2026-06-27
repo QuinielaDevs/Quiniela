@@ -611,10 +611,10 @@ export function MatchCard({
 
   // En slots TBD el nombre legible es el origen del bracket (p.ej. "Ganador 97");
   // se usa tanto para mostrar como para la etiqueta accesible del GoalPicker.
-  const homeLabel = isTbd
+  const homeLabel = !match.home_team_code || match.home_team === "Por definir"
     ? (describeMatchSource(match.home_source) ?? match.home_team)
     : match.home_team;
-  const awayLabel = isTbd
+  const awayLabel = !match.away_team_code || match.away_team === "Por definir"
     ? (describeMatchSource(match.away_source) ?? match.away_team)
     : match.away_team;
 
@@ -765,11 +765,9 @@ export function MatchCard({
             )}
             <span className="truncate">{homeLabel}</span>
           </span>
-          {match.home_team_code && (
-            <span className="text-xs uppercase text-muted-foreground shrink-0">
-              {match.home_team_code}
-            </span>
-          )}
+          <span className="text-xs uppercase text-muted-foreground shrink-0 select-none">
+            {match.home_team_code || "\u00A0"}
+          </span>
           {isFinishedWithResult ? (
             <span
               className="font-display text-2xl font-extrabold tabular-nums text-foreground md:text-3xl"
@@ -816,11 +814,9 @@ export function MatchCard({
               </span>
             )}
           </span>
-          {match.away_team_code && (
-            <span className="text-xs uppercase text-muted-foreground shrink-0">
-              {match.away_team_code}
-            </span>
-          )}
+          <span className="text-xs uppercase text-muted-foreground shrink-0 select-none">
+            {match.away_team_code || "\u00A0"}
+          </span>
           {isFinishedWithResult ? (
             <span
               className="font-display text-2xl font-extrabold tabular-nums text-foreground md:text-3xl"
