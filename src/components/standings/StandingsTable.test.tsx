@@ -171,6 +171,37 @@ describe("StandingsTable", () => {
       expect(exactLabels.length).toBeGreaterThanOrEqual(2);
     });
 
+    it("muestra la tanda de penales al lado del resultado real en el desglose si el partido finalizó empatado con penales", () => {
+      const matchWithPenalties: StandingMatch = {
+        id: "m_pen",
+        status: "finished",
+        matchday: 1,
+        stage: "quarter",
+        homeScore: 1,
+        awayScore: 1,
+        homeTeam: "España",
+        awayTeam: "Alemania",
+        matchTime: "2026-06-20T18:00:00Z",
+        penaltiesHomeScore: 4,
+        penaltiesAwayScore: 3,
+      };
+
+      render(
+        <StandingsTable
+          members={MEMBERS}
+          matches={[matchWithPenalties]}
+          predictions={[]}
+        />,
+      );
+
+      const rows = screen.getAllByTestId("standings-row-toggle");
+      fireEvent.click(rows[0]!); // Expandir Beto o Ana
+
+      expect(screen.getByText(/España vs Alemania/)).toBeInTheDocument();
+      expect(screen.getByText("Real:")).toBeInTheDocument();
+      expect(screen.getByText("(4-3 pen.)")).toBeInTheDocument();
+    });
+
     it("agrupa partidos por jornada con encabezados de fase", () => {
       renderTable();
       const rows = screen.getAllByTestId("standings-row-toggle");

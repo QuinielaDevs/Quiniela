@@ -14,6 +14,7 @@ import {
 import { seedPrediction } from "./helpers/seed/predictions";
 import { seedChallengeRaw } from "./helpers/seed/challenges";
 import { createLeagueWithUsers } from "./helpers/users";
+import { selectPhaseTab } from "./helpers/ui";
 
 test.describe("Panel de administración (e2e)", () => {
   const stack = createCleanupStack();
@@ -466,5 +467,71 @@ test.describe("Panel de administración (e2e)", () => {
     await pageMember.goto("/predictions");
     await expect(pageMember.getByTestId("admin-status-select")).toHaveCount(0);
     await expect(pageMember.getByTestId("admin-save-result")).toHaveCount(0);
+  });
+
+  test("ADM-12: Guardado de empate en knockout con penales y su reflejo visual", async () => {
+    const pageAdmin = fixture.users[0]!.page!;
+
+    // 1) Sembrar un partido knockout (bracketSlot >= 9000, con team codes)
+    const matches = await seedMatches([
+      tbdKnockoutMatch({
+        homeTeamCode: "ARG",
+        awayTeamCode: "BOL",
+        home: "Argentina",
+        away: "Bolivia",
+        bracketSlot: 9912,
+        status: "scheduled",
+        stage: "final",
+      }),
+    ]);
+    const m = matches[0]!;
+    localMatchIds.push(m.id);
+
+    // 2) Ir al panel de administración y localizar la tarjeta
+    await pageAdmin.goto("/standings/manage");
+    const card = pageAdmin.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`);
+
+    // 3) Seleccionar estado "Finalizado" (finished)
+    await card.getByTestId("admin-status-select").selectOption("finished");
+
+    // 4) Poner marcador reglamentario de empate 1-1
+    await card.getByTestId("admin-home-score").getByTestId("goal-increment").click();
+    await card.getByTestId("admin-away-score").getByTestId("goal-increment").click();
+
+    // 5) Verificar que aparece el marcador de penales
+    const penaltiesHomePicker = card.getByTestId("admin-penalties-home-score");
+    const penaltiesAwayPicker = card.getByTestId("admin-penalties-away-score");
+    await expect(penaltiesHomePicker).toBeVisible();
+    await expect(penaltiesAwayPicker).toBeVisible();
+
+    // 6) Configurar tanda de penales 4-3
+    for (let i = 0; i < 4; i++) {
+      await penaltiesHomePicker.getByTestId("goal-increment").click();
+    }
+    for (let i = 0; i < 3; i++) {
+      await penaltiesAwayPicker.getByTestId("goal-increment").click();
+    }
+
+    // 7) Guardar
+    await card.getByTestId("admin-save-result").click();
+    await expect(card.getByTestId("admin-save-result")).toHaveText("Guardar");
+
+    // 8) Ir a /predictions y verificar el indicador de penales
+    await pageAdmin.goto("/predictions");
+    await selectPhaseTab(pageAdmin, "Final");
+
+    const matchCard = pageAdmin.locator(`[data-testid="match-card"][data-match-id="${m.id}"]`);
+    await expect(matchCard.getByTestId("result-divider")).toHaveText("Resultado(4-3 pen.)");
+
+    // 9) Ir a /standings y verificar el acordeón del usuario
+    await pageAdmin.goto("/standings");
+    const userRow = pageAdmin.locator(`[data-testid="standings-row-toggle"]`).first();
+    await userRow.click();
+
+    const accordion = pageAdmin.getByTestId("standings-accordion");
+    await expect(accordion).toBeVisible();
+
+    // Verificar que se renderiza el indicador de penales al lado del real
+    await expect(accordion.getByText("(4-3 pen.)")).toBeVisible();
   });
 });

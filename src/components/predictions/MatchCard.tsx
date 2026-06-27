@@ -54,7 +54,10 @@ export type MatchCardMatch = Pick<
   | "group_label"
   | "home_score"
   | "away_score"
->;
+> & {
+  penalties_home_score?: number | null;
+  penalties_away_score?: number | null;
+};
 
 export type PersistedPrediction = {
   id?: string;
@@ -753,17 +756,17 @@ export function MatchCard({
           bandera/nombre/código arriba, stepper abajo) flanqueando el "vs", con
           más aire. Así aprovecha el ancho sin truncar nombres ni dejar huecos. */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 md:flex md:items-end md:justify-center md:gap-10 lg:gap-14">
-        <div className="flex flex-col items-start gap-2 md:items-center md:text-center">
-          <span className="flex items-center gap-1.5 text-sm font-semibold md:text-base">
+        <div className="flex flex-col items-start gap-2 md:items-center md:text-center min-w-0 w-full">
+          <span className="flex items-center gap-1.5 text-sm font-semibold md:text-base truncate w-full" title={homeLabel}>
             {flagForTeamCode(match.home_team_code) && (
-              <span aria-hidden="true">
+              <span aria-hidden="true" className="shrink-0">
                 {flagForTeamCode(match.home_team_code)}
               </span>
             )}
-            {homeLabel}
+            <span className="truncate">{homeLabel}</span>
           </span>
           {match.home_team_code && (
-            <span className="text-xs uppercase text-muted-foreground">
+            <span className="text-xs uppercase text-muted-foreground shrink-0">
               {match.home_team_code}
             </span>
           )}
@@ -789,27 +792,32 @@ export function MatchCard({
 
         {isFinishedWithResult ? (
           <div
-            className="font-display text-sm font-semibold uppercase tracking-widest text-muted-foreground md:text-base"
+            className="flex flex-col items-center font-display text-sm font-semibold uppercase tracking-widest text-muted-foreground md:text-base shrink-0"
             aria-hidden="true"
             data-testid="result-divider"
           >
-            Resultado
+            <span>Resultado</span>
+            {match.penalties_home_score !== null && match.penalties_away_score !== null && (
+              <span className="text-[10px] lowercase tracking-normal text-muted-foreground mt-0.5 font-normal">
+                ({match.penalties_home_score}-{match.penalties_away_score} pen.)
+              </span>
+            )}
           </div>
         ) : (
-          <div className="pt-8 font-display text-xl font-bold text-accent md:pb-2.5 md:pt-0 md:text-2xl">vs</div>
+          <div className="pt-8 font-display text-xl font-bold text-accent md:pb-2.5 md:pt-0 md:text-2xl shrink-0">vs</div>
         )}
 
-        <div className="flex flex-col items-end gap-2 md:items-center md:text-center">
-          <span className="flex items-center gap-1.5 text-right text-sm font-semibold md:text-base">
-            {awayLabel}
+        <div className="flex flex-col items-end gap-2 md:items-center md:text-center min-w-0 w-full">
+          <span className="flex items-center gap-1.5 text-right text-sm font-semibold md:text-base justify-end truncate w-full" title={awayLabel}>
+            <span className="truncate">{awayLabel}</span>
             {flagForTeamCode(match.away_team_code) && (
-              <span aria-hidden="true">
+              <span aria-hidden="true" className="shrink-0">
                 {flagForTeamCode(match.away_team_code)}
               </span>
             )}
           </span>
           {match.away_team_code && (
-            <span className="text-xs uppercase text-muted-foreground">
+            <span className="text-xs uppercase text-muted-foreground shrink-0">
               {match.away_team_code}
             </span>
           )}
