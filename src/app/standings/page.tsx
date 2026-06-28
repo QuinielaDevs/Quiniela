@@ -16,7 +16,10 @@ import {
   type StandingMember,
   type StandingPrediction,
 } from "@/utils/standings";
+import { fetchStandingPredictions } from "@/utils/standing-predictions";
 import type { LeagueRole, PaymentStatus } from "@/types";
+import type { Database } from "@/types/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Fila de league_members embebiendo el perfil (FK user_id → profiles.id).
 type MemberRow = {
@@ -102,18 +105,12 @@ export async function StandingsBoard() {
   // tabla). Si no hay finished, no hace falta consultar predicciones.
   let predictions: StandingPrediction[] = [];
   if (finishedIds.length > 0) {
-    const { data: predRows } = await supabase
-      .from("predictions")
-      .select("user_id, match_id, home_score_pred, away_score_pred, multiplier")
-      .eq("league_id", leagueId)
-      .in("match_id", finishedIds);
-    predictions = (predRows ?? []).map((p) => ({
-      userId: p.user_id,
-      matchId: p.match_id,
-      homeScorePred: p.home_score_pred,
-      awayScorePred: p.away_score_pred,
-      multiplier: p.multiplier,
-    }));
+    const { data: predRows } = await fetchStandingPredictions(
+      supabase as SupabaseClient<Database>,
+      leagueId,
+      finishedIds,
+    );
+    predictions = predRows;
   }
 
   const rows = (memberRows ?? []) as unknown as MemberRow[];

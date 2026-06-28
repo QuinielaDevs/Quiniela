@@ -38,7 +38,14 @@ const mockFromMatches = {
   })),
 };
 
-const mockInPreds = vi.fn();
+const mockRangePreds = vi.fn();
+const mockOrderPreds = vi.fn(() => ({
+  order: mockOrderPreds,
+  range: mockRangePreds,
+}));
+const mockInPreds = vi.fn(() => ({
+  order: mockOrderPreds,
+}));
 const mockEqPreds = vi.fn(() => ({
   in: mockInPreds,
 }));
@@ -78,6 +85,8 @@ describe("API /api/standings GET handler", () => {
     mockEqMembers.mockReset();
     mockEqMatches.mockReset();
     mockInPreds.mockReset();
+    mockOrderPreds.mockClear();
+    mockRangePreds.mockReset();
     mockEqPreds.mockClear();
     mockSupabase.from.mockClear();
     mockRpc.mockReset();
@@ -202,7 +211,7 @@ describe("API /api/standings GET handler", () => {
       error: null,
     });
 
-    mockInPreds.mockResolvedValue({
+    mockRangePreds.mockResolvedValue({
       data: [
         {
           user_id: "user-uuid-1",

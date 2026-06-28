@@ -25,11 +25,14 @@ import {
   type LiveMatch,
 } from "@/components/live/goalImpact";
 import { createClient } from "@/utils/supabase/client";
+import { fetchStandingPredictions } from "@/utils/standing-predictions";
 import {
   buildProjectedStandings,
   type StandingMember,
   type StandingPrediction,
 } from "@/utils/standings";
+import type { Database } from "@/types/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   calculateBasePoints,
   calculatePredictionPoints,
@@ -513,11 +516,12 @@ export function LiveStandingsBoard({
         return;
       }
 
-      const { data: predRows, error: predictionError } = await supabase
-        .from("predictions")
-        .select("user_id, match_id, home_score_pred, away_score_pred, multiplier")
-        .eq("league_id", leagueId)
-        .in("match_id", matchIds);
+      const { data: predRows, error: predictionError } =
+        await fetchStandingPredictions(
+          supabase as SupabaseClient<Database>,
+          leagueId,
+          matchIds,
+        );
       if (predictionError || latestRefreshRef.current !== requestId) return;
 
       if (
@@ -530,13 +534,7 @@ export function LiveStandingsBoard({
 
       const nextSnapshot = {
         matches: nextMatches,
-        predictions: (predRows ?? []).map((prediction) => ({
-          userId: prediction.user_id,
-          matchId: prediction.match_id,
-          homeScorePred: prediction.home_score_pred,
-          awayScorePred: prediction.away_score_pred,
-          multiplier: prediction.multiplier,
-        })),
+        predictions: predRows,
       };
 
       if (connectionRef.current !== "live") {

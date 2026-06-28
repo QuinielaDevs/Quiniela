@@ -10,8 +10,11 @@ import { BrandEyebrow } from "@/components/layout/BrandEyebrow";
 import { NoLeagueState } from "@/components/join/NoLeagueState";
 import { createClient } from "@/utils/supabase/server";
 import { getActiveLeagueMembership } from "@/utils/active-league";
+import { fetchStandingPredictions } from "@/utils/standing-predictions";
 import type { PaymentStatus } from "@/types";
 import type { StandingMember, StandingPrediction } from "@/utils/standings";
+import type { Database } from "@/types/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MemberRow = {
   user_id: string;
@@ -85,19 +88,12 @@ export async function LiveBoard() {
 
   let predictions: StandingPrediction[] = [];
   if (matchIds.length > 0) {
-    const { data: predRows } = await supabase
-      .from("predictions")
-      .select("user_id, match_id, home_score_pred, away_score_pred, multiplier")
-      .eq("league_id", leagueId)
-      .in("match_id", matchIds);
-
-    predictions = (predRows ?? []).map((prediction) => ({
-      userId: prediction.user_id,
-      matchId: prediction.match_id,
-      homeScorePred: prediction.home_score_pred,
-      awayScorePred: prediction.away_score_pred,
-      multiplier: prediction.multiplier,
-    }));
+    const { data: predRows } = await fetchStandingPredictions(
+      supabase as SupabaseClient<Database>,
+      leagueId,
+      matchIds,
+    );
+    predictions = predRows;
   }
 
   const members = ((memberRows ?? []) as unknown as MemberRow[]).map(

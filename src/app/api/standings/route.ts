@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { buildStandings, type StandingMatch, type StandingMember, type StandingPrediction } from "@/utils/standings";
+import { fetchStandingPredictions } from "@/utils/standing-predictions";
 import type { LeagueRole, PaymentStatus } from "@/types";
+import type { Database } from "@/types/database.types";
 
 // Fila de league_members embebiendo el perfil (FK user_id → profiles.id).
 type MemberRow = {
@@ -127,24 +129,19 @@ export async function GET(req: NextRequest) {
     // 5. Consultar predicciones para partidos finalizados
     let predictions: StandingPrediction[] = [];
     if (finishedIds.length > 0) {
-      const { data: predRows, error: predError } = await supabase
-        .from("predictions")
-        .select("user_id, match_id, home_score_pred, away_score_pred, multiplier")
-        .eq("league_id", leagueId)
-        .in("match_id", finishedIds);
+      const { data: predRows, error: predError } =
+        await fetchStandingPredictions(
+          supabase as SupabaseClient<Database>,
+          leagueId,
+          finishedIds,
+        );
 
       if (predError) {
         console.error("Error fetching predictions:", predError);
         throw predError;
       }
 
-      predictions = (predRows ?? []).map((p) => ({
-        userId: p.user_id,
-        matchId: p.match_id,
-        homeScorePred: p.home_score_pred,
-        awayScorePred: p.away_score_pred,
-        multiplier: p.multiplier,
-      }));
+      predictions = predRows;
     }
 
     // 6. Mapear miembros al formato requerido por la función buildStandings
