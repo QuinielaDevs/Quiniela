@@ -151,6 +151,27 @@ describe("MatchCard", () => {
     expect(savePrediction).not.toHaveBeenCalled();
   });
 
+  it("muestra nota de resultado al 90 para eliminatorias", () => {
+    renderMatchCard({
+      match: {
+        ...MATCH,
+        stage: "round-32",
+        matchday: null,
+        bracket_slot: 74,
+      },
+    });
+
+    expect(screen.getByTestId("regulation-time-note")).toHaveTextContent(
+      "Resultado al 90",
+    );
+  });
+
+  it("no muestra nota de resultado al 90 en fase de grupos", () => {
+    renderMatchCard();
+
+    expect(screen.queryByTestId("regulation-time-note")).not.toBeInTheDocument();
+  });
+
   it("cancela el timer anterior y guarda solo el ultimo marcador", async () => {
     vi.mocked(savePrediction).mockResolvedValue({
       success: true,

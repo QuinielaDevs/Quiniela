@@ -154,8 +154,15 @@ export function describeMatchSource(source: string | null): string | null {
     return `${ordinal} Grupo ${single[2]}`;
   }
 
-  const thirds = /^3(.+)$/.exec(source);
-  if (thirds) return `3.º (${thirds[1]})`;
+  const thirds = /^3([A-L](?:\/?[A-L])*)$/.exec(source);
+  if (thirds) {
+    const groupsText = thirds[1];
+    if (!groupsText) return source;
+    const groups = groupsText.includes("/")
+      ? groupsText
+      : groupsText.split("").join("/");
+    return `3.º (${groups})`;
+  }
 
   return source;
 }

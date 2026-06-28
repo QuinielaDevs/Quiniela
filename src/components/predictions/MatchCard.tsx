@@ -99,6 +99,7 @@ const FINISHED_COPY = "Finalizado";
 const LIVE_COPY = "En vivo";
 const SUSPENDED_COPY = "Suspendido";
 const CANCELED_COPY = "Cancelado";
+const REGULATION_TIME_COPY = "Resultado al 90";
 const KICKOFF_LOCK_MS = 0;
 const CLOSED_STATUSES = new Set(["live", "finished", "suspended", "canceled"]);
 
@@ -608,6 +609,9 @@ export function MatchCard({
   const phaseLabel = match.matchday
     ? `Jornada ${match.matchday}`
     : stageLabel(match.stage);
+  const showRegulationTimeNote = Boolean(
+    match.stage && match.stage !== "group",
+  );
 
   // En slots TBD el nombre legible es el origen del bracket (p.ej. "Ganador 97");
   // se usa tanto para mostrar como para la etiqueta accesible del GoalPicker.
@@ -649,6 +653,14 @@ export function MatchCard({
           {match.bracket_slot != null && (
             <span className="rounded-sm border border-accent/60 bg-accent/10 px-1.5 py-0.5 font-semibold text-accent">
               Partido {match.bracket_slot}
+            </span>
+          )}
+          {showRegulationTimeNote && (
+            <span
+              className="rounded-sm border border-border bg-background px-1.5 py-0.5 font-semibold text-muted-foreground"
+              data-testid="regulation-time-note"
+            >
+              {REGULATION_TIME_COPY}
             </span>
           )}
           {formattedTime && (
