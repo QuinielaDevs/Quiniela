@@ -73,6 +73,7 @@ describe("describeMatchSource", () => {
 
   it("describe terceros con conjunto de grupos", () => {
     expect(describeMatchSource("3A/B/C/D/F")).toBe("3.º (A/B/C/D/F)");
+    expect(describeMatchSource("3ABCDF")).toBe("3.º (A/B/C/D/F)");
   });
 
   it("describe ganadores y perdedores de partidos previos", () => {

@@ -291,6 +291,21 @@ function teamFromRow(row: GroupStandingRow | undefined): TeamRef | null {
   return { teamCode: row.teamCode, teamName: row.teamName };
 }
 
+function parseThirdPlaceSource(source: string | null): GroupLabel[] | null {
+  if (!source?.startsWith("3")) return null;
+  const rawGroups = source.slice(1);
+  if (!rawGroups) return null;
+
+  const groups = rawGroups.includes("/")
+    ? rawGroups.split("/")
+    : rawGroups.split("");
+  if (groups.length === 0 || groups.some((group) => !isGroupLabel(group))) {
+    return null;
+  }
+
+  return groups as GroupLabel[];
+}
+
 function resolveWinnerLoser(match: TournamentMatch, wantWinner: boolean): TeamRef | null {
   if (!isFinishedWithScore(match)) return null;
   
@@ -342,11 +357,18 @@ export function resolveSourceCode(
     return teamFromRow(context.groupTables[group].complete ? context.groupTables[group].rows[rank - 1] : undefined);
   }
 
-  if (/^3[A-L](?:\/[A-L])+$/.test(code)) {
+  const thirdPlaceGroups = parseThirdPlaceSource(code);
+  if (thirdPlaceGroups) {
+    if (thirdPlaceGroups.length === 1) {
+      const group = thirdPlaceGroups[0];
+      if (!group) return null;
+      return teamFromRow(context.groupTables[group].complete ? context.groupTables[group].rows[2] : undefined);
+    }
     if (!context.destination || !context.bestThirdAssignments) return null;
     const thirdCode = context.bestThirdAssignments[context.destination];
     const group = thirdCode.slice(1) as GroupLabel;
-    return teamFromRow(context.groupTables[group].rows[2]);
+    if (!thirdPlaceGroups.includes(group)) return null;
+    return teamFromRow(context.groupTables[group].complete ? context.groupTables[group].rows[2] : undefined);
   }
 
   const knockout = /^([WL])(\d{2,3})$/.exec(code);
@@ -363,7 +385,7 @@ function destinationForThirdPlaceSource(
   source: string | null,
   counterpart: string | null,
 ): ThirdPlaceDestination | undefined {
-  if (!source || !/^3[A-L](?:\/[A-L])+$/.test(source)) return undefined;
+  if (!parseThirdPlaceSource(source)) return undefined;
   return THIRD_PLACE_DESTINATIONS.find((destination) => destination === counterpart);
 }
 

@@ -243,6 +243,24 @@ describe("tournament advancement motor", () => {
     expect(bySlot.get(87)?.homeTeamCode).toBe("KA");
   });
 
+  it("resuelve mejores terceros con placeholders comprimidos de seed", () => {
+    const slashResult = calculateTournamentAdvancement([
+      ...completeTournamentGroups(),
+      knockoutMatch(74, "1E", "3A/B/C/D/F"),
+    ]);
+    const compactResult = calculateTournamentAdvancement([
+      ...completeTournamentGroups(),
+      knockoutMatch(74, "1E", "3ABCDF"),
+    ]);
+
+    expect(compactResult.knockoutSlots[0]).toMatchObject({
+      bracketSlot: 74,
+      homeTeamCode: "EA",
+      awayTeamCode: slashResult.knockoutSlots[0]?.awayTeamCode,
+    });
+    expect(compactResult.knockoutSlots[0]?.awayTeamCode).toBeTruthy();
+  });
+
   it("propaga W/L para rondas posteriores y conserva TBD si falta ganador", () => {
     const result = calculateTournamentAdvancement([
       ...completeTournamentGroups(),
