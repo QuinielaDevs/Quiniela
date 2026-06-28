@@ -119,7 +119,7 @@ function makeSupabaseMock({
         : { data: predictionRows, error: predictionError };
 
     const builder: Record<string, unknown> = {};
-    for (const method of ["select", "eq", "in", "order"]) {
+    for (const method of ["select", "eq", "in", "order", "range"]) {
       builder[method] = () => builder;
     }
     builder.then = (

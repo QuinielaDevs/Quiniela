@@ -42,7 +42,7 @@ vi.mock("@/components/live/LiveStandingsBoard", () => ({
 
 function tableBuilder(result: { data: unknown }) {
   const builder: Record<string, unknown> = {};
-  for (const method of ["select", "eq", "order", "limit", "in"]) {
+  for (const method of ["select", "eq", "order", "limit", "in", "range"]) {
     builder[method] = () => builder;
   }
   builder.single = () => Promise.resolve({ error: null, ...result });
