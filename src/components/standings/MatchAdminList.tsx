@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { setMatchResult } from "@/app/actions/matches.actions";
+import {
+  recalculateTournamentAdvancement,
+  setMatchResult,
+} from "@/app/actions/matches.actions";
 import { GoalPicker } from "@/components/predictions/GoalPicker";
 import { flagForTeamCode } from "@/utils/team-flags";
 import { cn } from "@/utils/utils";
@@ -57,6 +60,25 @@ function statusUsesScore(status: MatchStatus): boolean {
 }
 
 export function MatchAdminList({ matches }: MatchAdminListProps) {
+  const router = useRouter();
+  const [isRecalculating, startRecalculateTransition] = useTransition();
+  const [recalculateError, setRecalculateError] = useState<string | null>(null);
+  const [recalculateSuccess, setRecalculateSuccess] = useState(false);
+
+  function recalculateBracket() {
+    setRecalculateError(null);
+    setRecalculateSuccess(false);
+    startRecalculateTransition(async () => {
+      const result = await recalculateTournamentAdvancement();
+      if (!result.success) {
+        setRecalculateError(result.error);
+        return;
+      }
+      setRecalculateSuccess(true);
+      router.refresh();
+    });
+  }
+
   if (matches.length === 0) {
     return (
       <div className="rounded-md border border-border bg-card p-6 text-center text-card-foreground">
@@ -69,11 +91,39 @@ export function MatchAdminList({ matches }: MatchAdminListProps) {
   }
 
   return (
-    <ul className="flex flex-col gap-2">
-      {matches.map((match) => (
-        <MatchAdminCard key={match.id} match={match} />
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">
+            Avance de eliminatorias
+          </p>
+          {recalculateError ? (
+            <p className="mt-1 text-xs text-destructive" role="status">
+              {recalculateError}
+            </p>
+          ) : recalculateSuccess ? (
+            <p className="mt-1 text-xs text-success" role="status">
+              Bracket recalculado.
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={recalculateBracket}
+          disabled={isRecalculating}
+          data-testid="recalculate-bracket-button"
+          className="inline-flex h-11 shrink-0 items-center justify-center rounded-sm border border-primary bg-primary/15 px-4 text-sm font-semibold text-primary disabled:opacity-50"
+        >
+          {isRecalculating ? "Recalculando..." : "Recalcular bracket"}
+        </button>
+      </div>
+
+      <ul className="flex flex-col gap-2">
+        {matches.map((match) => (
+          <MatchAdminCard key={match.id} match={match} />
+        ))}
+      </ul>
+    </div>
   );
 }
 
