@@ -7,12 +7,15 @@ import type { AdminMatchView } from "@/components/standings/MatchAdminList";
 
 const refresh = vi.fn();
 const setMatchResult = vi.fn();
+const recalculateTournamentAdvancement = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh }),
 }));
 
 vi.mock("@/app/actions/matches.actions", () => ({
+  recalculateTournamentAdvancement: (...args: unknown[]) =>
+    recalculateTournamentAdvancement(...args),
   setMatchResult: (...args: unknown[]) => setMatchResult(...args),
 }));
 
@@ -25,6 +28,7 @@ function makeMatch(overrides: Partial<AdminMatchView> = {}): AdminMatchView {
     awayTeamCode: "RSA",
     matchTime: "2026-06-11T19:00:00.000Z",
     status: "scheduled",
+    stage: "group",
     homeScore: null,
     awayScore: null,
     groupLabel: "A",
@@ -40,6 +44,11 @@ describe("MatchAdminList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setMatchResult.mockResolvedValue({ success: true, data: {}, error: null });
+    recalculateTournamentAdvancement.mockResolvedValue({
+      success: true,
+      data: null,
+      error: null,
+    });
   });
 
   afterEach(() => cleanup());
@@ -55,6 +64,71 @@ describe("MatchAdminList", () => {
     expect(screen.getAllByText(/Sudáfrica/).length).toBeGreaterThan(0);
     // Badge de estado (programado) presente.
     expect(screen.getAllByText("Programado").length).toBeGreaterThan(0);
+  });
+
+  it("agrupa por acordeón y deja colapsadas las jornadas finalizadas", () => {
+    render(
+      <MatchAdminList
+        matches={[
+          makeMatch({
+            id: "J1",
+            status: "finished",
+            homeScore: 2,
+            awayScore: 0,
+          }),
+          makeMatch({
+            id: "R32",
+            homeTeam: "Germany",
+            awayTeam: "Mexico",
+            homeTeamCode: "GER",
+            awayTeamCode: "MEX",
+            matchTime: "2026-06-29T20:30:00.000Z",
+            stage: "round-32",
+            matchday: null,
+            bracketSlot: 74,
+          }),
+        ]}
+      />,
+    );
+
+    const jornada = screen.getByText("Jornada 1").closest("details");
+    const round32 = screen.getByText("16avos").closest("details");
+
+    expect(jornada).not.toHaveAttribute("open");
+    expect(round32).toHaveAttribute("open");
+  });
+
+  it("recalcula el bracket sin modificar resultados", async () => {
+    const user = userEvent.setup();
+    render(<MatchAdminList matches={[makeMatch()]} />);
+
+    await user.click(screen.getByRole("button", { name: "Recalcular bracket" }));
+
+    await waitFor(() => {
+      expect(recalculateTournamentAdvancement).toHaveBeenCalledTimes(1);
+    });
+    expect(setMatchResult).not.toHaveBeenCalled();
+    expect(screen.getByText("Bracket recalculado.")).toBeInTheDocument();
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
+
+  it("muestra error si falla el recálculo del bracket", async () => {
+    recalculateTournamentAdvancement.mockResolvedValue({
+      success: false,
+      data: null,
+      error: "No se pudo actualizar el bracket.",
+    });
+    const user = userEvent.setup();
+    render(<MatchAdminList matches={[makeMatch()]} />);
+
+    await user.click(screen.getByRole("button", { name: "Recalcular bracket" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No se pudo actualizar el bracket."),
+      ).toBeInTheDocument();
+    });
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("un partido scheduled no muestra el editor de marcador hasta elegir live/finished", async () => {

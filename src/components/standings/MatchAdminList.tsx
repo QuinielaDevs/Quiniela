@@ -3,9 +3,13 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { setMatchResult } from "@/app/actions/matches.actions";
+import {
+  recalculateTournamentAdvancement,
+  setMatchResult,
+} from "@/app/actions/matches.actions";
 import { GoalPicker } from "@/components/predictions/GoalPicker";
 import { flagForTeamCode } from "@/utils/team-flags";
+import { stageLabel } from "@/utils/tournament";
 import { cn } from "@/utils/utils";
 import type { MatchStatus } from "@/types";
 
@@ -19,6 +23,7 @@ export type AdminMatchView = {
   awayTeamCode: string | null;
   matchTime: string; // ISO 8601 UTC
   status: MatchStatus;
+  stage: string | null;
   homeScore: number | null;
   awayScore: number | null;
   groupLabel: string | null;
@@ -51,12 +56,119 @@ const ALLOWED_TRANSITIONS: Record<MatchStatus, MatchStatus[]> = {
   canceled: ["scheduled", "canceled"],
 };
 
+type MatchAdminSection = {
+  key: string;
+  label: string;
+  matches: AdminMatchView[];
+  isPastGroupDay: boolean;
+};
+
+const KNOCKOUT_STAGE_ORDER: Record<string, number> = {
+  "round-32": 4,
+  "round-16": 5,
+  quarter: 6,
+  semi: 7,
+  "third-place": 8,
+  final: 9,
+};
+
 /** Un estado lleva marcador editable (live/finished). */
 function statusUsesScore(status: MatchStatus): boolean {
   return status === "live" || status === "finished";
 }
 
+function sectionSortValue(match: AdminMatchView): number {
+  if (match.matchday != null && (match.stage === "group" || !match.stage)) {
+    return match.matchday;
+  }
+  const knockoutOrder = match.stage
+    ? KNOCKOUT_STAGE_ORDER[match.stage]
+    : undefined;
+  if (knockoutOrder != null) {
+    return knockoutOrder;
+  }
+  return 99;
+}
+
+function sectionForMatch(match: AdminMatchView): { key: string; label: string } {
+  if (match.matchday != null && (match.stage === "group" || !match.stage)) {
+    return {
+      key: `jornada-${match.matchday}`,
+      label: `Jornada ${match.matchday}`,
+    };
+  }
+
+  if (match.stage) {
+    return {
+      key: match.stage,
+      label: stageLabel(match.stage),
+    };
+  }
+
+  return { key: "otros", label: "Otros partidos" };
+}
+
+function groupMatchesBySection(matches: AdminMatchView[]): MatchAdminSection[] {
+  const sectionMap = new Map<string, MatchAdminSection>();
+
+  for (const match of matches) {
+    const section = sectionForMatch(match);
+    const existing = sectionMap.get(section.key);
+    if (existing) {
+      existing.matches.push(match);
+      continue;
+    }
+
+    sectionMap.set(section.key, {
+      ...section,
+      matches: [match],
+      isPastGroupDay: false,
+    });
+  }
+
+  return [...sectionMap.values()]
+    .map((section) => ({
+      ...section,
+      matches: [...section.matches].sort((a, b) => {
+        const slotA = a.bracketSlot;
+        const slotB = b.bracketSlot;
+        if (slotA != null && slotB != null) return slotA - slotB;
+        return new Date(a.matchTime).getTime() - new Date(b.matchTime).getTime();
+      }),
+      isPastGroupDay:
+        section.key.startsWith("jornada-") &&
+        section.matches.every((match) => match.status === "finished"),
+    }))
+    .sort((a, b) => {
+      const firstA = a.matches[0];
+      const firstB = b.matches[0];
+      if (!firstA || !firstB) return 0;
+      const byPhase = sectionSortValue(firstA) - sectionSortValue(firstB);
+      if (byPhase !== 0) return byPhase;
+      return firstA.matchTime.localeCompare(firstB.matchTime);
+    });
+}
+
 export function MatchAdminList({ matches }: MatchAdminListProps) {
+  const router = useRouter();
+  const [isRecalculating, startRecalculateTransition] = useTransition();
+  const [recalculateError, setRecalculateError] = useState<string | null>(null);
+  const [recalculateSuccess, setRecalculateSuccess] = useState(false);
+
+  function recalculateBracket() {
+    setRecalculateError(null);
+    setRecalculateSuccess(false);
+    startRecalculateTransition(async () => {
+      const result = await recalculateTournamentAdvancement();
+      if (!result.success) {
+        setRecalculateError(result.error);
+        return;
+      }
+      setRecalculateSuccess(true);
+      router.refresh();
+    });
+  }
+
   if (matches.length === 0) {
     return (
       <div className="rounded-md border border-border bg-card p-6 text-center text-card-foreground">
@@ -68,12 +180,58 @@ export function MatchAdminList({ matches }: MatchAdminListProps) {
     );
   }
 
+  const sections = groupMatchesBySection(matches);
+
   return (
-    <ul className="flex flex-col gap-2">
-      {matches.map((match) => (
-        <MatchAdminCard key={match.id} match={match} />
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">
+            Avance de eliminatorias
+          </p>
+          {recalculateError ? (
+            <p className="mt-1 text-xs text-destructive" role="status">
+              {recalculateError}
+            </p>
+          ) : recalculateSuccess ? (
+            <p className="mt-1 text-xs text-success" role="status">
+              Bracket recalculado.
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={recalculateBracket}
+          disabled={isRecalculating}
+          data-testid="recalculate-bracket-button"
+          className="inline-flex h-11 shrink-0 items-center justify-center rounded-sm border border-primary bg-primary/15 px-4 text-sm font-semibold text-primary disabled:opacity-50"
+        >
+          {isRecalculating ? "Recalculando..." : "Recalcular bracket"}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {sections.map((section) => (
+          <details
+            key={section.key}
+            className="rounded-md border border-border bg-card"
+            open={!section.isPastGroupDay || sections.length === 1}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-sm font-semibold text-foreground marker:hidden">
+              <span>{section.label}</span>
+              <span className="rounded-sm border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                {section.matches.length} partidos
+              </span>
+            </summary>
+            <ul className="flex flex-col gap-2 border-t border-border p-2">
+              {section.matches.map((match) => (
+                <MatchAdminCard key={match.id} match={match} />
+              ))}
+            </ul>
+          </details>
+        ))}
+      </div>
+    </div>
   );
 }
 

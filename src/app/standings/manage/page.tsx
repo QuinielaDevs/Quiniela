@@ -36,6 +36,7 @@ type ManageMatchRow = {
   away_team_code: string | null;
   match_time: string;
   status: MatchStatus;
+  stage: string | null;
   home_score: number | null;
   away_score: number | null;
   group_label: string | null;
@@ -94,7 +95,7 @@ export async function ManageBoard() {
   const { data: matchRows } = await supabase
     .from("matches")
     .select(
-      "id, home_team, away_team, home_team_code, away_team_code, match_time, status, home_score, away_score, group_label, matchday, bracket_slot, penalties_home_score, penalties_away_score",
+      "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, home_score, away_score, group_label, matchday, bracket_slot, penalties_home_score, penalties_away_score",
     )
     .not("home_team_code", "is", null)
     .not("away_team_code", "is", null)
@@ -110,6 +111,7 @@ export async function ManageBoard() {
       awayTeamCode: m.away_team_code,
       matchTime: m.match_time,
       status: m.status,
+      stage: m.stage,
       homeScore: m.home_score,
       awayScore: m.away_score,
       groupLabel: m.group_label,
