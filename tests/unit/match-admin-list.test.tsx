@@ -28,6 +28,7 @@ function makeMatch(overrides: Partial<AdminMatchView> = {}): AdminMatchView {
     awayTeamCode: "RSA",
     matchTime: "2026-06-11T19:00:00.000Z",
     status: "scheduled",
+    stage: "group",
     homeScore: null,
     awayScore: null,
     groupLabel: "A",
@@ -63,6 +64,38 @@ describe("MatchAdminList", () => {
     expect(screen.getAllByText(/Sudáfrica/).length).toBeGreaterThan(0);
     // Badge de estado (programado) presente.
     expect(screen.getAllByText("Programado").length).toBeGreaterThan(0);
+  });
+
+  it("agrupa por acordeón y deja colapsadas las jornadas finalizadas", () => {
+    render(
+      <MatchAdminList
+        matches={[
+          makeMatch({
+            id: "J1",
+            status: "finished",
+            homeScore: 2,
+            awayScore: 0,
+          }),
+          makeMatch({
+            id: "R32",
+            homeTeam: "Germany",
+            awayTeam: "Mexico",
+            homeTeamCode: "GER",
+            awayTeamCode: "MEX",
+            matchTime: "2026-06-29T20:30:00.000Z",
+            stage: "round-32",
+            matchday: null,
+            bracketSlot: 74,
+          }),
+        ]}
+      />,
+    );
+
+    const jornada = screen.getByText("Jornada 1").closest("details");
+    const round32 = screen.getByText("16avos").closest("details");
+
+    expect(jornada).not.toHaveAttribute("open");
+    expect(round32).toHaveAttribute("open");
   });
 
   it("recalcula el bracket sin modificar resultados", async () => {
