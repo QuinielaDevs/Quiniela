@@ -80,6 +80,16 @@ async function insertMatch(overrides: MatchOverrides = {}): Promise<string> {
   return data!.id;
 }
 
+async function addLeagueMember(userId: string): Promise<void> {
+  const { error } = await admin.from("league_members").insert({
+    league_id: leagueId,
+    user_id: userId,
+    role: "member",
+    wager_balance: 100,
+  });
+  expect(error).toBeNull();
+}
+
 let user: { id: string; token: string };
 let leagueId: string;
 
@@ -228,5 +238,99 @@ describe("fn_ensure_default_predictions", () => {
     });
 
     expect(error).not.toBeNull();
+  });
+
+  it("materializa 0-0 para todos los miembros cuando un slot knockout deja de ser TBD", async () => {
+    const teammate = await createAuthedUser();
+    await addLeagueMember(teammate.id);
+
+    const matchId = await insertMatch({
+      matchTimeIso: new Date(Date.now() + DAY_MS).toISOString(),
+      homeCode: null,
+      awayCode: null,
+      bracketSlot: uniqueBracketSlot(),
+    });
+
+    const { error: updateError } = await admin
+      .from("matches")
+      .update({
+        home_team: "Argentina",
+        away_team: "México",
+        home_team_code: "ARG",
+        away_team_code: "MEX",
+      })
+      .eq("id", matchId);
+    expect(updateError).toBeNull();
+
+    const { data: preds, error: predError } = await admin
+      .from("predictions")
+      .select("user_id, home_score_pred, away_score_pred")
+      .eq("league_id", leagueId)
+      .eq("match_id", matchId);
+
+    expect(predError).toBeNull();
+    const byUser = new Map((preds ?? []).map((p) => [p.user_id, p]));
+    expect(byUser.get(user.id)?.home_score_pred).toBe(0);
+    expect(byUser.get(user.id)?.away_score_pred).toBe(0);
+    expect(byUser.get(teammate.id)?.home_score_pred).toBe(0);
+    expect(byUser.get(teammate.id)?.away_score_pred).toBe(0);
+  });
+
+  it("materializa defaults antes del accrual cuando un partido pasa a finished", async () => {
+    const missingUser = await createAuthedUser();
+    await addLeagueMember(missingUser.id);
+
+    const matchId = await insertMatch({
+      matchTimeIso: new Date(Date.now() + DAY_MS).toISOString(),
+      bracketSlot: uniqueBracketSlot(),
+    });
+
+    const client = createAuthedClient(user.token);
+    const { error: saveError } = await client.rpc("fn_save_prediction", {
+      p_league_id: leagueId,
+      p_match_id: matchId,
+      p_home_score_pred: 2,
+      p_away_score_pred: 1,
+    });
+    expect(saveError).toBeNull();
+
+    const { error: finishError } = await admin
+      .from("matches")
+      .update({
+        home_score: 0,
+        away_score: 0,
+        status: "finished",
+      })
+      .eq("id", matchId);
+    expect(finishError).toBeNull();
+
+    const { data: preds, error: predError } = await admin
+      .from("predictions")
+      .select(
+        "user_id, home_score_pred, away_score_pred, points_earned, evaluated_at",
+      )
+      .eq("league_id", leagueId)
+      .eq("match_id", matchId);
+    expect(predError).toBeNull();
+
+    const byUser = new Map((preds ?? []).map((p) => [p.user_id, p]));
+    expect(byUser.get(user.id)?.home_score_pred).toBe(2);
+    expect(byUser.get(user.id)?.away_score_pred).toBe(1);
+    expect(Number(byUser.get(user.id)?.points_earned ?? 0)).toBe(0);
+
+    const defaultPred = byUser.get(missingUser.id);
+    expect(defaultPred?.home_score_pred).toBe(0);
+    expect(defaultPred?.away_score_pred).toBe(0);
+    expect(Number(defaultPred?.points_earned ?? 0)).toBe(5);
+    expect(defaultPred?.evaluated_at).not.toBeNull();
+
+    const { data: member, error: memberError } = await admin
+      .from("league_members")
+      .select("wager_balance")
+      .eq("league_id", leagueId)
+      .eq("user_id", missingUser.id)
+      .single();
+    expect(memberError).toBeNull();
+    expect(Number(member!.wager_balance)).toBe(105);
   });
 });
