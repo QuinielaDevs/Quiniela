@@ -468,16 +468,17 @@ export async function shouldRunSync(
   for (const match of matches) {
     const matchTimeMs = new Date(match.match_time).getTime();
 
-    // Condición A: Faltan 2 minutos o menos para el inicio
-    const isJustBeforeKickoff = nowMs >= matchTimeMs - twoMinutesInMs && nowMs < matchTimeMs;
+    // Condición A: Rango de kickoff (±2 minutos) y el partido sigue en 'scheduled' localmente
+    const isKickoffWindow = nowMs >= matchTimeMs - twoMinutesInMs && nowMs <= matchTimeMs + twoMinutesInMs;
+    const needsKickoffSync = isKickoffWindow && match.status === "scheduled";
 
     // Condición B: Ya pasaron entre 120 y 210 minutos desde el inicio y sigue sin finalizar localmente
     const isPostMatchPolling = nowMs >= matchTimeMs + oneHundredTwentyMinutesInMs && nowMs < matchTimeMs + limitInMs;
 
-    if (isJustBeforeKickoff || isPostMatchPolling) {
+    if (needsKickoffSync || isPostMatchPolling) {
       console.log(
         `🎯 Sync window active for match starting at ${match.match_time} (status: ${match.status}). ` +
-        `Current state: isJustBeforeKickoff=${isJustBeforeKickoff}, isPostMatchPolling=${isPostMatchPolling}`,
+        `Current state: needsKickoffSync=${needsKickoffSync}, isPostMatchPolling=${isPostMatchPolling}`,
       );
       return true;
     }

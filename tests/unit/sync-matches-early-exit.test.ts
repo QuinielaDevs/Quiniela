@@ -57,6 +57,57 @@ describe("shouldRunSync early exit logic", () => {
     expect(result).toBe(true);
   });
 
+  it("should return true when a match is exactly at kickoff time and still scheduled", async () => {
+    // Current time: 12:00 UTC, match kickoff: 12:00 UTC
+    const now = new Date("2026-06-12T12:00:00.000Z");
+    mockIn.mockResolvedValue({
+      data: [
+        {
+          status: "scheduled",
+          match_time: "2026-06-12T12:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    const result = await shouldRunSync(mockSupabase, now);
+    expect(result).toBe(true);
+  });
+
+  it("should return true when a match started 1 minute ago but is still scheduled", async () => {
+    // Current time: 12:01 UTC, match kickoff: 12:00 UTC
+    const now = new Date("2026-06-12T12:01:00.000Z");
+    mockIn.mockResolvedValue({
+      data: [
+        {
+          status: "scheduled",
+          match_time: "2026-06-12T12:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    const result = await shouldRunSync(mockSupabase, now);
+    expect(result).toBe(true);
+  });
+
+  it("should return false when a match started 1 minute ago but is already live", async () => {
+    // Current time: 12:01 UTC, match kickoff: 12:00 UTC
+    const now = new Date("2026-06-12T12:01:00.000Z");
+    mockIn.mockResolvedValue({
+      data: [
+        {
+          status: "live",
+          match_time: "2026-06-12T12:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    const result = await shouldRunSync(mockSupabase, now);
+    expect(result).toBe(false);
+  });
+
   it("should return false when a match starts in 5 minutes (outside 2m window)", async () => {
     // Current time: 12:00 UTC, match kickoff: 12:05 UTC
     const now = new Date("2026-06-12T12:00:00.000Z");
