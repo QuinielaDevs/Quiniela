@@ -511,4 +511,62 @@ test.describe("Tabla en vivo (Realtime) (e2e)", () => {
     await expect(page.getByTestId("live-board").first()).toHaveAttribute("data-connection", "live", { timeout: 15_000 });
     await expect(page.getByTestId("live-matches-section")).toBeHidden();
   });
+
+  test("LIVE-11: Marcador de prórroga y penales en el carrusel superior y acordeón en vivo", async () => {
+    const page = fixture.users[0]!.page!;
+
+    // 1. Crear un partido en vivo con prórroga y penales
+    const seeded = await seedMatches([
+      liveMatch(
+        { home: 1, away: 1 },
+        {
+          matchday: 1,
+          homeTeamCode: "ARG",
+          awayTeamCode: "BOL",
+          home: "Argentina",
+          away: "Bolivia",
+          extraTimeHomeScore: 2,
+          extraTimeAwayScore: 2,
+          penaltiesHomeScore: 4,
+          penaltiesAwayScore: 3,
+        }
+      ),
+    ]);
+    const m = seeded[0]!;
+
+    const predId = await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[0]!.userId,
+      matchId: m.id,
+      home: 1,
+      away: 1,
+      multiplier: 1.0,
+    });
+
+    try {
+      await page.goto("/live");
+      await expect(page.getByTestId("live-board").first()).toHaveAttribute("data-connection", "live", { timeout: 15_000 });
+
+      // 2. Verificar el carrusel superior (tarjeta de partido)
+      const card = page.locator('[data-testid="live-match-card"]').filter({ hasText: "ARG" }).first();
+      await expect(card).toBeVisible();
+      await expect(card.getByText("Prórroga: 2-2")).toBeVisible();
+      await expect(card.getByText("Penales: 4-3")).toBeVisible();
+
+      // 3. Verificar el acordeón del usuario
+      const rowUser0 = page.getByTestId("live-row").filter({ hasText: "E2E Jugador 0" });
+      await rowUser0.getByTestId("live-row-toggle").click();
+
+      const accordion = rowUser0.getByTestId("live-accordion");
+      await expect(accordion).toBeVisible();
+
+      // Verificar que se renderizan las leyendas de prórroga/penales en el acordeón en vivo
+      await expect(accordion.getByText("(2-2 t.s.)")).toBeVisible();
+      await expect(accordion.getByText("(4-3 pen.)")).toBeVisible();
+    } finally {
+      // Limpiar predicción y partido
+      await admin.from("predictions").delete().eq("id", predId);
+      await deleteMatches([m.id]);
+    }
+  });
 });

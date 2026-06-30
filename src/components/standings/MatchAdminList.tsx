@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -31,6 +31,8 @@ export type AdminMatchView = {
   bracketSlot: number | null;
   penaltiesHomeScore: number | null;
   penaltiesAwayScore: number | null;
+  extraTimeHomeScore: number | null;
+  extraTimeAwayScore: number | null;
 };
 
 type MatchAdminListProps = {
@@ -253,6 +255,12 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
   const [penaltiesAwayScore, setPenaltiesAwayScore] = useState<number>(
     match.penaltiesAwayScore ?? 0,
   );
+  const [extraTimeHomeScore, setExtraTimeHomeScore] = useState<number>(
+    match.extraTimeHomeScore ?? match.homeScore ?? 0,
+  );
+  const [extraTimeAwayScore, setExtraTimeAwayScore] = useState<number>(
+    match.extraTimeAwayScore ?? match.awayScore ?? 0,
+  );
 
   useEffect(() => {
     if (isPending) return;
@@ -261,15 +269,27 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
     setAwayScore(match.awayScore ?? 0);
     setPenaltiesHomeScore(match.penaltiesHomeScore ?? 0);
     setPenaltiesAwayScore(match.penaltiesAwayScore ?? 0);
+    setExtraTimeHomeScore(match.extraTimeHomeScore ?? match.homeScore ?? 0);
+    setExtraTimeAwayScore(match.extraTimeAwayScore ?? match.awayScore ?? 0);
   }, [
     match.status,
     match.homeScore,
     match.awayScore,
     match.penaltiesHomeScore,
     match.penaltiesAwayScore,
+    match.extraTimeHomeScore,
+    match.extraTimeAwayScore,
     isPending,
   ]);
+  const handleHomeScoreChange = useCallback((val: number) => {
+    setExtraTimeHomeScore((prev) => (prev === homeScore ? val : prev));
+    setHomeScore(val);
+  }, [homeScore]);
 
+  const handleAwayScoreChange = useCallback((val: number) => {
+    setExtraTimeAwayScore((prev) => (prev === awayScore ? val : prev));
+    setAwayScore(val);
+  }, [awayScore]);
   // Destinos válidos relativos al estado PERSISTIDO (origen).
   const statusOptions = useMemo(
     () => ALLOWED_TRANSITIONS[match.status],
@@ -289,17 +309,24 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
     [match.matchTime],
   );
 
-  const showPenalties =
+  const showExtraTime =
     showScore &&
     match.bracketSlot !== null &&
     homeScore === awayScore &&
     status === "finished";
+
+  const showPenalties =
+    showExtraTime &&
+    extraTimeHomeScore === extraTimeAwayScore;
 
   const dirty =
     status !== match.status ||
     (showScore &&
       (homeScore !== (match.homeScore ?? 0) ||
         awayScore !== (match.awayScore ?? 0))) ||
+    (showExtraTime &&
+      (extraTimeHomeScore !== (match.extraTimeHomeScore ?? 0) ||
+        extraTimeAwayScore !== (match.extraTimeAwayScore ?? 0))) ||
     (showPenalties &&
       (penaltiesHomeScore !== (match.penaltiesHomeScore ?? 0) ||
         penaltiesAwayScore !== (match.penaltiesAwayScore ?? 0)));
@@ -315,6 +342,8 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
         status,
         penaltiesHomeScore: showPenalties ? penaltiesHomeScore : null,
         penaltiesAwayScore: showPenalties ? penaltiesAwayScore : null,
+        extraTimeHomeScore: showExtraTime ? extraTimeHomeScore : null,
+        extraTimeAwayScore: showExtraTime ? extraTimeAwayScore : null,
       });
       if (!result.success) {
         setError(result.error);
@@ -404,7 +433,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
         <div className="flex items-center justify-center gap-4">
           <GoalPicker
             value={homeScore}
-            onChange={setHomeScore}
+            onChange={handleHomeScoreChange}
             label={match.homeTeam}
             disabled={isPending}
             max={99}
@@ -414,13 +443,43 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
           <span className="font-display text-lg text-muted-foreground">–</span>
           <GoalPicker
             value={awayScore}
-            onChange={setAwayScore}
+            onChange={handleAwayScoreChange}
             label={match.awayTeam}
             disabled={isPending}
             max={99}
             side="away"
             testId="admin-away-score"
           />
+        </div>
+      )}
+
+      {/* Editor de prórroga (tiempo extra) */}
+      {showExtraTime && (
+        <div className="flex flex-col gap-2 border-t border-border/50 pt-3 mt-1 items-center">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            Tiempo Extra / Prórroga
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <GoalPicker
+              value={extraTimeHomeScore}
+              onChange={setExtraTimeHomeScore}
+              label={`Prórroga ${match.homeTeam}`}
+              disabled={isPending}
+              max={99}
+              side="home"
+              testId="admin-extra-home-score"
+            />
+            <span className="font-display text-lg text-muted-foreground">–</span>
+            <GoalPicker
+              value={extraTimeAwayScore}
+              onChange={setExtraTimeAwayScore}
+              label={`Prórroga ${match.awayTeam}`}
+              disabled={isPending}
+              max={99}
+              side="away"
+              testId="admin-extra-away-score"
+            />
+          </div>
         </div>
       )}
 

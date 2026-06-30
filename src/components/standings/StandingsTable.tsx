@@ -64,6 +64,8 @@ type MatchDetail = {
   matchTime?: string;
   penaltiesHomeScore?: number | null;
   penaltiesAwayScore?: number | null;
+  extraTimeHomeScore?: number | null;
+  extraTimeAwayScore?: number | null;
 };
 
 /** Calcula el desglose de puntos de un usuario para los partidos en alcance. */
@@ -103,6 +105,8 @@ function computeUserBreakdown(
       matchTime: match.matchTime,
       penaltiesHomeScore: match.penaltiesHomeScore ?? null,
       penaltiesAwayScore: match.penaltiesAwayScore ?? null,
+      extraTimeHomeScore: match.extraTimeHomeScore ?? null,
+      extraTimeAwayScore: match.extraTimeAwayScore ?? null,
     });
   }
 
@@ -468,6 +472,11 @@ export function StandingsTable({
                                   <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">Real:</span>
                                   <span className="font-bold text-foreground">
                                     {d.homeScore}-{d.awayScore}
+                                    {d.extraTimeHomeScore != null && d.extraTimeAwayScore != null && (
+                                      <span className="text-[10px] text-muted-foreground ml-1">
+                                        ({d.extraTimeHomeScore}-{d.extraTimeAwayScore} t.s.)
+                                      </span>
+                                    )}
                                     {d.penaltiesHomeScore !== null && d.penaltiesAwayScore !== null && (
                                       <span className="text-[10px] text-muted-foreground ml-1">
                                         ({d.penaltiesHomeScore}-{d.penaltiesAwayScore} pen.)

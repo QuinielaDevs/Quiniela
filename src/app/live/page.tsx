@@ -50,7 +50,7 @@ export async function LiveBoard() {
       supabase
         .from("matches")
         .select(
-          "id, status, matchday, stage, group_label, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time",
+          "id, status, matchday, stage, group_label, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score",
         )
         .in("status", ["finished", "live"])
         .order("match_time", { ascending: true }),
@@ -83,6 +83,10 @@ export async function LiveBoard() {
     homeTeamCode: match.home_team_code ?? null,
     awayTeamCode: match.away_team_code ?? null,
     groupLabel: match.group_label ?? null,
+    penaltiesHomeScore: match.penalties_home_score ?? null,
+    penaltiesAwayScore: match.penalties_away_score ?? null,
+    extraTimeHomeScore: match.extra_time_home_score ?? null,
+    extraTimeAwayScore: match.extra_time_away_score ?? null,
   }));
   const matchIds = matches.map((match) => match.id);
 
