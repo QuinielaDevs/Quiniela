@@ -45,6 +45,8 @@ export type StandingMatch = {
   awayTeam?: string | null;
   penaltiesHomeScore?: number | null;
   penaltiesAwayScore?: number | null;
+  extraTimeHomeScore?: number | null;
+  extraTimeAwayScore?: number | null;
 };
 
 export type StandingPrediction = {

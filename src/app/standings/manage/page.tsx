@@ -44,6 +44,8 @@ type ManageMatchRow = {
   bracket_slot: number | null;
   penalties_home_score: number | null;
   penalties_away_score: number | null;
+  extra_time_home_score: number | null;
+  extra_time_away_score: number | null;
 };
 
 // Panel rápido de administración (Story 3.3). Resuelve sesión + liga activa,
@@ -95,7 +97,7 @@ export async function ManageBoard() {
   const { data: matchRows } = await supabase
     .from("matches")
     .select(
-      "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, home_score, away_score, group_label, matchday, bracket_slot, penalties_home_score, penalties_away_score",
+      "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, home_score, away_score, group_label, matchday, bracket_slot, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score",
     )
     .not("home_team_code", "is", null)
     .not("away_team_code", "is", null)
@@ -119,6 +121,8 @@ export async function ManageBoard() {
       bracketSlot: m.bracket_slot,
       penaltiesHomeScore: m.penalties_home_score,
       penaltiesAwayScore: m.penalties_away_score,
+      extraTimeHomeScore: m.extra_time_home_score,
+      extraTimeAwayScore: m.extra_time_away_score,
     }),
   );
 

@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
         .eq("league_id", leagueId),
       supabase
         .from("matches")
-        .select("id, status, matchday, stage, home_score, away_score, updated_at")
+        .select("id, status, matchday, stage, home_score, away_score, updated_at, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score")
         .eq("status", "finished"),
       supabase.rpc("fn_get_league_duel_points", { p_league_id: leagueId }),
     ]);
@@ -123,6 +123,10 @@ export async function GET(req: NextRequest) {
       homeScore: m.home_score,
       awayScore: m.away_score,
       updatedAt: m.updated_at,
+      penaltiesHomeScore: m.penalties_home_score,
+      penaltiesAwayScore: m.penalties_away_score,
+      extraTimeHomeScore: m.extra_time_home_score,
+      extraTimeAwayScore: m.extra_time_away_score,
     }));
     const finishedIds = finishedMatches.map((m) => m.id);
 

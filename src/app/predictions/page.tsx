@@ -79,7 +79,7 @@ export async function PredictionsBoard() {
     supabase
       .from("matches")
       .select(
-        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday, home_source, away_source, bracket_slot, venue, group_label, home_score, away_score, penalties_home_score, penalties_away_score",
+        "id, home_team, away_team, home_team_code, away_team_code, match_time, status, stage, matchday, home_source, away_source, bracket_slot, venue, group_label, home_score, away_score, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score",
       )
       .in("status", ["scheduled", "live", "finished", "suspended", "canceled"])
       .order("match_time", { ascending: true }),

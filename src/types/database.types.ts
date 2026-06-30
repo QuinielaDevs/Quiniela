@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -34,6 +34,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          changed_by: string | null
+          created_at: string
+          id: number
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_by?: string | null
+          created_at?: string
+          id?: number
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: number
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       award_candidates: {
         Row: {
           category: string
@@ -280,7 +313,10 @@ export type Database = {
           away_team_code: string | null
           bracket_slot: number | null
           created_at: string
+          external_last_sync_at: string | null
           external_ref: string | null
+          extra_time_away_score: number | null
+          extra_time_home_score: number | null
           group_label: string | null
           home_score: number | null
           home_source: string | null
@@ -303,7 +339,10 @@ export type Database = {
           away_team_code?: string | null
           bracket_slot?: number | null
           created_at?: string
+          external_last_sync_at?: string | null
           external_ref?: string | null
+          extra_time_away_score?: number | null
+          extra_time_home_score?: number | null
           group_label?: string | null
           home_score?: number | null
           home_source?: string | null
@@ -326,7 +365,10 @@ export type Database = {
           away_team_code?: string | null
           bracket_slot?: number | null
           created_at?: string
+          external_last_sync_at?: string | null
           external_ref?: string | null
+          extra_time_away_score?: number | null
+          extra_time_home_score?: number | null
           group_label?: string | null
           home_score?: number | null
           home_source?: string | null
@@ -788,7 +830,10 @@ export type Database = {
           away_team_code: string | null
           bracket_slot: number | null
           created_at: string
+          external_last_sync_at: string | null
           external_ref: string | null
+          extra_time_away_score: number | null
+          extra_time_home_score: number | null
           group_label: string | null
           home_score: number | null
           home_source: string | null
@@ -797,6 +842,8 @@ export type Database = {
           id: string
           match_time: string
           matchday: number | null
+          penalties_away_score: number | null
+          penalties_home_score: number | null
           stage: string | null
           status: string
           updated_at: string
@@ -812,11 +859,13 @@ export type Database = {
       fn_admin_set_match_result: {
         Args: {
           p_away_score: number
+          p_extra_time_away_score?: number
+          p_extra_time_home_score?: number
           p_home_score: number
           p_match_id: string
+          p_penalties_away_score?: number
+          p_penalties_home_score?: number
           p_status: string
-          p_penalties_away_score?: number | null
-          p_penalties_home_score?: number | null
         }
         Returns: {
           away_score: number | null
@@ -825,7 +874,10 @@ export type Database = {
           away_team_code: string | null
           bracket_slot: number | null
           created_at: string
+          external_last_sync_at: string | null
           external_ref: string | null
+          extra_time_away_score: number | null
+          extra_time_home_score: number | null
           group_label: string | null
           home_score: number | null
           home_source: string | null
@@ -847,6 +899,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      fn_apply_accrual_correction: {
+        Args: {
+          p_match_id: string
+          p_match_status: string
+          p_new_points: number
+          p_prediction_id: string
+        }
+        Returns: number
       }
       fn_are_special_predictions_locked: { Args: never; Returns: boolean }
       fn_create_league: {
@@ -878,6 +939,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fn_current_round_ordinal: { Args: never; Returns: number }
       fn_ensure_default_predictions: {
         Args: { p_league_id: string }
         Returns: number
@@ -949,6 +1011,13 @@ export type Database = {
           user_id: string
         }[]
       }
+      fn_get_league_duel_points: {
+        Args: { p_league_id: string }
+        Returns: {
+          duel_points: number
+          user_id: string
+        }[]
+      }
       fn_join_league_by_invite: {
         Args: { p_invite_code: string }
         Returns: {
@@ -967,7 +1036,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      fn_current_round_ordinal: { Args: never; Returns: number }
       fn_leave_league: { Args: { p_league_id: string }; Returns: undefined }
       fn_match_editable: { Args: { p_match_id: string }; Returns: boolean }
       fn_match_round_ordinal: {
@@ -975,6 +1043,14 @@ export type Database = {
         Returns: number
       }
       fn_match_unlocked: { Args: { p_match_id: string }; Returns: boolean }
+      fn_materialize_match_default_predictions: {
+        Args: { p_match_id: string }
+        Returns: number
+      }
+      fn_postpone_match_and_predictions: {
+        Args: { p_match_id: string; p_status: string }
+        Returns: undefined
+      }
       fn_prediction_multiplier: {
         Args: { p_matchday: number; p_stage: string }
         Returns: number
@@ -996,6 +1072,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      fn_purge_old_audit_logs: {
+        Args: { p_days_to_keep?: number }
+        Returns: number
       }
       fn_remove_member: {
         Args: { p_league_id: string; p_user_id: string }
@@ -1058,6 +1138,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fn_set_active_league: {
+        Args: { p_league_id: string }
+        Returns: {
+          active_league_id: string | null
+          avatar_url: string
+          created_at: string
+          display_name: string
+          email: string | null
+          id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fn_set_member_payment_status: {
         Args: { p_league_id: string; p_status: string; p_user_id: string }
         Returns: {
@@ -1076,23 +1173,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      fn_set_active_league: {
-        Args: { p_league_id: string }
-        Returns: {
-          active_league_id: string | null
-          avatar_url: string
-          created_at: string
-          display_name: string
-          email: string | null
-          id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "profiles"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+      fn_should_run_sync: { Args: never; Returns: boolean }
       fn_sync_tournament_phases_from_matches: {
         Args: never
         Returns: undefined
@@ -1253,3 +1334,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
