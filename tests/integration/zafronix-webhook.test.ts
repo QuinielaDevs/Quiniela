@@ -315,7 +315,16 @@ describe("POST /api/webhooks/zafronix", () => {
       // Resetear el partido de grupo a estado live
       const { error } = await supabase
         .from("matches")
-        .update({ status: "live", home_score: null, away_score: null })
+        .update({
+          status: "live",
+          home_score: null,
+          away_score: null,
+          penalties_home_score: null,
+          penalties_away_score: null,
+          extra_time_home_score: null,
+          extra_time_away_score: null,
+          external_last_sync_at: null,
+        })
         .eq("id", groupMatchId);
       if (error) throw error;
     });
@@ -390,6 +399,11 @@ describe("POST /api/webhooks/zafronix", () => {
           away_score: null,
           home_team: "TBD",
           away_team: "TBD",
+          penalties_home_score: null,
+          penalties_away_score: null,
+          extra_time_home_score: null,
+          extra_time_away_score: null,
+          external_last_sync_at: null,
         })
         .eq("id", knockoutMatchId);
       if (error) throw error;
@@ -429,6 +443,44 @@ describe("POST /api/webhooks/zafronix", () => {
       expect(match!.home_score).toBe(3);
       expect(match!.away_score).toBe(1);
       expect(match!.status).toBe("finished");
+    });
+
+    it("actualiza partido con penales como objeto en match.finalized", async () => {
+      const payload = {
+        type: "match.finalized",
+        id: "knockout-penalties-obj-test",
+        matchId: KNOCKOUT_EXTERNAL_REF,
+        year: 2026,
+        ts: new Date().toISOString(),
+        payload: {
+          homeTeam: "Germany",
+          awayTeam: "Japan",
+          homeScore: 1,
+          awayScore: 1,
+          result: "1-1",
+          extraTime: true,
+          penalties: { home: 5, away: 4 },
+          stage: "r16",
+          actor: "actor:test",
+        },
+      };
+      const res = await postWebhook(payload);
+      expect(res.status).toBe(200);
+
+      const { data: match } = await supabase
+        .from("matches")
+        .select("home_team, away_team, home_score, away_score, status, penalties_home_score, penalties_away_score")
+        .eq("id", knockoutMatchId)
+        .single();
+
+      expect(match).toBeDefined();
+      expect(match!.home_team).toBe("Germany");
+      expect(match!.away_team).toBe("Japan");
+      expect(match!.home_score).toBe(1);
+      expect(match!.away_score).toBe(1);
+      expect(match!.status).toBe("finished");
+      expect(match!.penalties_home_score).toBe(5);
+      expect(match!.penalties_away_score).toBe(4);
     });
 
     it("match.patched actualiza marcador corregido en knockout", async () => {
@@ -474,6 +526,54 @@ describe("POST /api/webhooks/zafronix", () => {
       expect(match!.home_score).toBe(3);
       expect(match!.away_score).toBe(1);
       expect(match!.status).toBe("finished");
+    });
+
+    it("match.patched actualiza penales en formato objeto en knockout", async () => {
+      // Poner partido en estado finished de empate
+      const { error } = await supabase
+        .from("matches")
+        .update({
+          status: "finished",
+          home_score: 1,
+          away_score: 1,
+          home_team: "Germany",
+          away_team: "Japan",
+          penalties_home_score: null,
+          penalties_away_score: null,
+        })
+        .eq("id", knockoutMatchId);
+      if (error) throw error;
+
+      const payload = {
+        type: "match.patched",
+        id: "patch-penalties-obj-test",
+        matchId: KNOCKOUT_EXTERNAL_REF,
+        year: 2026,
+        ts: new Date().toISOString(),
+        payload: {
+          homeTeam: "Germany",
+          awayTeam: "Japan",
+          changes: {
+            penalties: { from: null, to: { home: 3, away: 4 } },
+          },
+          actor: "actor:test",
+        },
+      };
+      const res = await postWebhook(payload);
+      expect(res.status).toBe(200);
+
+      const { data: match } = await supabase
+        .from("matches")
+        .select("home_score, away_score, status, penalties_home_score, penalties_away_score")
+        .eq("id", knockoutMatchId)
+        .single();
+
+      expect(match).toBeDefined();
+      expect(match!.home_score).toBe(1);
+      expect(match!.away_score).toBe(1);
+      expect(match!.status).toBe("finished");
+      expect(match!.penalties_home_score).toBe(3);
+      expect(match!.penalties_away_score).toBe(4);
     });
   });
 
@@ -535,7 +635,16 @@ describe("POST /api/webhooks/zafronix", () => {
       // Resetear el partido de postpone
       const { error: updateError } = await supabase
         .from("matches")
-        .update({ status: "scheduled", home_score: null, away_score: null })
+        .update({
+          status: "scheduled",
+          home_score: null,
+          away_score: null,
+          penalties_home_score: null,
+          penalties_away_score: null,
+          extra_time_home_score: null,
+          extra_time_away_score: null,
+          external_last_sync_at: null,
+        })
         .eq("id", postponeMatchId);
       if (updateError) throw updateError;
 

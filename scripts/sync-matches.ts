@@ -295,13 +295,21 @@ export async function syncMatches(
     let penHome: number | null = null;
     let penAway: number | null = null;
 
-    if (apiMatch.penalties && typeof apiMatch.penalties === "string") {
-      const parts = apiMatch.penalties.split("-");
-      const h = parseInt(parts[0] ?? "", 10);
-      const a = parseInt(parts[1] ?? "", 10);
-      if (Number.isInteger(h) && Number.isInteger(a)) {
-        penHome = h;
-        penAway = a;
+    if (apiMatch.penalties) {
+      if (typeof apiMatch.penalties === "string") {
+        const parts = apiMatch.penalties.split("-");
+        const h = parseInt(parts[0] ?? "", 10);
+        const a = parseInt(parts[1] ?? "", 10);
+        if (Number.isInteger(h) && Number.isInteger(a)) {
+          penHome = h;
+          penAway = a;
+        }
+      } else if (typeof apiMatch.penalties === "object") {
+        const p = apiMatch.penalties as { home: number; away: number };
+        if (Number.isInteger(p.home) && Number.isInteger(p.away)) {
+          penHome = p.home;
+          penAway = p.away;
+        }
       }
     }
 

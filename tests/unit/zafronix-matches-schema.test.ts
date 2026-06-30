@@ -105,6 +105,15 @@ describe("Pin del Schema Canónico (REST API GET /matches)", () => {
       expect(result.data?.penalties).toBe("4-3");
       expect(result.data?.referee).toBe("Szymon Marciniak");
     });
+
+    it("parsea match con penalties como objeto { home, away }", () => {
+      const match = makeMatch({
+        penalties: { home: 3, away: 4 },
+      });
+      const result = zafronixMatchSchema.safeParse(match);
+      expect(result.success).toBe(true);
+      expect(result.data?.penalties).toEqual({ home: 3, away: 4 });
+    });
   });
 
   describe("Validación de campos requeridos", () => {

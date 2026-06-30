@@ -118,7 +118,10 @@ z.object({
   awayScore: z.number().int().nonnegative().nullable(),
   result: z.string().nullable().optional(),                 // Score string "3-2" or null
   extraTime: z.boolean().nullable().optional(),
-  penalties: z.string().nullable().optional(),
+  penalties: z.union([
+    z.string(),
+    z.object({ home: z.number(), away: z.number() }),
+  ]).nullable().optional(),
   stadium: z.string().nullable().optional(),
   stadiumId: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
@@ -135,6 +138,7 @@ z.object({
 Key design decisions:
 - **`matchNo` optional**: Present for 2026 (104/104 confirmed) but absent for historical years. Fallback via `resolveMatchNo()`.
 - **`referee` union type**: Real API sends `{name, country}`. Accepts string for backward compat.
+- **`penalties` union type**: Updated in June 2026 to support both string (legacy/fixtures) and object (`{ home, away }`) formats due to API structure changes.
 - **No `.strict()`**: Tolerates new API fields without breaking (forward compatibility).
 - **No `.passthrough()`**: Strips unknown keys to keep parsed data predictable.
 
@@ -284,7 +288,7 @@ The functions are identical — the canonical module is the single source of tru
 Golden fixture with 3 representative match scenarios:
 1. **Group stage finished** — Mexico 2-1 Canada, all fields populated, referee as object `{name, country}`
 2. **Knockout TBD** — matchNo 73, null teams, null scores, `homeRef: "1A"`, `awayRef: "2B"`
-3. **Final with penalties** — France 3-2 Brazil, penalties `"4-3"`, referee as string
+3. **Final with penalties** — France 3-2 Brazil, penalties `"4-3"` (string format) or `{ home: 4, away: 3 }` (object format), referee as string
 
 Used by the schema pinning tests to detect contract drift.
 

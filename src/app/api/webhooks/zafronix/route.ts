@@ -323,13 +323,23 @@ async function handleMatchFinalized(
   let penHome: number | null = null;
   let penAway: number | null = null;
 
-  if (penalties && typeof penalties === "string") {
-    const parts = penalties.split("-");
-    const h = parseInt(parts[0] ?? "", 10);
-    const a = parseInt(parts[1] ?? "", 10);
-    if (Number.isInteger(h) && Number.isInteger(a)) {
-      penHome = h;
-      penAway = a;
+  if (penalties) {
+    if (typeof penalties === "string") {
+      const parts = penalties.split("-");
+      const h = parseInt(parts[0] ?? "", 10);
+      const a = parseInt(parts[1] ?? "", 10);
+      if (Number.isInteger(h) && Number.isInteger(a)) {
+        penHome = h;
+        penAway = a;
+      }
+    } else if (typeof penalties === "object" && penalties !== null) {
+      const p = penalties as Record<string, unknown>;
+      const h = Number(p.home ?? p.homeScore);
+      const a = Number(p.away ?? p.awayScore);
+      if (Number.isInteger(h) && Number.isInteger(a)) {
+        penHome = h;
+        penAway = a;
+      }
     }
   }
 
@@ -524,6 +534,19 @@ async function handleMatchPatched(
       const parts = val.split("-");
       const h = parseInt(parts[0] ?? "", 10);
       const a = parseInt(parts[1] ?? "", 10);
+      if (Number.isInteger(h) && Number.isInteger(a)) {
+        updateData.penalties_home_score = h;
+        updateData.penalties_away_score = a;
+      } else {
+        return NextResponse.json(
+          { error: "validation_failed", message: "Invalid penalties correction value" },
+          { status: 400 },
+        );
+      }
+    } else if (typeof val === "object" && val !== null) {
+      const p = val as Record<string, unknown>;
+      const h = Number(p.home ?? p.homeScore);
+      const a = Number(p.away ?? p.awayScore);
       if (Number.isInteger(h) && Number.isInteger(a)) {
         updateData.penalties_home_score = h;
         updateData.penalties_away_score = a;

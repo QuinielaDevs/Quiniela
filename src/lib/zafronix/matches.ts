@@ -44,7 +44,16 @@ export const zafronixMatchSchema = z.object({
   awayScore: z.number().int().nonnegative().nullable(),
   result: z.string().nullable().optional(),
   extraTime: z.boolean().nullable().optional(),
-  penalties: z.string().nullable().optional(),
+  penalties: z
+    .union([
+      z.string(),
+      z.object({
+        home: z.number().int().nonnegative(),
+        away: z.number().int().nonnegative(),
+      }),
+    ])
+    .nullable()
+    .optional(),
   stadium: z.string().nullable().optional(),
   stadiumId: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
