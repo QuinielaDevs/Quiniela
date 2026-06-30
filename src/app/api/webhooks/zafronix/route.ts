@@ -43,6 +43,12 @@ interface LocalMatch {
   away_team: string;
   status: string;
   external_last_sync_at: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  penalties_home_score: number | null;
+  penalties_away_score: number | null;
+  extra_time_home_score: number | null;
+  extra_time_away_score: number | null;
 }
 
 async function findLocalMatch(
@@ -54,7 +60,7 @@ async function findLocalMatch(
   // 1. Intentar coincidencia directa por external_ref (tests)
   const { data: directMatch, error: directError } = await supabase
     .from("matches")
-    .select("id, bracket_slot, home_team, away_team, status, external_last_sync_at")
+    .select("id, bracket_slot, home_team, away_team, status, external_last_sync_at, home_score, away_score, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score")
     .eq("external_ref", matchId)
     .maybeSingle();
 
@@ -78,7 +84,7 @@ async function findLocalMatch(
     // Eliminatorias: buscar por bracket_slot
     const { data, error } = await supabase
       .from("matches")
-      .select("id, bracket_slot, home_team, away_team, status, external_last_sync_at")
+      .select("id, bracket_slot, home_team, away_team, status, external_last_sync_at, home_score, away_score, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score")
       .eq("bracket_slot", matchNum)
       .maybeSingle();
     return { data, error };
@@ -92,7 +98,7 @@ async function findLocalMatch(
 
     const { data, error } = await supabase
       .from("matches")
-      .select("id, bracket_slot, home_team, away_team, status, external_last_sync_at")
+      .select("id, bracket_slot, home_team, away_team, status, external_last_sync_at, home_score, away_score, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score")
       .eq("home_team", normHome)
       .eq("away_team", normAway)
       .maybeSingle();
@@ -270,7 +276,7 @@ async function handleMatchFinalized(
     );
   }
 
-  const { homeTeam, awayTeam, homeScore, awayScore, penalties } = payloadResult.data;
+  const { homeTeam, awayTeam, homeScore, awayScore, penalties, result, extraTime } = payloadResult.data;
 
   // Buscar el partido usando el helper de mapeo
   const { data: match, error: findError } = await findLocalMatch(
@@ -310,8 +316,13 @@ async function handleMatchFinalized(
     }
   }
 
+  let effectiveHomeScore = homeScore;
+  let effectiveAwayScore = awayScore;
+  let apiExtraHome: number | null = null;
+  let apiExtraAway: number | null = null;
   let penHome: number | null = null;
   let penAway: number | null = null;
+
   if (penalties && typeof penalties === "string") {
     const parts = penalties.split("-");
     const h = parseInt(parts[0] ?? "", 10);
@@ -322,13 +333,47 @@ async function handleMatchFinalized(
     }
   }
 
+  if (extraTime) {
+    let resHome: number | null = null;
+    let resAway: number | null = null;
+    if (result && typeof result === "string") {
+      const parts = result.split("-");
+      const h = parseInt(parts[0] ?? "", 10);
+      const a = parseInt(parts[1] ?? "", 10);
+      if (Number.isInteger(h) && Number.isInteger(a)) {
+        resHome = h;
+        resAway = a;
+      }
+    }
+
+    if (effectiveHomeScore !== null && effectiveAwayScore !== null) {
+      if (effectiveHomeScore === effectiveAwayScore) {
+        apiExtraHome = resHome !== null ? resHome : effectiveHomeScore;
+        apiExtraAway = resAway !== null ? resAway : effectiveAwayScore;
+      } else {
+        apiExtraHome = effectiveHomeScore;
+        apiExtraAway = effectiveAwayScore;
+        if (match.home_score === match.away_score && match.home_score !== null) {
+          effectiveHomeScore = match.home_score!;
+          effectiveAwayScore = match.away_score!;
+        } else {
+          const minScore = Math.min(effectiveHomeScore, effectiveAwayScore);
+          effectiveHomeScore = minScore;
+          effectiveAwayScore = minScore;
+        }
+      }
+    }
+  }
+
   // Preparar la actualización
   const updateData: Record<string, unknown> = {
-    home_score: homeScore,
-    away_score: awayScore,
+    home_score: effectiveHomeScore,
+    away_score: effectiveAwayScore,
     status: "finished",
     penalties_home_score: penHome,
     penalties_away_score: penAway,
+    extra_time_home_score: apiExtraHome,
+    extra_time_away_score: apiExtraAway,
     updated_at: new Date().toISOString(),
     external_last_sync_at: event.ts,
   };
@@ -424,6 +469,9 @@ async function handleMatchPatched(
     external_last_sync_at: event.ts,
   };
 
+  let finalHomeScore = match.home_score;
+  let finalAwayScore = match.away_score;
+
   if (changes.homeScore) {
     const val = changes.homeScore.to;
     if (typeof val !== "number" || !Number.isInteger(val) || val < 0) {
@@ -432,6 +480,7 @@ async function handleMatchPatched(
         { status: 400 },
       );
     }
+    finalHomeScore = val;
     updateData.home_score = val;
   }
   if (changes.awayScore) {
@@ -442,8 +491,30 @@ async function handleMatchPatched(
         { status: 400 },
       );
     }
+    finalAwayScore = val;
     updateData.away_score = val;
   }
+
+  let finalExtraTime = match.extra_time_home_score !== null;
+  if (changes.extraTime) {
+    const val = changes.extraTime.to;
+    if (typeof val === "boolean") {
+      finalExtraTime = val;
+    }
+  }
+
+  let finalResultStr = match.extra_time_home_score !== null && match.extra_time_away_score !== null
+    ? `${match.extra_time_home_score}-${match.extra_time_away_score}`
+    : null;
+  if (changes.result) {
+    const val = changes.result.to;
+    if (val === null) {
+      finalResultStr = null;
+    } else if (typeof val === "string") {
+      finalResultStr = val;
+    }
+  }
+
   if (changes.penalties) {
     const val = changes.penalties.to;
     if (val === null) {
@@ -463,6 +534,42 @@ async function handleMatchPatched(
         );
       }
     }
+  }
+
+  // Si el partido corregido tiene extraTime, aplicar la lógica de mitigación
+  if (finalExtraTime) {
+    let resHome: number | null = null;
+    let resAway: number | null = null;
+    if (finalResultStr && typeof finalResultStr === "string") {
+      const parts = finalResultStr.split("-");
+      const h = parseInt(parts[0] ?? "", 10);
+      const a = parseInt(parts[1] ?? "", 10);
+      if (Number.isInteger(h) && Number.isInteger(a)) {
+        resHome = h;
+        resAway = a;
+      }
+    }
+
+    if (finalHomeScore !== null && finalAwayScore !== null) {
+      if (finalHomeScore === finalAwayScore) {
+        updateData.extra_time_home_score = resHome !== null ? resHome : finalHomeScore;
+        updateData.extra_time_away_score = resAway !== null ? resAway : finalAwayScore;
+      } else {
+        updateData.extra_time_home_score = finalHomeScore;
+        updateData.extra_time_away_score = finalAwayScore;
+        if (match.home_score === match.away_score && match.home_score !== null) {
+          updateData.home_score = match.home_score;
+          updateData.away_score = match.away_score;
+        } else {
+          const minScore = Math.min(finalHomeScore, finalAwayScore);
+          updateData.home_score = minScore;
+          updateData.away_score = minScore;
+        }
+      }
+    }
+  } else {
+    updateData.extra_time_home_score = null;
+    updateData.extra_time_away_score = null;
   }
 
   // AC #4: Si es eliminatoria, actualizar equipos si se proveen y no son placeholders

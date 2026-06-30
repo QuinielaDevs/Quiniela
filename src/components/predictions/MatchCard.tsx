@@ -57,6 +57,8 @@ export type MatchCardMatch = Pick<
 > & {
   penalties_home_score?: number | null;
   penalties_away_score?: number | null;
+  extra_time_home_score?: number | null;
+  extra_time_away_score?: number | null;
 };
 
 export type PersistedPrediction = {
@@ -807,6 +809,11 @@ export function MatchCard({
             data-testid="result-divider"
           >
             <span>Resultado</span>
+            {match.extra_time_home_score != null && match.extra_time_away_score != null && (
+              <span className="text-[10px] lowercase tracking-normal text-muted-foreground mt-0.5 font-normal">
+                ({match.extra_time_home_score}-{match.extra_time_away_score} t.s.)
+              </span>
+            )}
             {match.penalties_home_score !== null && match.penalties_away_score !== null && (
               <span className="text-[10px] lowercase tracking-normal text-muted-foreground mt-0.5 font-normal">
                 ({match.penalties_home_score}-{match.penalties_away_score} pen.)

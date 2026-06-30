@@ -521,7 +521,7 @@ test.describe("Panel de administración (e2e)", () => {
     await selectPhaseTab(pageAdmin, "Final");
 
     const matchCard = pageAdmin.locator(`[data-testid="match-card"][data-match-id="${m.id}"]`);
-    await expect(matchCard.getByTestId("result-divider")).toHaveText("Resultado(4-3 pen.)");
+    await expect(matchCard.getByTestId("result-divider")).toHaveText("Resultado(1-1 t.s.)(4-3 pen.)");
 
     // 9) Ir a /standings y verificar el acordeón del usuario
     await pageAdmin.goto("/standings");
@@ -532,6 +532,79 @@ test.describe("Panel de administración (e2e)", () => {
     await expect(accordion).toBeVisible();
 
     // Verificar que se renderiza el indicador de penales al lado del real
+    await expect(accordion.getByText("(1-1 t.s.)")).toBeVisible();
     await expect(accordion.getByText("(4-3 pen.)")).toBeVisible();
+  });
+
+  test("ADM-13: Guardado de prórroga con ganador en knockout y ocultación de penales", async () => {
+    const pageAdmin = fixture.users[0]!.page!;
+
+    // 1) Sembrar un partido knockout (bracketSlot >= 9000, con team codes)
+    const matches = await seedMatches([
+      tbdKnockoutMatch({
+        homeTeamCode: "ARG",
+        awayTeamCode: "BOL",
+        home: "Argentina",
+        away: "Bolivia",
+        bracketSlot: 9913,
+        status: "scheduled",
+        stage: "final",
+      }),
+    ]);
+    const m = matches[0]!;
+    localMatchIds.push(m.id);
+
+    // 2) Ir al panel de administración y localizar la tarjeta
+    await pageAdmin.goto("/standings/manage");
+    const card = pageAdmin.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`);
+
+    // 3) Seleccionar estado "Finalizado" (finished)
+    await card.getByTestId("admin-status-select").selectOption("finished");
+
+    // 4) Poner marcador reglamentario de empate 1-1
+    await card.getByTestId("admin-home-score").getByTestId("goal-increment").click();
+    await card.getByTestId("admin-away-score").getByTestId("goal-increment").click();
+
+    // 5) Verificar que los selectores de prórroga aparecen inicializados en 1-1
+    const extraTimeHomePicker = card.getByTestId("admin-extra-home-score");
+    const extraTimeAwayPicker = card.getByTestId("admin-extra-away-score");
+    await expect(extraTimeHomePicker).toBeVisible();
+    await expect(extraTimeAwayPicker).toBeVisible();
+    await expect(extraTimeHomePicker.getByTestId("goal-value")).toHaveText("1");
+    await expect(extraTimeAwayPicker.getByTestId("goal-value")).toHaveText("1");
+
+    // 6) Asegurar que la tanda de penales está visible inicialmente
+    const penaltiesHomePicker = card.getByTestId("admin-penalties-home-score");
+    await expect(penaltiesHomePicker).toBeVisible();
+
+    // 7) Cambiar prórroga a 2-1 (ganador Argentina)
+    await extraTimeHomePicker.getByTestId("goal-increment").click();
+
+    // 8) La tanda de penales debe desaparecer al haber un ganador en prórroga
+    await expect(penaltiesHomePicker).not.toBeVisible();
+
+    // 9) Guardar
+    await card.getByTestId("admin-save-result").click();
+    await expect(card.getByTestId("admin-save-result")).toHaveText("Guardar");
+
+    // 10) Ir a /predictions y verificar que se muestra la prórroga sin penales
+    await pageAdmin.goto("/predictions");
+    await selectPhaseTab(pageAdmin, "Final");
+
+    const matchCard = pageAdmin.locator(`[data-testid="match-card"][data-match-id="${m.id}"]`);
+    await expect(matchCard.getByTestId("result-divider")).toHaveText("Resultado(2-1 t.s.)");
+    await expect(matchCard.getByText("pen.")).toHaveCount(0);
+
+    // 11) Ir a /standings y verificar el acordeón del usuario
+    await pageAdmin.goto("/standings");
+    const userRow = pageAdmin.locator(`[data-testid="standings-row-toggle"]`).first();
+    await userRow.click();
+
+    const accordion = pageAdmin.getByTestId("standings-accordion");
+    await expect(accordion).toBeVisible();
+
+    // Verificar que se renderiza el indicador de prórroga pero no de penales
+    await expect(accordion.getByText("(2-1 t.s.)")).toBeVisible();
+    await expect(accordion.getByText("pen.")).toHaveCount(0);
   });
 });

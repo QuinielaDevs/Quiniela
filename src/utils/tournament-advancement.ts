@@ -24,6 +24,8 @@ export type TournamentMatch = {
   away_score: number | null;
   penalties_home_score: number | null;
   penalties_away_score: number | null;
+  extra_time_home_score: number | null;
+  extra_time_away_score: number | null;
   match_time: string;
   status: string;
   matchday: number | null;
@@ -320,7 +322,21 @@ function resolveWinnerLoser(match: TournamentMatch, wantWinner: boolean): TeamRe
     };
   }
 
-  // Si hay empate reglamentario, resolver por goles de la tanda de penales
+  // Si hay empate reglamentario, verificar si se definió en prórroga (extra_time)
+  const extHome = match.extra_time_home_score;
+  const extAway = match.extra_time_away_score;
+  if (extHome !== null && extAway !== null && extHome !== extAway) {
+    const homeWins = extHome > extAway;
+    const useHome = wantWinner ? homeWins : !homeWins;
+    const teamCode = useHome ? match.home_team_code : match.away_team_code;
+    if (!teamCode) return null;
+    return {
+      teamCode,
+      teamName: useHome ? match.home_team : match.away_team,
+    };
+  }
+
+  // Si la prórroga también quedó en empate (o no hubo y se fue directo a penales), resolver por goles de la tanda de penales
   const penHome = match.penalties_home_score;
   const penAway = match.penalties_away_score;
   if (penHome !== null && penAway !== null && penHome !== penAway) {

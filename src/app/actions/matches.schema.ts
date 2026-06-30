@@ -43,6 +43,20 @@ export const setMatchResultSchema = z
       .max(99, "El marcador de penales es demasiado alto.")
       .nullable()
       .optional(),
+    extraTimeHomeScore: z
+      .number()
+      .int("El marcador de prórroga debe ser un número entero.")
+      .nonnegative("El marcador de prórroga no puede ser negativo.")
+      .max(99, "El marcador de prórroga es demasiado alto.")
+      .nullable()
+      .optional(),
+    extraTimeAwayScore: z
+      .number()
+      .int("El marcador de prórroga debe ser un número entero.")
+      .nonnegative("El marcador de prórroga no puede ser negativo.")
+      .max(99, "El marcador de prórroga es demasiado alto.")
+      .nullable()
+      .optional(),
   })
   .superRefine((data, ctx) => {
     if (data.status !== "live" && data.status !== "finished") return;
@@ -67,18 +81,42 @@ export const setMatchResultSchema = z
       data.awayScore !== null &&
       data.homeScore === data.awayScore
     ) {
-      if (
-        data.penaltiesHomeScore !== undefined &&
-        data.penaltiesHomeScore !== null &&
-        data.penaltiesAwayScore !== undefined &&
-        data.penaltiesAwayScore !== null
-      ) {
-        if (data.penaltiesHomeScore === data.penaltiesAwayScore) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["penaltiesHomeScore"],
-            message: "La tanda de penales no puede terminar en empate.",
-          });
+      const hasExtraTimeHome = data.extraTimeHomeScore !== undefined && data.extraTimeHomeScore !== null;
+      const hasExtraTimeAway = data.extraTimeAwayScore !== undefined && data.extraTimeAwayScore !== null;
+      const hasPenaltiesHome = data.penaltiesHomeScore !== undefined && data.penaltiesHomeScore !== null;
+      const hasPenaltiesAway = data.penaltiesAwayScore !== undefined && data.penaltiesAwayScore !== null;
+
+      if (hasExtraTimeHome !== hasExtraTimeAway) {
+        ctx.addIssue({
+          code: "custom",
+          path: [hasExtraTimeHome ? "extraTimeAwayScore" : "extraTimeHomeScore"],
+          message: "Ambos marcadores de prórroga son requeridos si se especifica prórroga.",
+        });
+      }
+
+      if (hasPenaltiesHome !== hasPenaltiesAway) {
+        ctx.addIssue({
+          code: "custom",
+          path: [hasPenaltiesHome ? "penaltiesAwayScore" : "penaltiesHomeScore"],
+          message: "Ambos marcadores de penales son requeridos si se especifica tanda de penales.",
+        });
+      } else if (hasPenaltiesHome && hasPenaltiesAway && data.penaltiesHomeScore === data.penaltiesAwayScore) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["penaltiesHomeScore"],
+          message: "La tanda de penales no puede terminar en empate.",
+        });
+      }
+
+      if (hasExtraTimeHome && hasExtraTimeAway) {
+        if (data.extraTimeHomeScore !== data.extraTimeAwayScore) {
+          if (hasPenaltiesHome || hasPenaltiesAway) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["penaltiesHomeScore"],
+              message: "Un partido decidido en prórroga no debe tener tanda de penales.",
+            });
+          }
         }
       }
     }

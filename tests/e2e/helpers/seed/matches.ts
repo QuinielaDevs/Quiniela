@@ -30,6 +30,10 @@ export interface MatchSpec {
   awayScore?: number | null;
   externalRef?: string | null;
   venue?: string | null;
+  extraTimeHomeScore?: number | null;
+  extraTimeAwayScore?: number | null;
+  penaltiesHomeScore?: number | null;
+  penaltiesAwayScore?: number | null;
   /** Escape hatch: NO forzar el prefijo test_ (p. ej. placeholders "Por
    *  definir" del dataset histórico). El cleanup por prefijo no los ve:
    *  bórralos por id. */
@@ -84,6 +88,10 @@ function toRow(spec: MatchSpec) {
     away_score: spec.awayScore ?? null,
     external_ref: spec.externalRef ?? null,
     venue: spec.venue ?? null,
+    extra_time_home_score: spec.extraTimeHomeScore ?? null,
+    extra_time_away_score: spec.extraTimeAwayScore ?? null,
+    penalties_home_score: spec.penaltiesHomeScore ?? null,
+    penalties_away_score: spec.penaltiesAwayScore ?? null,
   };
 }
 

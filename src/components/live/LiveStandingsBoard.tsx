@@ -72,6 +72,10 @@ type MatchPayload = {
   away_team_code?: unknown;
   home_score?: unknown;
   away_score?: unknown;
+  penalties_home_score?: unknown;
+  penalties_away_score?: unknown;
+  extra_time_home_score?: unknown;
+  extra_time_away_score?: unknown;
 };
 
 function toNullableNumber(value: unknown): number | null {
@@ -99,6 +103,10 @@ function mapPayloadToMatch(payload: MatchPayload): LiveMatch | null {
     homeTeamCode: toNullableString(payload.home_team_code),
     awayTeamCode: toNullableString(payload.away_team_code),
     groupLabel: toNullableString(payload.group_label),
+    penaltiesHomeScore: toNullableNumber(payload.penalties_home_score),
+    penaltiesAwayScore: toNullableNumber(payload.penalties_away_score),
+    extraTimeHomeScore: toNullableNumber(payload.extra_time_home_score),
+    extraTimeAwayScore: toNullableNumber(payload.extra_time_away_score),
   };
 }
 
@@ -235,6 +243,21 @@ function LiveMatchesCarousel({ matches }: { matches: LiveMatch[] }) {
                       </span>
                     </div>
                   </div>
+                  {((match.extraTimeHomeScore != null && match.extraTimeAwayScore != null) ||
+                    (match.penaltiesHomeScore != null && match.penaltiesAwayScore != null)) && (
+                    <div className="flex flex-col gap-0.5 border-t border-border/40 pt-1.5 mt-1 text-center text-[10px] text-muted-foreground font-semibold">
+                      {match.extraTimeHomeScore != null && match.extraTimeAwayScore != null && (
+                        <span>
+                          Prórroga: {match.extraTimeHomeScore}-{match.extraTimeAwayScore}
+                        </span>
+                      )}
+                      {match.penaltiesHomeScore != null && match.penaltiesAwayScore != null && (
+                        <span>
+                          Penales: {match.penaltiesHomeScore}-{match.penaltiesAwayScore}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -282,6 +305,10 @@ type MatchDetail = {
   phaseKey: string;
   isLive: boolean;
   matchTime?: string;
+  penaltiesHomeScore?: number | null;
+  penaltiesAwayScore?: number | null;
+  extraTimeHomeScore?: number | null;
+  extraTimeAwayScore?: number | null;
 };
 
 function computeLiveBreakdown(
@@ -322,6 +349,10 @@ function computeLiveBreakdown(
       }),
       isLive: match.status === "live",
       matchTime: match.matchTime,
+      penaltiesHomeScore: match.penaltiesHomeScore ?? null,
+      penaltiesAwayScore: match.penaltiesAwayScore ?? null,
+      extraTimeHomeScore: match.extraTimeHomeScore ?? null,
+      extraTimeAwayScore: match.extraTimeAwayScore ?? null,
     });
   }
 
@@ -1030,7 +1061,19 @@ export function LiveStandingsBoard({
                               <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[10px] text-muted-foreground">
                                 <span className="flex items-center gap-1 rounded bg-muted/40 border border-border/20 px-1.5 py-0.5">
                                   <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">Real:</span>
-                                  <span className="font-bold text-foreground">{d.homeScore}-{d.awayScore}</span>
+                                  <span className="font-bold text-foreground">
+                                    {d.homeScore}-{d.awayScore}
+                                    {d.extraTimeHomeScore != null && d.extraTimeAwayScore != null && (
+                                      <span className="text-[10px] text-muted-foreground ml-1">
+                                        ({d.extraTimeHomeScore}-{d.extraTimeAwayScore} t.s.)
+                                      </span>
+                                    )}
+                                    {d.penaltiesHomeScore !== null && d.penaltiesAwayScore !== null && (
+                                      <span className="text-[10px] text-muted-foreground ml-1">
+                                        ({d.penaltiesHomeScore}-{d.penaltiesAwayScore} pen.)
+                                      </span>
+                                    )}
+                                  </span>
                                 </span>
                                 <span className="flex items-center gap-1 rounded bg-muted/40 border border-border/20 px-1.5 py-0.5">
                                   <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">Pred:</span>

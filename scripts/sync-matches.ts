@@ -194,7 +194,7 @@ export async function syncMatches(
   const { data: localMatches, error: fetchError } = await supabase
     .from("matches")
     .select(
-      "id, external_ref, home_score, away_score, penalties_home_score, penalties_away_score, status, home_team, away_team, bracket_slot, match_time",
+      "id, external_ref, home_score, away_score, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score, status, home_team, away_team, bracket_slot, match_time",
     );
 
   if (fetchError) {
@@ -282,16 +282,19 @@ export async function syncMatches(
     // Esto evita que un estado inconsistente temporal de la API (scores sin result) 
     // corrompa un resultado ya guardado. Las correcciones legítimas llegan vía webhook (match.patched).
     const apiReportsFinished = mappedStatus === "finished";
-    const effectiveHomeScore = (local.status === "finished" && !apiReportsFinished)
+    let effectiveHomeScore = (local.status === "finished" && !apiReportsFinished)
       ? local.home_score
       : apiHomeScore;
-    const effectiveAwayScore = (local.status === "finished" && !apiReportsFinished)
+    let effectiveAwayScore = (local.status === "finished" && !apiReportsFinished)
       ? local.away_score
       : apiAwayScore;
 
-    // Parsear penales de la API en enteros
+    // Parsear prórroga y penales
+    let apiExtraHome: number | null = null;
+    let apiExtraAway: number | null = null;
     let penHome: number | null = null;
     let penAway: number | null = null;
+
     if (apiMatch.penalties && typeof apiMatch.penalties === "string") {
       const parts = apiMatch.penalties.split("-");
       const h = parseInt(parts[0] ?? "", 10);
@@ -299,6 +302,42 @@ export async function syncMatches(
       if (Number.isInteger(h) && Number.isInteger(a)) {
         penHome = h;
         penAway = a;
+      }
+    }
+
+    if (apiMatch.extraTime) {
+      let resHome: number | null = null;
+      let resAway: number | null = null;
+      if (apiMatch.result && typeof apiMatch.result === "string") {
+        const parts = apiMatch.result.split("-");
+        const h = parseInt(parts[0] ?? "", 10);
+        const a = parseInt(parts[1] ?? "", 10);
+        if (Number.isInteger(h) && Number.isInteger(a)) {
+          resHome = h;
+          resAway = a;
+        }
+      }
+
+      if (effectiveHomeScore !== null && effectiveAwayScore !== null) {
+        if (effectiveHomeScore === effectiveAwayScore) {
+          // Caso ideal: homeScore/awayScore es el empate a los 90 mins, y result es el marcador de prórroga
+          apiExtraHome = resHome !== null ? resHome : effectiveHomeScore;
+          apiExtraAway = resAway !== null ? resAway : effectiveAwayScore;
+        } else {
+          // Caso alternativo: la API manda el marcador final de 120 mins en homeScore/awayScore
+          apiExtraHome = effectiveHomeScore;
+          apiExtraAway = effectiveAwayScore;
+          // Si localmente ya tenemos un empate de 90 min guardado, lo preservamos
+          if (local.home_score === local.away_score && local.home_score !== null) {
+            effectiveHomeScore = local.home_score;
+            effectiveAwayScore = local.away_score;
+          } else {
+            // Si no, asumimos empate con los menores goles posibles
+            const minScore = Math.min(effectiveHomeScore, effectiveAwayScore);
+            effectiveHomeScore = minScore;
+            effectiveAwayScore = minScore;
+          }
+        }
       }
     }
 
@@ -310,6 +349,9 @@ export async function syncMatches(
     const penaltiesChanged =
       local.penalties_home_score !== penHome ||
       local.penalties_away_score !== penAway;
+    const extraTimeChanged =
+      local.extra_time_home_score !== apiExtraHome ||
+      local.extra_time_away_score !== apiExtraAway;
 
     // Detectar si el horario (match_time) cambió en la API
     const timeChanged = apiMatch.kickoffUtc
@@ -330,7 +372,7 @@ export async function syncMatches(
       (local.home_team !== apiMatch.homeTeam ||
         local.away_team !== apiMatch.awayTeam);
 
-    if (!scoreChanged && !statusChanged && !teamsChanged && !timeChanged && !penaltiesChanged) {
+    if (!scoreChanged && !statusChanged && !teamsChanged && !timeChanged && !penaltiesChanged && !extraTimeChanged) {
       continue;
     }
 
@@ -342,6 +384,8 @@ export async function syncMatches(
       status: finalStatus,
       penalties_home_score: penHome,
       penalties_away_score: penAway,
+      extra_time_home_score: apiExtraHome,
+      extra_time_away_score: apiExtraAway,
       updated_at: new Date().toISOString(),
     };
 

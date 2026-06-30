@@ -36,6 +36,8 @@ function makeMatch(overrides: Partial<AdminMatchView> = {}): AdminMatchView {
     bracketSlot: null,
     penaltiesHomeScore: null,
     penaltiesAwayScore: null,
+    extraTimeHomeScore: null,
+    extraTimeAwayScore: null,
     ...overrides,
   };
 }
@@ -169,6 +171,8 @@ describe("MatchAdminList", () => {
         status: "finished",
         penaltiesHomeScore: null,
         penaltiesAwayScore: null,
+        extraTimeHomeScore: null,
+        extraTimeAwayScore: null,
       });
     });
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -243,6 +247,8 @@ describe("MatchAdminList", () => {
         status: "live",
         penaltiesHomeScore: null,
         penaltiesAwayScore: null,
+        extraTimeHomeScore: null,
+        extraTimeAwayScore: null,
       });
     });
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -287,6 +293,54 @@ describe("MatchAdminList", () => {
         status: "finished",
         penaltiesHomeScore: 3,
         penaltiesAwayScore: 2,
+        extraTimeHomeScore: 1,
+        extraTimeAwayScore: 1,
+      });
+    });
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
+
+  it("muestra tiempo extra y oculta penales si la prórroga tiene desempate y guarda", async () => {
+    const user = userEvent.setup();
+    render(
+      <MatchAdminList
+        matches={[
+          makeMatch({
+            id: "M3",
+            bracketSlot: 75,
+            status: "finished",
+            homeScore: 1,
+            awayScore: 1,
+          }),
+        ]}
+      />,
+    );
+
+    // Al inicio (prórroga 0-0), deben aparecer penales
+    expect(screen.getByText("Tiempo Extra / Prórroga")).toBeInTheDocument();
+    expect(screen.getByText("Tanda de Penales (Desempate)")).toBeInTheDocument();
+
+    // Modificar prórroga: México 2 - 1 Sudáfrica
+    await user.click(screen.getByLabelText("Incrementar goles de Prórroga México"));
+    await user.click(screen.getByLabelText("Incrementar goles de Prórroga México"));
+    await user.click(screen.getByLabelText("Incrementar goles de Prórroga Sudáfrica"));
+
+    // Tanda de penales debe desaparecer ya que no hay empate en prórroga
+    expect(screen.queryByText("Tanda de Penales (Desempate)")).not.toBeInTheDocument();
+
+    // Guardar
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => {
+      expect(setMatchResult).toHaveBeenCalledWith({
+        matchId: "M3",
+        homeScore: 1,
+        awayScore: 1,
+        status: "finished",
+        penaltiesHomeScore: null,
+        penaltiesAwayScore: null,
+        extraTimeHomeScore: 3,
+        extraTimeAwayScore: 2,
       });
     });
     await waitFor(() => expect(refresh).toHaveBeenCalled());

@@ -954,4 +954,53 @@ test.describe("Clasificación oficial (e2e)", () => {
     await rowUser0.getByTestId("standings-row-toggle").click();
     await expect(rowUser0.getByTestId("standings-accordion")).toBeHidden();
   });
+
+  test("STD-12: El acordeón de posiciones desglosa marcadores con prórroga y penales", async () => {
+    const page = fixture.users[0]!.page!;
+    const testMatch = await seedMatches([
+      finishedMatch(
+        { home: 1, away: 1 },
+        {
+          matchday: 1,
+          home: "Argentina",
+          away: "Bolivia",
+          extraTimeHomeScore: 2,
+          extraTimeAwayScore: 2,
+          penaltiesHomeScore: 4,
+          penaltiesAwayScore: 3,
+        }
+      ),
+    ]);
+    const m = testMatch[0]!;
+
+    const predId = await seedPrediction({
+      leagueId: fixture.league.id,
+      userId: fixture.users[0]!.userId,
+      matchId: m.id,
+      home: 1,
+      away: 1,
+      multiplier: 1.0,
+      pointsEarned: 5.0, // exacto
+      evaluatedAt: new Date().toISOString(),
+    });
+
+    try {
+      await page.goto("/standings");
+      await expect(page.getByTestId("standings-skeleton")).toBeHidden();
+
+      const rowUser0 = page.locator(`[data-testid="standings-row"][data-user-id="${fixture.users[0]!.userId}"]`).first();
+      await rowUser0.getByTestId("standings-row-toggle").click();
+
+      const accordion = rowUser0.getByTestId("standings-accordion");
+      await expect(accordion).toBeVisible();
+
+      // Verificar que se renderizan las leyendas en la UI del acordeón
+      await expect(accordion.getByText("(2-2 t.s.)")).toBeVisible();
+      await expect(accordion.getByText("(4-3 pen.)")).toBeVisible();
+    } finally {
+      // Eliminar predicción y partido
+      await admin.from("predictions").delete().eq("id", predId);
+      await deleteMatches([m.id]);
+    }
+  });
 });

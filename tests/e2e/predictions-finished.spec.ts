@@ -7,6 +7,7 @@ import {
 } from "./helpers/auth";
 import { seedPredictionsE2E } from "./helpers/seed";
 import { selectPhaseTab } from "./helpers/ui";
+import { seedMatches, deleteMatches, finishedMatch } from "./helpers/seed/matches";
 
 // E2E de la página /predictions con foco en partidos finalizados y el modo
 // resultado de la MatchCard. Los seeds están en helpers/seed.ts.
@@ -521,6 +522,43 @@ test.describe("/predictions — partidos finalizados (e2e)", () => {
             .eq("id", rm.id);
         }
       }
+    }
+  });
+
+  test("muestra marcadores de prórroga y penales en partidos finalizados", async () => {
+    const page = context.page;
+    const testMatch = await seedMatches([
+      finishedMatch(
+        { home: 1, away: 1 },
+        {
+          matchday: 1,
+          home: "Argentina",
+          away: "Bolivia",
+          extraTimeHomeScore: 2,
+          extraTimeAwayScore: 2,
+          penaltiesHomeScore: 4,
+          penaltiesAwayScore: 3,
+        }
+      ),
+    ]);
+    const m = testMatch[0]!;
+
+    try {
+      await page.goto("/predictions");
+      await selectPhaseTab(page, "Jornada 1");
+
+      const card = page.locator(`[data-testid="match-card"][data-match-id="${m.id}"]`);
+      await expect(card).toBeVisible();
+
+      // Marcador regular
+      await expect(card.getByTestId("actual-home-score")).toHaveText("1");
+      await expect(card.getByTestId("actual-away-score")).toHaveText("1");
+
+      // Prórroga y penales
+      const divider = card.getByTestId("result-divider");
+      await expect(divider).toHaveText("Resultado(2-2 t.s.)(4-3 pen.)");
+    } finally {
+      await deleteMatches([m.id]);
     }
   });
 });

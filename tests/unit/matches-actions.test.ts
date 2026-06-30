@@ -83,6 +83,8 @@ describe("matches.actions (Story 7.3 integration)", () => {
       p_status: "finished",
       p_penalties_home_score: null,
       p_penalties_away_score: null,
+      p_extra_time_home_score: null,
+      p_extra_time_away_score: null,
     });
     expect(rpc).toHaveBeenCalledWith(
       "fn_admin_apply_knockout_advancement",

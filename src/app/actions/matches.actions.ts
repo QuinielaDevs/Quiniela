@@ -25,7 +25,7 @@ function toAdminError(error: { code?: string | null } | null): string {
 }
 
 const MATCH_ADVANCEMENT_SELECT =
-  "id, external_ref, home_team, away_team, home_team_code, away_team_code, home_score, away_score, penalties_home_score, penalties_away_score, match_time, status, matchday, stage, group_label, bracket_slot, home_source, away_source, venue";
+  "id, external_ref, home_team, away_team, home_team_code, away_team_code, home_score, away_score, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score, match_time, status, matchday, stage, group_label, bracket_slot, home_source, away_source, venue";
 const ADVANCEMENT_WARNING =
   "Resultado guardado. No se pudo actualizar el bracket automáticamente; intenta recalcular el avance nuevamente.";
 
@@ -101,7 +101,16 @@ export async function setMatchResult(
       };
     }
 
-    const { matchId, homeScore, awayScore, status, penaltiesHomeScore, penaltiesAwayScore } = parsed.data;
+    const {
+      matchId,
+      homeScore,
+      awayScore,
+      status,
+      penaltiesHomeScore,
+      penaltiesAwayScore,
+      extraTimeHomeScore,
+      extraTimeAwayScore,
+    } = parsed.data;
 
     const supabase = await createClient();
     // El RPC tipa los marcadores como `number` (no nullable). Para los estados
@@ -115,6 +124,8 @@ export async function setMatchResult(
         p_status: status,
         p_penalties_home_score: penaltiesHomeScore ?? null,
         p_penalties_away_score: penaltiesAwayScore ?? null,
+        p_extra_time_home_score: extraTimeHomeScore ?? null,
+        p_extra_time_away_score: extraTimeAwayScore ?? null,
       })
       .single();
 
