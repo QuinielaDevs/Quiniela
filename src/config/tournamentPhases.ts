@@ -49,7 +49,7 @@ const rawPhases = [
   { code: 'A' as const, rewardPoints: 50 as const, startsAt: null,              endsAt: INAUGURAL_KICKOFF, editsLocked: false, label: 'Before inaugural match' },
   { code: 'B' as const, rewardPoints: 25 as const, startsAt: INAUGURAL_KICKOFF, endsAt: KNOCKOUT_START,    editsLocked: false, label: 'Group stage' },
   { code: 'C' as const, rewardPoints: 10 as const, startsAt: KNOCKOUT_START,    endsAt: SEMIFINAL_START,   editsLocked: false, label: 'Round of 32 + Round of 16 + Quarterfinals' },
-  { code: 'D' as const, rewardPoints: 2 as const,  startsAt: SEMIFINAL_START,   endsAt: null,              editsLocked: true,  label: 'Semifinals onward' },
+  { code: 'D' as const, rewardPoints: 2 as const,  startsAt: SEMIFINAL_START,   endsAt: null,              editsLocked: false, label: 'Semifinals onward' },
 ] as const;
 
 /**

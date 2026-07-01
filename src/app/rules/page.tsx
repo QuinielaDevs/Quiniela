@@ -161,7 +161,8 @@ export default function RulesPage() {
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Estas predicciones dan puntos grandes si aciertas, pero pierden
-                valor mientras avanza el torneo.
+                valor mientras avanza el torneo. Se pueden registrar y modificar
+                hasta el inicio del partido de la final, momento en el que se bloquean.
               </p>
               <div className="mt-4 divide-y divide-border border-t border-border">
                 {specialAwards.map((award) => (

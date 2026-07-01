@@ -74,3 +74,45 @@ export async function saveSpecialPrediction(
     return { success: false, data: null, error: message };
   }
 }
+
+/**
+ * Establece el ganador oficial de una categoría de premio (admin-gated).
+ * Invoca el RPC fn_admin_resolve_award_winner.
+ */
+export async function resolveAwardWinner(
+  category: AwardCategory,
+  winnerCandidateId: string | null,
+): Promise<ServerActionResult<null>> {
+  if (category !== "champion" && category !== "top_scorer" && category !== "mvp") {
+    return { success: false, data: null, error: "Categoría de premio inválida" };
+  }
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (winnerCandidateId !== null && !uuidRegex.test(winnerCandidateId)) {
+    return { success: false, data: null, error: "ID de candidato inválido" };
+  }
+
+  try {
+    const supabase = await createClient();
+
+    const { error } = await supabase.rpc("fn_admin_resolve_award_winner", {
+      p_category: category,
+      p_winner_candidate_id: winnerCandidateId,
+    });
+
+    if (error) {
+      return { success: false, data: null, error: error.message };
+    }
+
+    revalidatePath("/awards");
+    revalidatePath("/standings");
+    revalidatePath("/standings/manage");
+    revalidatePath("/live");
+    return { success: true, data: null, error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Error inesperado al guardar el ganador";
+    return { success: false, data: null, error: message };
+  }
+}
+

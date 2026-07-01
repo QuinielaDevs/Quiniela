@@ -332,7 +332,7 @@ test.describe("Gran tour multi-usuario (e2e)", () => {
       await pageAna.goto("/standings/manage");
       const row = pageAna.locator(
         `[data-testid="member-admin-row"][data-user-id="${beto.userId}"]`,
-      );
+      ).first();
       const toggle = row.getByTestId("payment-toggle");
       await expect(toggle).toHaveText("Pendiente");
       await toggle.click();

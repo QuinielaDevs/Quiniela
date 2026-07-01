@@ -93,8 +93,8 @@ describe("MatchAdminList", () => {
       />,
     );
 
-    const jornada = screen.getByText("Jornada 1").closest("details");
-    const round32 = screen.getByText("16avos").closest("details");
+    const jornada = screen.getByText("Jueves, 11 de junio de 2026").closest("details");
+    const round32 = screen.getByText("Lunes, 29 de junio de 2026").closest("details");
 
     expect(jornada).not.toHaveAttribute("open");
     expect(round32).toHaveAttribute("open");

@@ -25,6 +25,17 @@ import {
 import { selectPhaseTab } from "./helpers/ui";
 import { seedLeague, addMember, setActiveLeague } from "./helpers/seed/league";
 
+async function setFinalKickoff(inPast: boolean) {
+  const admin = createAdminClient();
+  const matchTime = inPast
+    ? new Date(Date.now() - 3600 * 1000).toISOString()
+    : new Date(Date.now() + 86400 * 1000).toISOString();
+  await admin
+    .from("matches")
+    .update({ match_time: matchTime })
+    .eq("stage", "final");
+}
+
 async function selectCandidateBySearch(card: Locator, searchQuery: string, candidateName: string) {
   const input = card.getByRole("combobox");
   await input.fill(searchQuery);
@@ -53,9 +64,10 @@ test.describe("/awards — Premios Especiales", () => {
     phasesSnap = await snapshotPhases();
     winnersSnap = await snapshotWinners();
 
-    // Asegurar que empezamos en la fase A activa por defecto
+    // Asegurar que empezamos en la fase A activa por defecto y la final desbloqueada
     await setActivePhase("A");
     await clearWinners();
+    await setFinalKickoff(false);
 
     // 2) Crear liga con 1 admin
     fixture = await createLeagueWithUsers(browser, { members: 1 });
@@ -68,6 +80,7 @@ test.describe("/awards — Premios Especiales", () => {
     await stack.run();
     await restorePhases(phasesSnap);
     await restoreWinners(winnersSnap);
+    await setFinalKickoff(false);
   });
 
   test("AWD-01: El board lista las 3 categorías con candidatos", async () => {
@@ -320,32 +333,37 @@ test.describe("/awards — Premios Especiales", () => {
   test("AWD-07: Fase D bloquea todo", async () => {
     // Poner fase D activa
     await setActivePhase("D");
-    await page.goto("/awards");
+    await setFinalKickoff(true);
+    try {
+      await page.goto("/awards");
 
-    // UI: Comprobar aviso de bloqueado
-    const board = page.getByRole("main").getByTestId("awards-board");
-    await expect(board.getByTestId("award-locked-notice")).toBeVisible();
+      // UI: Comprobar aviso de bloqueado
+      const board = page.getByRole("main").getByTestId("awards-board");
+      await expect(board.getByTestId("award-locked-notice")).toBeVisible();
 
-    // UI: Comprobar que los inputs están deshabilitados
-    const categoryCard = board.locator('[data-category="champion"]');
-    await expect(categoryCard.getByRole("combobox")).toBeDisabled();
+      // UI: Comprobar que los inputs están deshabilitados
+      const categoryCard = board.locator('[data-category="champion"]');
+      await expect(categoryCard.getByRole("combobox")).toBeDisabled();
 
-    // Servidor: Comprobar que el trigger de base de datos rechaza inserciones/actualizaciones
-    const admin = createAdminClient();
-    const argCandidate = await getCandidate("champion", { name: "Argentina" });
+      // Servidor: Comprobar que el trigger de base de datos rechaza inserciones/actualizaciones
+      const admin = createAdminClient();
+      const argCandidate = await getCandidate("champion", { name: "Argentina" });
 
-    const { error } = await admin.from("special_predictions").upsert(
-      {
-        user_id: fixture.users[0]!.userId,
-        league_id: fixture.league.id,
-        category: "champion",
-        candidate_id: argCandidate.id,
-      },
-      { onConflict: "user_id,league_id,category" }
-    );
+      const { error } = await admin.from("special_predictions").upsert(
+        {
+          user_id: fixture.users[0]!.userId,
+          league_id: fixture.league.id,
+          category: "champion",
+          candidate_id: argCandidate.id,
+        },
+        { onConflict: "user_id,league_id,category" }
+      );
 
-    expect(error).not.toBeNull();
-    expect(error!.message).toContain("premios especiales están bloqueadas");
+      expect(error).not.toBeNull();
+      expect(error!.message).toContain("premios especiales están bloqueadas");
+    } finally {
+      await setFinalKickoff(false);
+    }
   });
 
   test("AWD-08: Resolución con ganador oficial", async () => {
@@ -535,5 +553,120 @@ test.describe("/awards — Premios Especiales", () => {
 
     // Comprobar que no hay ningún candidato seleccionado en la UI
     await expect(board.getByTestId("selected-candidate")).toHaveCount(0);
+  });
+
+  test("AWD-13: Advertencia de degradación de puntos al cambiar de fase", async () => {
+    // 1) Empezar en Fase A
+    await setActivePhase("A");
+    await page.goto("/awards");
+    const board = page.getByRole("main").getByTestId("awards-board");
+    const card = board.locator('[data-category="champion"]');
+
+    // Seleccionar Argentina en Fase A (50 pts)
+    await selectCandidateBySearch(card, "Arg", "Argentina");
+    await expect(card.getByTestId("award-current-value")).toContainText("+50 pts");
+
+    // Esperar 4 segundos para asegurar que el timestamp T_saved de la predicción esté en el pasado
+    await page.waitForTimeout(4000);
+
+    // Ajustar el límite de Fase A/B a hace 2 segundos en el pasado.
+    // De esta manera, T_saved (hace 4 segundos) queda en Fase A, y el momento actual (now) queda en Fase B.
+    const admin = createAdminClient();
+    const b1 = new Date(Date.now() - 2000).toISOString();
+    const b2 = new Date(Date.now() + 3600 * 1000).toISOString();
+    const b3 = new Date(Date.now() + 7200 * 1000).toISOString();
+
+    await admin.from("tournament_phases").update({ starts_at: null, ends_at: b1 }).eq("phase_code", "A");
+    await admin.from("tournament_phases").update({ starts_at: b1, ends_at: b2 }).eq("phase_code", "B");
+    await admin.from("tournament_phases").update({ starts_at: b2, ends_at: b3 }).eq("phase_code", "C");
+    await admin.from("tournament_phases").update({ starts_at: b3, ends_at: null }).eq("phase_code", "D");
+
+    // 2) Recargar la página
+    await page.reload();
+
+    // 3) Intentar cambiar a Brazil, cancelar confirmación
+    const input = card.getByRole("combobox");
+    await input.fill("Bra");
+    const option = card.getByTestId("candidate-option").filter({ hasText: "Brazil" });
+    await option.click();
+
+    // Comprobar aviso de advertencia custom
+    const warning = card.locator('[role="alertdialog"]');
+    await expect(warning).toBeVisible();
+    await expect(warning).toContainText("disminuirán de 50 a 25");
+
+    // Hacer clic en Cancelar
+    await warning.getByRole("button", { name: "Cancelar" }).click();
+    await expect(warning).not.toBeVisible();
+
+    // Comprobar que sigue seleccionada Argentina
+    await expect(card.getByTestId("selected-candidate")).toContainText("Argentina");
+    await expect(card.getByTestId("award-current-value")).toContainText("+50 pts");
+
+    // 4) Intentar cambiar a Brazil, aceptar confirmación
+    await input.fill("Bra");
+    await option.click();
+    await expect(warning).toBeVisible();
+    await warning.getByRole("button", { name: "Continuar" }).click();
+    await expect(warning).not.toBeVisible();
+
+    // Comprobar que cambió a Brazil y ahora tiene +25 pts
+    await expect(card.getByTestId("selected-candidate")).toContainText("Brazil");
+    await expect(card.getByTestId("award-current-value")).toContainText("+25 pts");
+  });
+
+  test("AWD-14: Resolución administrativa y visualización en acordeones", async () => {
+    // 1) Asegurar final en el futuro (desbloqueado)
+    await setFinalKickoff(false);
+
+    // 2) Ir a /awards y salvar una predicción
+    await page.goto("/awards");
+    const board = page.getByRole("main").getByTestId("awards-board");
+    const champCard = board.locator('[data-category="champion"]');
+    await selectCandidateBySearch(champCard, "Arg", "Argentina");
+
+    // 3) Ir a /standings y verificar que el acordeón no muestra las predicciones especiales
+    await page.goto("/standings");
+    const rows = page.getByTestId("standings-row");
+    await expect(rows.first()).toBeVisible();
+    await rows.first().click();
+    await expect(page.getByTestId("accordion-special-predictions")).not.toBeVisible();
+
+    // 4) Bloquear final (kickoff en el pasado)
+    await setFinalKickoff(true);
+    await page.reload();
+
+    // 4) Verificar que ahora sí se muestra el acordeón de premios especiales
+    await rows.first().click();
+    await expect(page.getByTestId("accordion-special-predictions")).toBeVisible();
+
+    // 5) Ir al panel de administración para resolver ganadores
+    await page.goto("/standings/manage");
+    const adminSection = page.getByTestId("admin-awards-section").first();
+    await expect(adminSection).toBeVisible();
+
+    // Resolver campeón como Argentina
+    const champAdminCard = adminSection.locator('[data-category="champion"]');
+    await champAdminCard.locator('summary').click();
+    const adminInput = champAdminCard.getByRole("combobox");
+    await adminInput.fill("Arg");
+    const adminOption = champAdminCard.getByTestId("candidate-option").filter({ hasText: "Argentina" });
+    await expect(adminOption).toBeVisible({ timeout: 5000 });
+    await adminOption.click();
+    await page.waitForTimeout(500);
+
+    // Verificar en BD que se guardó
+    const admin = createAdminClient();
+    const argCandidate = await getCandidate("champion", { name: "Argentina" });
+    const { data: dbCand } = await admin
+      .from("award_candidates")
+      .select("is_winner")
+      .eq("id", argCandidate.id)
+      .single();
+    expect(dbCand?.is_winner).toBe(true);
+
+    // 6) Limpiar ganadores y final
+    await clearWinners();
+    await setFinalKickoff(false);
   });
 });

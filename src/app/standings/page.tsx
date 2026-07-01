@@ -54,24 +54,37 @@ export async function StandingsBoard() {
   // partidos desbloqueados (finished → siempre visibles). NO usar service_role.
   // Los puntos de premios especiales llegan agregados por el RPC (BUG-004):
   // la RLS oculta los picks rivales, el RPC expone SOLO el total por usuario.
-  const [{ data: memberRows }, { data: finished }, { data: league }, { data: awardRows }, { data: duelRows }] =
-    await Promise.all([
-      supabase
-        .from("league_members")
-        .select("user_id, role, payment_status, joined_at, profiles(display_name, avatar_url)")
-        .eq("league_id", leagueId),
-      supabase
-        .from("matches")
-        .select("id, status, matchday, stage, home_score, away_score, updated_at, match_time, home_team, away_team, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score")
-        .eq("status", "finished"),
-      supabase
-        .from("leagues")
-        .select("name, requires_payment, payment_amount, payment_instructions")
-        .eq("id", leagueId)
-        .single(),
-      supabase.rpc("fn_get_league_award_points", { p_league_id: leagueId }),
-      supabase.rpc("fn_get_league_duel_points", { p_league_id: leagueId }),
-    ]);
+  // Pero si el partido de la final ya comenzó (bloqueado), la RLS permite leerlos.
+  const [
+    { data: memberRows },
+    { data: finished },
+    { data: league },
+    { data: awardRows },
+    { data: duelRows },
+    { data: specialPreds },
+    { data: isAwardsLocked },
+  ] = await Promise.all([
+    supabase
+      .from("league_members")
+      .select("user_id, role, payment_status, joined_at, profiles(display_name, avatar_url)")
+      .eq("league_id", leagueId),
+    supabase
+      .from("matches")
+      .select("id, status, matchday, stage, home_score, away_score, updated_at, match_time, home_team, away_team, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score")
+      .eq("status", "finished"),
+    supabase
+      .from("leagues")
+      .select("name, requires_payment, payment_amount, payment_instructions")
+      .eq("id", leagueId)
+      .single(),
+    supabase.rpc("fn_get_league_award_points", { p_league_id: leagueId }),
+    supabase.rpc("fn_get_league_duel_points", { p_league_id: leagueId }),
+    supabase
+      .from("special_predictions")
+      .select("user_id, category, candidate_id, award_candidates(name)")
+      .eq("league_id", leagueId),
+    supabase.rpc("fn_are_special_predictions_locked"),
+  ]);
 
   const awardPointsByUser = new Map(
     ((awardRows ?? []) as Array<{ user_id: string; award_points: number }>).map(
@@ -179,6 +192,13 @@ export async function StandingsBoard() {
         members={members}
         matches={finishedMatches}
         predictions={predictions}
+        specialPredictions={(specialPreds ?? []) as unknown as Array<{
+          user_id: string;
+          category: string;
+          candidate_id: string;
+          award_candidates: { name: string } | null;
+        }>}
+        isAwardsLocked={!!isAwardsLocked}
       />
     </>
   );

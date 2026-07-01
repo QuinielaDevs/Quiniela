@@ -39,7 +39,7 @@ interface AwardSelectorProps {
   selectedId: string | null;
   pendingId: string | null;
   disabled: boolean;
-  onSelect: (candidateId: string) => void;
+  onSelect: (candidateId: string) => boolean | void;
   category: "champion" | "top_scorer" | "mvp";
 }
 
@@ -134,8 +134,10 @@ export function AwardSelector({
   }, [isOpen]);
 
   function selectCandidate(c: AwardCandidate) {
-    setLocalSelected(c);
-    onSelect(c.id);
+    const accepted = onSelect(c.id);
+    if (accepted !== false) {
+      setLocalSelected(c);
+    }
     setIsOpen(false);
     setSearch("");
     setResults([]);
