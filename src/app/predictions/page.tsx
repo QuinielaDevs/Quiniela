@@ -75,6 +75,7 @@ export async function PredictionsBoard() {
     { data: specialPredictions },
     activePhaseResult,
     { data: currentRoundOrdinal },
+    { data: dbPhases },
   ] = await Promise.all([
     supabase
       .from("matches")
@@ -92,11 +93,15 @@ export async function PredictionsBoard() {
       .eq("user_id", userId),
     supabase
       .from("special_predictions")
-      .select("category, candidate_id")
+      .select("category, candidate_id, predicted_at")
       .eq("league_id", leagueId)
       .eq("user_id", userId),
     supabase.rpc("fn_get_active_tournament_phase"),
     supabase.rpc("fn_current_round_ordinal"),
+    supabase
+      .from("tournament_phases")
+      .select("phase_code, reward_points, starts_at, ends_at, label")
+      .order("sort_order", { ascending: true }),
   ]);
 
   if (!matches || matches.length === 0) {
@@ -123,9 +128,15 @@ export async function PredictionsBoard() {
   const preds = (specialPredictions ?? []) as Array<{
     category: string;
     candidate_id: string;
+    predicted_at: string | null;
   }>;
 
   const initialSelections: Record<AwardCategory, string | null> = {
+    champion: null,
+    top_scorer: null,
+    mvp: null,
+  };
+  const initialPredTimes: Record<AwardCategory, string | null> = {
     champion: null,
     top_scorer: null,
     mvp: null,
@@ -140,6 +151,7 @@ export async function PredictionsBoard() {
     const cat = p.category as AwardCategory;
     if (cat === "champion" || cat === "top_scorer" || cat === "mvp") {
       initialSelections[cat] = p.candidate_id;
+      initialPredTimes[cat] = p.predicted_at;
     }
   }
 
@@ -179,6 +191,8 @@ export async function PredictionsBoard() {
         predictions={predictions ?? []}
         selectedCandidates={selectedCandidates}
         initialSelections={initialSelections}
+        initialPredTimes={initialPredTimes}
+        phasesList={dbPhases ?? []}
         isAwardsLocked={isAwardsLocked}
         activePhaseLabel={activePhaseLabel}
         activePhaseCode={activePhaseCode}
