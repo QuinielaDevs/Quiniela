@@ -35,7 +35,7 @@ const specialAwards = [
   { label: "Antes del partido inaugural", points: "50 pts" },
   { label: "Fase de grupos", points: "25 pts" },
   { label: "Octavos y cuartos", points: "10 pts" },
-  { label: "Desde semifinales", points: "2 pts" },
+  { label: "Semifinales (hasta inicio de la Final)", points: "2 pts" },
 ];
 
 export default function RulesPage() {

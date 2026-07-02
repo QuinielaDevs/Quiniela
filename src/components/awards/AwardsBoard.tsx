@@ -264,7 +264,11 @@ export function AwardsBoard({
               "block text-[10px] uppercase font-bold tracking-wider",
               activePhaseCode === "D" ? "text-yellow-400" : "text-white/40"
             )}>
-              {activePhaseCode === "D" ? "🔒 Bloqueado" : "Semifinal en adelante"}
+              {isLocked
+                ? "🔒 Bloqueado"
+                : activePhaseCode === "D"
+                  ? "👉 En Curso"
+                  : "Semifinales (hasta la Final)"}
             </span>
             <span className="text-lg font-extrabold text-white mt-0.5">2 pts</span>
           </div>
