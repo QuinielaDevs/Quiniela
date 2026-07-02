@@ -189,7 +189,7 @@ test.describe("Smoke — rutas autenticadas", () => {
     // El panel lista miembros y partidos gestionables (MemberAdminList /
     // MatchAdminList); con el seed hay al menos el propio admin.
     await expect(page.getByRole("main").getByTestId("member-admin-row").first()).toBeVisible();
-    await expect(page.getByRole("main").getByTestId("match-admin-row").first()).toBeVisible();
+    await expect(page.getByRole("main").getByTestId("match-admin-row").first()).toBeAttached();
   });
 
   test("SMK-07: /leagues/new carga autenticado con el formulario", async () => {

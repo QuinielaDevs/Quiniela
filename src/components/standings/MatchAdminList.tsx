@@ -9,7 +9,6 @@ import {
 } from "@/app/actions/matches.actions";
 import { GoalPicker } from "@/components/predictions/GoalPicker";
 import { flagForTeamCode } from "@/utils/team-flags";
-import { stageLabel } from "@/utils/tournament";
 import { cn } from "@/utils/utils";
 import type { MatchStatus } from "@/types";
 
@@ -65,64 +64,41 @@ type MatchAdminSection = {
   isPastGroupDay: boolean;
 };
 
-const KNOCKOUT_STAGE_ORDER: Record<string, number> = {
-  "round-32": 4,
-  "round-16": 5,
-  quarter: 6,
-  semi: 7,
-  "third-place": 8,
-  final: 9,
-};
+function formatDateGroup(matchTime: string): string {
+  const date = new Date(matchTime);
+  if (Number.isNaN(date.getTime())) return "Fecha no disponible";
 
-/** Un estado lleva marcador editable (live/finished). */
-function statusUsesScore(status: MatchStatus): boolean {
-  return status === "live" || status === "finished";
-}
+  const formatted = new Intl.DateTimeFormat("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
 
-function sectionSortValue(match: AdminMatchView): number {
-  if (match.matchday != null && (match.stage === "group" || !match.stage)) {
-    return match.matchday;
-  }
-  const knockoutOrder = match.stage
-    ? KNOCKOUT_STAGE_ORDER[match.stage]
-    : undefined;
-  if (knockoutOrder != null) {
-    return knockoutOrder;
-  }
-  return 99;
-}
-
-function sectionForMatch(match: AdminMatchView): { key: string; label: string } {
-  if (match.matchday != null && (match.stage === "group" || !match.stage)) {
-    return {
-      key: `jornada-${match.matchday}`,
-      label: `Jornada ${match.matchday}`,
-    };
-  }
-
-  if (match.stage) {
-    return {
-      key: match.stage,
-      label: stageLabel(match.stage),
-    };
-  }
-
-  return { key: "otros", label: "Otros partidos" };
+  // Capitalize first letter
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
 function groupMatchesBySection(matches: AdminMatchView[]): MatchAdminSection[] {
   const sectionMap = new Map<string, MatchAdminSection>();
+  const now = Date.now();
 
   for (const match of matches) {
-    const section = sectionForMatch(match);
-    const existing = sectionMap.get(section.key);
+    const dateKey = match.matchTime.split("T")[0] || "unknown";
+    const existing = sectionMap.get(dateKey);
     if (existing) {
       existing.matches.push(match);
       continue;
     }
 
-    sectionMap.set(section.key, {
-      ...section,
+    const label = dateKey === "unknown"
+      ? "Otros partidos"
+      : formatDateGroup(match.matchTime);
+
+    sectionMap.set(dateKey, {
+      key: dateKey,
+      label,
       matches: [match],
       isPastGroupDay: false,
     });
@@ -131,25 +107,24 @@ function groupMatchesBySection(matches: AdminMatchView[]): MatchAdminSection[] {
   return [...sectionMap.values()]
     .map((section) => ({
       ...section,
-      matches: [...section.matches].sort((a, b) => {
-        const slotA = a.bracketSlot;
-        const slotB = b.bracketSlot;
-        if (slotA != null && slotB != null) return slotA - slotB;
-        return new Date(a.matchTime).getTime() - new Date(b.matchTime).getTime();
-      }),
-      isPastGroupDay:
-        section.key.startsWith("jornada-") &&
-        section.matches.every((match) => match.status === "finished"),
+      matches: [...section.matches].sort((a, b) =>
+        new Date(a.matchTime).getTime() - new Date(b.matchTime).getTime()
+      ),
+      isPastGroupDay: section.matches.every((match) => match.status === "finished"),
     }))
     .sort((a, b) => {
-      const firstA = a.matches[0];
-      const firstB = b.matches[0];
-      if (!firstA || !firstB) return 0;
-      const byPhase = sectionSortValue(firstA) - sectionSortValue(firstB);
-      if (byPhase !== 0) return byPhase;
-      return firstA.matchTime.localeCompare(firstB.matchTime);
+      if (a.key === "unknown") return 1;
+      if (b.key === "unknown") return -1;
+
+      const timeA = new Date(a.matches[0]!.matchTime).getTime();
+      const timeB = new Date(b.matches[0]!.matchTime).getTime();
+      const diffA = Math.abs(timeA - now);
+      const diffB = Math.abs(timeB - now);
+
+      return diffA - diffB;
     });
 }
+
 
 export function MatchAdminList({ matches }: MatchAdminListProps) {
   const router = useRouter();
@@ -217,7 +192,6 @@ export function MatchAdminList({ matches }: MatchAdminListProps) {
           <details
             key={section.key}
             className="rounded-md border border-border bg-card"
-            open={!section.isPastGroupDay || sections.length === 1}
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-sm font-semibold text-foreground marker:hidden">
               <span>{section.label}</span>
@@ -296,7 +270,7 @@ function MatchAdminCard({ match }: { match: AdminMatchView }) {
     [match.status],
   );
 
-  const showScore = statusUsesScore(status);
+  const showScore = status === "live" || status === "finished";
 
   const localTime = useMemo(
     () =>

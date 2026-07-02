@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -899,6 +899,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      fn_admin_resolve_award_winner: {
+        Args: {
+          p_category: string
+          p_winner_candidate_id: string | null
+        }
+        Returns: unknown
       }
       fn_apply_accrual_correction: {
         Args: {

@@ -51,6 +51,13 @@ type LiveStandingsBoardProps = {
   members: StandingMember[];
   initialMatches: LiveMatch[];
   initialPredictions: StandingPrediction[];
+  specialPredictions?: Array<{
+    user_id: string;
+    category: string;
+    candidate_id: string;
+    award_candidates: { name: string } | null;
+  }>;
+  isAwardsLocked?: boolean;
 };
 
 type ConnectionState = "connecting" | "live" | "reconnecting" | "polling";
@@ -410,7 +417,22 @@ export function LiveStandingsBoard({
   members,
   initialMatches,
   initialPredictions,
+  specialPredictions,
+  isAwardsLocked = false,
 }: LiveStandingsBoardProps) {
+  const specialPredsByUser = useMemo(() => {
+    const map = new Map<string, Record<string, string>>();
+    if (!specialPredictions) return map;
+    for (const sp of specialPredictions) {
+      let userRec = map.get(sp.user_id);
+      if (!userRec) {
+        userRec = {};
+        map.set(sp.user_id, userRec);
+      }
+      userRec[sp.category] = sp.award_candidates?.name ?? "Candidato Desconocido";
+    }
+    return map;
+  }, [specialPredictions]);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1026,6 +1048,31 @@ export function LiveStandingsBoard({
                       </span>
                     </div>
                   </div>
+
+                  {isAwardsLocked && specialPredsByUser.has(row.userId) && (
+                    <div
+                      className="rounded-md border border-border/40 bg-[#1B263B]/20 p-2.5 text-xs"
+                      data-testid="accordion-special-predictions"
+                    >
+                      <div className="font-semibold text-accent mb-1.5 flex items-center gap-1.5">
+                        <span>🏆</span> Premios Especiales Elegidos:
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-1">
+                        <div className="flex flex-col rounded bg-card/45 p-1.5 border border-border/20">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold">Campeón</span>
+                          <span className="font-semibold mt-0.5 truncate text-foreground">{specialPredsByUser.get(row.userId)?.champion ?? "Sin pronóstico"}</span>
+                        </div>
+                        <div className="flex flex-col rounded bg-card/45 p-1.5 border border-border/20">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold">Goleador</span>
+                          <span className="font-semibold mt-0.5 truncate text-foreground">{specialPredsByUser.get(row.userId)?.top_scorer ?? "Sin pronóstico"}</span>
+                        </div>
+                        <div className="flex flex-col rounded bg-card/45 p-1.5 border border-border/20">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold">MVP</span>
+                          <span className="font-semibold mt-0.5 truncate text-foreground">{specialPredsByUser.get(row.userId)?.mvp ?? "Sin pronóstico"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Lista de Partidos con scroll interno y agrupación */}
                   <div

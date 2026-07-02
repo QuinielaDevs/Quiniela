@@ -9,14 +9,17 @@ config({ path: ".env.test.local" });
 config({ path: ".env.test" });
 
 // Map local Supabase CLI env keys to Vitest expected keys
-if (process.env.api_external_url && !process.env.SUPABASE_URL) {
-  process.env.SUPABASE_URL = process.env.api_external_url;
+const url = process.env.api_external_url || process.env.API_URL || process.env.supabase_url || process.env.SUPABASE_URL;
+if (url && !process.env.SUPABASE_URL) {
+  process.env.SUPABASE_URL = url;
 }
-if (process.env.anon_key && !process.env.SUPABASE_ANON_KEY) {
-  process.env.SUPABASE_ANON_KEY = process.env.anon_key;
+const anon = process.env.anon_key || process.env.ANON_KEY || process.env.supabase_anon_key || process.env.SUPABASE_ANON_KEY;
+if (anon && !process.env.SUPABASE_ANON_KEY) {
+  process.env.SUPABASE_ANON_KEY = anon;
 }
-if (process.env.service_role_key && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.service_role_key;
+const svc = process.env.service_role_key || process.env.SERVICE_ROLE_KEY || process.env.supabase_service_role_key || process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (svc && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = svc;
 }
 
 // Auto-configure webhook secret fallback for integration tests

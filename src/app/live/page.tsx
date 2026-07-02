@@ -41,22 +41,33 @@ export async function LiveBoard() {
 
   // awardRows: total de premios especiales por usuario (BUG-004); la proyectada
   // los suma igual que la clasificación oficial General.
-  const [{ data: memberRows }, { data: matchRows }, { data: awardRows }, { data: duelRows }] =
-    await Promise.all([
-      supabase
-        .from("league_members")
-        .select("user_id, payment_status, joined_at, profiles(display_name, avatar_url)")
-        .eq("league_id", leagueId),
-      supabase
-        .from("matches")
-        .select(
-          "id, status, matchday, stage, group_label, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score",
-        )
-        .in("status", ["finished", "live"])
-        .order("match_time", { ascending: true }),
-      supabase.rpc("fn_get_league_award_points", { p_league_id: leagueId }),
-      supabase.rpc("fn_get_league_duel_points", { p_league_id: leagueId }),
-    ]);
+  const [
+    { data: memberRows },
+    { data: matchRows },
+    { data: awardRows },
+    { data: duelRows },
+    { data: specialPreds },
+    { data: isAwardsLocked },
+  ] = await Promise.all([
+    supabase
+      .from("league_members")
+      .select("user_id, payment_status, joined_at, profiles(display_name, avatar_url)")
+      .eq("league_id", leagueId),
+    supabase
+      .from("matches")
+      .select(
+        "id, status, matchday, stage, group_label, home_team, away_team, home_team_code, away_team_code, home_score, away_score, match_time, penalties_home_score, penalties_away_score, extra_time_home_score, extra_time_away_score",
+      )
+      .in("status", ["finished", "live"])
+      .order("match_time", { ascending: true }),
+    supabase.rpc("fn_get_league_award_points", { p_league_id: leagueId }),
+    supabase.rpc("fn_get_league_duel_points", { p_league_id: leagueId }),
+    supabase
+      .from("special_predictions")
+      .select("user_id, category, candidate_id, award_candidates(name)")
+      .eq("league_id", leagueId),
+    supabase.rpc("fn_are_special_predictions_locked"),
+  ]);
 
   const awardPointsByUser = new Map(
     ((awardRows ?? []) as Array<{ user_id: string; award_points: number }>).map(
@@ -119,6 +130,13 @@ export async function LiveBoard() {
       members={members}
       initialMatches={matches}
       initialPredictions={predictions}
+      specialPredictions={(specialPreds ?? []) as unknown as Array<{
+        user_id: string;
+        category: string;
+        candidate_id: string;
+        award_candidates: { name: string } | null;
+      }>}
+      isAwardsLocked={!!isAwardsLocked}
     />
   );
 }

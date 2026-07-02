@@ -164,13 +164,17 @@ async function AwardsForLeague({
 
   // La vista special_predictions_with_points añade is_correct/points (BUG-004):
   // la RLS (security_invoker) limita a las filas PROPIAS, que es lo que se
-  // muestra aquí; points > 0 solo cuando el admin resolvió el ganador.
-  const [{ data: predictions }] = await Promise.all([
+  // muestra aquí; points > 0 solo cuando el admin registró el ganador.
+  const [{ data: predictions }, { data: dbPhases }] = await Promise.all([
     supabase
       .from("special_predictions_with_points")
-      .select("category, candidate_id, is_correct, points")
+      .select("category, candidate_id, is_correct, points, predicted_at")
       .eq("league_id", activeLeague.id)
       .eq("user_id", userId),
+    supabase
+      .from("tournament_phases")
+      .select("phase_code, reward_points, starts_at, ends_at, label")
+      .order("sort_order", { ascending: true }),
   ]);
 
   const preds = (predictions ?? []) as Array<{
@@ -178,9 +182,15 @@ async function AwardsForLeague({
     candidate_id: string;
     is_correct: boolean;
     points: number;
+    predicted_at: string;
   }>;
 
   const initialSelections: Record<AwardCategory, string | null> = {
+    champion: null,
+    top_scorer: null,
+    mvp: null,
+  };
+  const initialPredTimes: Record<AwardCategory, string | null> = {
     champion: null,
     top_scorer: null,
     mvp: null,
@@ -196,6 +206,7 @@ async function AwardsForLeague({
     const cat = p.category as AwardCategory;
     if (cat === "champion" || cat === "top_scorer" || cat === "mvp") {
       initialSelections[cat] = p.candidate_id;
+      initialPredTimes[cat] = p.predicted_at;
       earnedPoints[cat] = {
         isCorrect: p.is_correct,
         points: Number(p.points ?? 0),
@@ -259,8 +270,8 @@ async function AwardsForLeague({
                 className={cn(
                   "rounded-full border px-3 py-1 text-sm transition-colors",
                   isActive
-                    ? "border-[#E9C46A] bg-[#E9C46A]/10 text-[#E9C46A]"
-                    : "border-white/15 text-white/70 hover:border-white/40",
+                    ? "border-accent bg-accent/15 text-accent"
+                    : "border-border bg-card text-muted-foreground hover:bg-accent/10 hover:text-foreground",
                 )}
               >
                 {league.name}
@@ -268,21 +279,24 @@ async function AwardsForLeague({
             );
           })}
         </nav>
-      ) : (
-        <p className="mb-5 text-xs uppercase tracking-wide text-white/40">
-          Liga: {activeLeague.name}
-        </p>
-      )}
+      ) : null}
 
       <AwardsBoard
-        key={activeLeague.id}
         leagueId={activeLeague.id}
         selectedCandidates={selectedCandidates}
         initialSelections={initialSelections}
+        initialPredTimes={initialPredTimes}
+        earnedPoints={earnedPoints}
         isLocked={isLocked}
         activePhaseLabel={activePhaseLabel}
         activePhaseCode={activePhaseCode}
-        earnedPoints={earnedPoints}
+        phases={(dbPhases ?? []) as Array<{
+          phase_code: string;
+          reward_points: number;
+          starts_at: string | null;
+          ends_at: string | null;
+          label: string;
+        }>}
       />
     </>
   );

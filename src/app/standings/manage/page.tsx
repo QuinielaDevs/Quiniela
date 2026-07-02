@@ -15,8 +15,9 @@ import {
   MatchAdminList,
   type AdminMatchView,
 } from "@/components/standings/MatchAdminList";
+import { AwardWinnerAdminList } from "@/components/standings/AwardWinnerAdminList";
 import { getActiveLeagueMembership } from "@/utils/active-league";
-import type { LeagueRole, MatchStatus, PaymentStatus } from "@/types";
+import type { LeagueRole, MatchStatus, PaymentStatus, AwardCandidate, AwardCategory } from "@/types";
 
 // Fila de league_members embebiendo el perfil (FK user_id → profiles.id).
 type ManageMemberRow = {
@@ -90,6 +91,20 @@ export async function ManageBoard() {
     paymentStatus: m.payment_status,
   }));
 
+  // Cargar los candidatos de premios y determinar los ganadores actuales
+  const { data: candidates } = await supabase
+    .from("award_candidates")
+    .select("*")
+    .order("category, display_order", { ascending: true });
+
+  const typedCandidates = (candidates ?? []) as AwardCandidate[];
+
+  const initialWinners: Record<AwardCategory, AwardCandidate | null> = {
+    champion: typedCandidates.find((c) => c.category === "champion" && c.is_winner) || null,
+    top_scorer: typedCandidates.find((c) => c.category === "top_scorer" && c.is_winner) || null,
+    mvp: typedCandidates.find((c) => c.category === "mvp" && c.is_winner) || null,
+  };
+
   // Story 7.2 — partidos gestionables: catálogo GLOBAL del torneo (no por-liga).
   // Cargamos los de fase de grupos con equipos reales (los knockout TBD se omiten
   // hasta que Story 7.3 resuelva el bracket). RLS matches_select_authenticated ya
@@ -146,6 +161,16 @@ export async function ManageBoard() {
           members={members}
           currentUserId={userId}
           leagueId={leagueId}
+        />
+      </section>
+
+      <section className="flex flex-col gap-3" data-testid="admin-awards-section">
+        <h2 className="font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">
+          Resolución de Premios Especiales
+        </h2>
+        <AwardWinnerAdminList
+          candidates={typedCandidates}
+          initialWinners={initialWinners}
         />
       </section>
 

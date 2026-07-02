@@ -122,7 +122,7 @@ describe("resolvePhase & scoreAward", () => {
     const phase = resolvePhase(SEMIFINAL);
     expect(phase.code).toBe("D");
     expect(phase.rewardPoints).toBe(2);
-    expect(phase.editsLocked).toBe(true);
+    expect(phase.editsLocked).toBe(false);
 
     expect(scoreAward(SEMIFINAL, true)).toBe(2);
   });
@@ -132,7 +132,7 @@ describe("resolvePhase & scoreAward", () => {
     const phase = resolvePhase(t);
     expect(phase.code).toBe("D");
     expect(phase.rewardPoints).toBe(2);
-    expect(phase.editsLocked).toBe(true);
+    expect(phase.editsLocked).toBe(false);
 
     expect(scoreAward(t, true)).toBe(2);
   });

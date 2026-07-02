@@ -1,8 +1,18 @@
-// Cliente admin (service role) compartido por todos los helpers E2E.
-// Extraído de auth.ts/seed.ts (Fase 1 del plan E2E) para no duplicar la
-// creación del cliente ni la validación de variables de entorno.
-
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+// Map local Supabase CLI env keys to E2E expected keys
+const url = process.env.SUPABASE_URL || process.env.API_URL || process.env.api_external_url;
+if (url) {
+  process.env.SUPABASE_URL = url;
+}
+const anon = process.env.SUPABASE_ANON_KEY || process.env.ANON_KEY || process.env.anon_key;
+if (anon) {
+  process.env.SUPABASE_ANON_KEY = anon;
+}
+const svc = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY || process.env.service_role_key;
+if (svc) {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = svc;
+}
 
 export function requireEnv(name: string): string {
   const value = process.env[name];

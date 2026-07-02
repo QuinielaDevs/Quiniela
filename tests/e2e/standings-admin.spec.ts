@@ -73,7 +73,8 @@ test.describe("Panel de administración (e2e)", () => {
     localMatchIds.push(m.id);
 
     await page.goto("/standings/manage");
-    const card = page.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`);
+    const card = page.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`).first();
+    await page.locator("details").filter({ has: card }).locator("summary").first().click();
 
     // Cambiar estado a Live
     const select = card.getByTestId("admin-status-select");
@@ -134,7 +135,8 @@ test.describe("Panel de administración (e2e)", () => {
     });
 
     await page.goto("/standings/manage");
-    const card = page.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`);
+    const card = page.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`).first();
+    await page.locator("details").filter({ has: card }).locator("summary").first().click();
 
     // Poner marcador final 2-1 y estado finished
     const select = card.getByTestId("admin-status-select");
@@ -266,7 +268,8 @@ test.describe("Panel de administración (e2e)", () => {
     localMatchIds.push(m.id);
 
     await page.goto("/standings/manage");
-    const card = page.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`);
+    const card = page.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`).first();
+    await page.locator("details").filter({ has: card }).locator("summary").first().click();
 
     const select = card.getByTestId("admin-status-select");
     await select.selectOption("finished");
@@ -302,7 +305,7 @@ test.describe("Panel de administración (e2e)", () => {
     const memberId = fixture.users[1]!.userId;
 
     await page.goto("/standings/manage");
-    const row = page.locator(`[data-testid="member-admin-row"][data-user-id="${memberId}"]`);
+    const row = page.locator(`[data-testid="member-admin-row"][data-user-id="${memberId}"]`).first();
     const toggle = row.getByTestId("payment-toggle");
 
     // 1) Asegurar estado actual Paid
@@ -383,9 +386,10 @@ test.describe("Panel de administración (e2e)", () => {
 
     await page.goto("/standings/manage");
     const rowUser2 = page.locator(`[data-testid="member-admin-row"][data-user-id="${fixture.users[2]!.userId}"]`);
+    const firstRowUser2 = rowUser2.first();
     
     // Hacer click en expulsar User 2
-    await rowUser2.getByTestId("expel-button").click();
+    await firstRowUser2.getByTestId("expel-button").click();
     await page.getByTestId("expel-confirm").click();
 
     // User 2 debería desaparecer de la UI
@@ -414,7 +418,7 @@ test.describe("Panel de administración (e2e)", () => {
     await page.goto("/standings/manage");
     
     // El admin no debería ver su propio botón de expulsión
-    const rowAdmin = page.locator(`[data-testid="member-admin-row"][data-user-id="${adminId}"]`);
+    const rowAdmin = page.locator(`[data-testid="member-admin-row"][data-user-id="${adminId}"]`).first();
     await expect(rowAdmin.getByTestId("expel-button")).toHaveCount(0);
 
     // Intentar expulsar al admin por RPC directo desde el cliente autenticado del propio admin
@@ -443,7 +447,7 @@ test.describe("Panel de administración (e2e)", () => {
     const memberUser = fixture.users[1]!;
 
     await pageAdmin.goto("/standings/manage");
-    const rowMember = pageAdmin.locator(`[data-testid="member-admin-row"][data-user-id="${memberUser.userId}"]`);
+    const rowMember = pageAdmin.locator(`[data-testid="member-admin-row"][data-user-id="${memberUser.userId}"]`).first();
     
     // Promover a admin
     await rowMember.getByRole("button", { name: `Hacer admin a ${memberUser.displayName}` }).click();
@@ -489,7 +493,8 @@ test.describe("Panel de administración (e2e)", () => {
 
     // 2) Ir al panel de administración y localizar la tarjeta
     await pageAdmin.goto("/standings/manage");
-    const card = pageAdmin.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`);
+    const card = pageAdmin.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`).first();
+    await pageAdmin.locator("details").filter({ has: card }).locator("summary").first().click();
 
     // 3) Seleccionar estado "Finalizado" (finished)
     await card.getByTestId("admin-status-select").selectOption("finished");
@@ -556,7 +561,8 @@ test.describe("Panel de administración (e2e)", () => {
 
     // 2) Ir al panel de administración y localizar la tarjeta
     await pageAdmin.goto("/standings/manage");
-    const card = pageAdmin.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`);
+    const card = pageAdmin.locator(`[data-testid="match-admin-row"][data-match-id="${m.id}"]`).first();
+    await pageAdmin.locator("details").filter({ has: card }).locator("summary").first().click();
 
     // 3) Seleccionar estado "Finalizado" (finished)
     await card.getByTestId("admin-status-select").selectOption("finished");

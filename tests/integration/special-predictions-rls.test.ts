@@ -318,30 +318,55 @@ describe("integridad de categoría (FK compuesta) y trigger de predicted_at", ()
 });
 
 describe("bloqueo de predicciones por fase de torneo (trigger)", () => {
+  const dummyMatchId = "00000000-0000-0000-0000-000000000000";
+
   beforeAll(async () => {
-    // Aseguramos estado inicial limpio en caso de aborto previo
+    // Aseguramos estado inicial limpio: todas las fases desbloqueadas
     await admin
       .from("tournament_phases")
       .update({ edits_locked: false })
-      .neq("phase_code", "D");
-    await admin
-      .from("tournament_phases")
-      .update({ edits_locked: true })
-      .eq("phase_code", "D");
+      .neq("phase_code", "");
+
+    // Insertar un partido final dummy si no existe
+    const { data: existing } = await admin
+      .from("matches")
+      .select("id")
+      .eq("stage", "final");
+
+    if (!existing || existing.length === 0) {
+      await admin.from("matches").insert({
+        id: dummyMatchId,
+        home_team: "TBD",
+        away_team: "TBD",
+        stage: "final",
+        status: "scheduled",
+        match_time: new Date(Date.now() + 86400 * 1000).toISOString(),
+      });
+    }
   });
 
-  it("bloquea inserciones y actualizaciones si la fase actual tiene edits_locked = true", async () => {
+  afterAll(async () => {
+    await admin.from("matches").delete().eq("id", dummyMatchId);
+  });
+
+  async function setFinalKickoff(inPast: boolean) {
+    const matchTime = inPast
+      ? new Date(Date.now() - 3600 * 1000).toISOString()
+      : new Date(Date.now() + 86400 * 1000).toISOString();
+    await admin
+      .from("matches")
+      .update({ match_time: matchTime })
+      .eq("stage", "final");
+  }
+
+  it("bloquea inserciones y actualizaciones si la final ha comenzado", async () => {
     const user = await createAuthedUser();
     const leagueId = await createLeagueWithMembership(user);
     const candidateId = await createCandidate("champion", "Candidato de Bloqueo");
     const client = createAuthedClient(user.token);
 
-    // 1. Bloqueamos todas las fases de manera temporal
-    const { error: lockErr } = await admin
-      .from("tournament_phases")
-      .update({ edits_locked: true })
-      .neq("phase_code", "");
-    expect(lockErr).toBeNull();
+    // 1. Bloqueamos poniendo la final en el pasado
+    await setFinalKickoff(true);
 
     try {
       // 2. Intentamos insertar
@@ -357,25 +382,19 @@ describe("bloqueo de predicciones por fase de torneo (trigger)", () => {
       expect(insertErr?.code).toBe("P0001");
       expect(insertErr?.message).toContain("bloqueadas");
     } finally {
-      // 4. Restauramos los bloqueos a su estado original (solo Fase D está bloqueada)
-      await admin
-        .from("tournament_phases")
-        .update({ edits_locked: false })
-        .neq("phase_code", "D");
-      await admin
-        .from("tournament_phases")
-        .update({ edits_locked: true })
-        .eq("phase_code", "D");
+      // 4. Restauramos final al futuro
+      await setFinalKickoff(false);
     }
   });
 
-  it("permite eliminaciones (DELETE) incluso si edits_locked = true", async () => {
+  it("permite eliminaciones (DELETE) incluso si la final ha comenzado", async () => {
     const user = await createAuthedUser();
     const leagueId = await createLeagueWithMembership(user);
     const candidateId = await createCandidate("champion", "Candidato a Borrar");
     const client = createAuthedClient(user.token);
 
     // 1. Insertamos primero en estado desbloqueado
+    await setFinalKickoff(false);
     const { error: insErr } = await client.from("special_predictions").insert({
       user_id: user.id,
       league_id: leagueId,
@@ -384,12 +403,8 @@ describe("bloqueo de predicciones por fase de torneo (trigger)", () => {
     });
     expect(insErr).toBeNull();
 
-    // 2. Bloqueamos todas las fases de manera temporal
-    const { error: lockErr } = await admin
-      .from("tournament_phases")
-      .update({ edits_locked: true })
-      .neq("phase_code", "");
-    expect(lockErr).toBeNull();
+    // 2. Bloqueamos poniendo la final en el pasado
+    await setFinalKickoff(true);
 
     try {
       // 3. Intentamos eliminar como admin (service role) para no fallar por RLS de delete
@@ -402,15 +417,8 @@ describe("bloqueo de predicciones por fase de torneo (trigger)", () => {
 
       expect(delErr).toBeNull();
     } finally {
-      // 4. Restauramos los bloqueos a su estado original (solo Fase D está bloqueada)
-      await admin
-        .from("tournament_phases")
-        .update({ edits_locked: false })
-        .neq("phase_code", "D");
-      await admin
-        .from("tournament_phases")
-        .update({ edits_locked: true })
-        .eq("phase_code", "D");
+      // 4. Restauramos final al futuro
+      await setFinalKickoff(false);
     }
   });
 });
