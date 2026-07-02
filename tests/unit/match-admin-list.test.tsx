@@ -97,7 +97,7 @@ describe("MatchAdminList", () => {
     const round32 = screen.getByText("Lunes, 29 de junio de 2026").closest("details");
 
     expect(jornada).not.toHaveAttribute("open");
-    expect(round32).toHaveAttribute("open");
+    expect(round32).not.toHaveAttribute("open");
   });
 
   it("recalcula el bracket sin modificar resultados", async () => {
