@@ -77,6 +77,14 @@ type PredictionsBoardViewProps = {
   predictions: BoardPrediction[];
   selectedCandidates: Record<AwardCategory, AwardCandidate | null>;
   initialSelections: Record<AwardCategory, string | null>;
+  initialPredTimes?: Record<AwardCategory, string | null>;
+  phasesList?: Array<{
+    phase_code: string;
+    reward_points: number;
+    starts_at: string | null;
+    ends_at: string | null;
+    label: string;
+  }>;
   isAwardsLocked: boolean;
   activePhaseLabel: string;
   activePhaseCode: string;
@@ -93,6 +101,8 @@ export function PredictionsBoardView({
   predictions,
   selectedCandidates,
   initialSelections,
+  initialPredTimes,
+  phasesList,
   isAwardsLocked,
   activePhaseLabel,
   activePhaseCode,
@@ -204,6 +214,8 @@ export function PredictionsBoardView({
           leagueId={leagueId}
           selectedCandidates={selectedCandidates}
           initialSelections={initialSelections}
+          initialPredTimes={initialPredTimes}
+          phases={phasesList}
           isLocked={isAwardsLocked}
           activePhaseLabel={activePhaseLabel}
           activePhaseCode={activePhaseCode}
