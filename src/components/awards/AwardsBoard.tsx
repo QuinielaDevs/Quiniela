@@ -76,18 +76,27 @@ export function AwardsBoard({
     return matched ? matched.reward_points : 2;
   }, [phases, activePhaseCode]);
 
+  const parseSafeDate = useCallback((dateStr: string | null) => {
+    if (!dateStr) return null;
+    let formatted = dateStr.includes(" ") ? dateStr.replace(" ", "T") : dateStr;
+    // Si la zona horaria termina en 2 dígitos (ej: +00 o -05), normalizar a ISO (+00:00)
+    formatted = formatted.replace(/([+-]\d{2})$/, "$1:00");
+    const time = new Date(formatted).getTime();
+    return Number.isNaN(time) ? null : time;
+  }, []);
+
   const getPointsForTimestamp = useCallback((predictedAtStr: string | null) => {
-    if (!predictedAtStr || !phases) return 0;
-    const time = new Date(predictedAtStr).getTime();
+    const time = parseSafeDate(predictedAtStr);
+    if (time === null || !phases) return 0;
     const matched = phases.find((phase) => {
-      const start = phase.starts_at ? new Date(phase.starts_at).getTime() : null;
-      const end = phase.ends_at ? new Date(phase.ends_at).getTime() : null;
+      const start = parseSafeDate(phase.starts_at);
+      const end = parseSafeDate(phase.ends_at);
       const matchesStart = start === null || time >= start;
       const matchesEnd = end === null || time < end;
       return matchesStart && matchesEnd;
     });
     return matched ? matched.reward_points : 0;
-  }, [phases]);
+  }, [phases, parseSafeDate]);
 
   const executeSave = useCallback((category: AwardCategory, candidateId: string, previous: string | null) => {
     setError(null);

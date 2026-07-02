@@ -24,6 +24,7 @@ import {
 } from "./helpers/seed/awards";
 import { selectPhaseTab } from "./helpers/ui";
 import { seedLeague, addMember, setActiveLeague } from "./helpers/seed/league";
+import { seedMatches, editableMatch, deleteMatches } from "./helpers/seed/matches";
 
 async function setFinalKickoff(inPast: boolean) {
   const admin = createAdminClient();
@@ -64,9 +65,19 @@ test.describe("/awards — Premios Especiales", () => {
     phasesSnap = await snapshotPhases();
     winnersSnap = await snapshotWinners();
 
-    // Asegurar que empezamos en la fase A activa por defecto y la final desbloqueada
+    // Asegurar que empezamos en la fase A activa por defecto
     await setActivePhase("A");
     await clearWinners();
+
+    // Sembrar partidos de test requeridos para el bloqueo y las tabs de predicciones
+    const seeded = await seedMatches([
+      editableMatch({ stage: "group", matchday: 1, homeTeamCode: "ARG", awayTeamCode: "BOL" }),
+      editableMatch({ stage: "final", matchday: null, homeTeamCode: "USA", awayTeamCode: "GER" }),
+    ]);
+    stack.add(async () => {
+      await deleteMatches(seeded.map((m) => m.id));
+    });
+
     await setFinalKickoff(false);
 
     // 2) Crear liga con 1 admin

@@ -167,4 +167,22 @@ describe("resolvePhase & scoreAward", () => {
     const insideGap = new Date("2026-06-11T12:00:00Z");
     expect(() => resolvePhase(insideGap, gapPhases)).toThrow("resolvePhase: no phase covers");
   });
+
+  describe("Postgres date string parsing compatibility (Safari/iOS)", () => {
+    it("normaliza de forma segura un string con espacio a ISO-8601", () => {
+      const spaceDate = "2026-06-11 19:00:00+00";
+      const isoDate = "2026-06-11T19:00:00Z";
+      
+      const parseSafeDate = (dateStr: string | null) => {
+        if (!dateStr) return null;
+        let formatted = dateStr.includes(" ") ? dateStr.replace(" ", "T") : dateStr;
+        formatted = formatted.replace(/([+-]\d{2})$/, "$1:00");
+        const time = new Date(formatted).getTime();
+        return Number.isNaN(time) ? null : time;
+      };
+
+      expect(parseSafeDate(spaceDate)).toBe(parseSafeDate(isoDate));
+      expect(parseSafeDate(spaceDate)).toBe(new Date("2026-06-11T19:00:00Z").getTime());
+    });
+  });
 });
