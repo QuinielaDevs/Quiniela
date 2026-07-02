@@ -78,7 +78,9 @@ export function AwardsBoard({
 
   const parseSafeDate = useCallback((dateStr: string | null) => {
     if (!dateStr) return null;
-    const formatted = dateStr.includes(" ") ? dateStr.replace(" ", "T") : dateStr;
+    let formatted = dateStr.includes(" ") ? dateStr.replace(" ", "T") : dateStr;
+    // Si la zona horaria termina en 2 dígitos (ej: +00 o -05), normalizar a ISO (+00:00)
+    formatted = formatted.replace(/([+-]\d{2})$/, "$1:00");
     const time = new Date(formatted).getTime();
     return Number.isNaN(time) ? null : time;
   }, []);
