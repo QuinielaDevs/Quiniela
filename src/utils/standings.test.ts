@@ -531,7 +531,7 @@ describe("buildStandings — rankChange (tendencias)", () => {
       member("b", { joinedAt: "2026-06-02T00:00:00.000Z" }),
     ];
     // Rango base (vacío): ambos comparten rango 1 (empatados)
-    const matches = [match("m1", { homeScore: 2, awayScore: 1, updatedAt: "2026-06-14T12:00:00Z" })];
+    const matches = [match("m1", { homeScore: 2, awayScore: 1, matchTime: "2026-06-14T12:00:00Z", updatedAt: "2026-06-14T12:00:00Z" })];
     // b acierta exacto (5 pts) y a no predice (0 pts) -> b pasa a #1 (único), a a #2
     const predictions = [prediction("b", "m1", { homeScorePred: 2, awayScorePred: 1 })];
 
@@ -543,15 +543,15 @@ describe("buildStandings — rankChange (tendencias)", () => {
     expect(rows.find((r) => r.userId === "a")).toMatchObject({ rank: 2, rankChange: -1 });
   });
 
-  it("calcula rankChange excluyendo el partido finalizado más reciente (updatedAt)", () => {
+  it("calcula rankChange excluyendo el partido finalizado más reciente (matchTime)", () => {
     const members = [
       member("a", { joinedAt: "2026-06-01T00:00:00.000Z" }),
       member("b", { joinedAt: "2026-06-02T00:00:00.000Z" }),
     ];
-    // Dos partidos: m1 (anterior) y m2 (más reciente por updatedAt)
+    // Dos partidos: m1 (anterior) y m2 (más reciente por matchTime)
     const matches = [
-      match("m1", { homeScore: 1, awayScore: 0, updatedAt: "2026-06-14T10:00:00Z" }),
-      match("m2", { homeScore: 2, awayScore: 1, updatedAt: "2026-06-14T11:00:00Z" }),
+      match("m1", { homeScore: 1, awayScore: 0, matchTime: "2026-06-14T10:00:00Z", updatedAt: "2026-06-14T10:00:00Z" }),
+      match("m2", { homeScore: 2, awayScore: 1, matchTime: "2026-06-14T11:00:00Z", updatedAt: "2026-06-14T11:00:00Z" }),
     ];
     
     // Predicciones:
@@ -569,6 +569,43 @@ describe("buildStandings — rankChange (tendencias)", () => {
     // y es #1 en la actual (10 pts vs 5 pts de a) -> rankChange = 2 - 1 = +1
     expect(rows.find((r) => r.userId === "b")).toMatchObject({ rank: 1, rankChange: 1 });
     // a: era #1 en la anterior, y es #2 en la actual -> rankChange = 1 - 2 = -1
+    expect(rows.find((r) => r.userId === "a")).toMatchObject({ rank: 2, rankChange: -1 });
+  });
+
+  it("calcula rankChange usando matchTime incluso si un partido antiguo tiene un updatedAt más reciente (corrección de administrador)", () => {
+    const members = [
+      member("a", { joinedAt: "2026-06-01T00:00:00.000Z" }),
+      member("b", { joinedAt: "2026-06-02T00:00:00.000Z" }),
+    ];
+    // m1 empezó antes pero fue editado/actualizado después.
+    // m2 empezó después pero no ha sido editado.
+    const matches = [
+      match("m1", { 
+        homeScore: 1, 
+        awayScore: 0, 
+        matchTime: "2026-06-14T10:00:00Z", 
+        updatedAt: "2026-06-14T20:00:00Z" // Editado por el administrador por la noche
+      }),
+      match("m2", { 
+        homeScore: 2, 
+        awayScore: 1, 
+        matchTime: "2026-06-14T15:00:00Z", 
+        updatedAt: "2026-06-14T17:00:00Z" // Finalizó por la tarde
+      }),
+    ];
+    
+    const predictions = [
+      prediction("a", "m1", { homeScorePred: 1, awayScorePred: 0 }), // 5 pts
+      prediction("b", "m2", { homeScorePred: 2, awayScorePred: 1, multiplier: 2 }), // 10 pts
+    ];
+
+    const rows = buildStandings(members, matches, predictions);
+
+    // Si se usa matchTime, el último partido es m2 (15:00 > 10:00).
+    // Al omitir m2, la tabla anterior solo incluye m1 (donde a=5pts, b=0pts -> a es #1, b es #2).
+    // En la actual (m1 + m2), b tiene 10pts y a tiene 5pts (b es #1, a es #2).
+    // b debe subir (2 - 1 = +1) y a bajar (1 - 2 = -1).
+    expect(rows.find((r) => r.userId === "b")).toMatchObject({ rank: 1, rankChange: 1 });
     expect(rows.find((r) => r.userId === "a")).toMatchObject({ rank: 2, rankChange: -1 });
   });
 });
