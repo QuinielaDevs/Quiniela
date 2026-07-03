@@ -202,8 +202,8 @@ export function buildStandings(
   const previousRanks = new Map<string, number>();
   if (matchesInScope.length > 0) {
     const sortedScope = [...matchesInScope].sort((a, b) => {
-      const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-      const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      const timeA = a.matchTime ? new Date(a.matchTime).getTime() : 0;
+      const timeB = b.matchTime ? new Date(b.matchTime).getTime() : 0;
       if (timeB !== timeA) return timeB - timeA;
       return b.id.localeCompare(a.id);
     });
