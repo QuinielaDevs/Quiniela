@@ -6,9 +6,9 @@
 name: Sync Matches (Backup Cron)
 
 on:
-  schedule:
-    # Cada 2 minutos durante el periodo de partidos (junio y julio)
-    - cron: "*/2 * * 6,7 *"
+#  schedule:
+#    # Cada 2 minutos durante el periodo de partidos (junio y julio)
+#    - cron: "*/2 * * 6,7 *"
   workflow_dispatch: # Permitir ejecución manual desde la UI de GitHub
 
 jobs:
