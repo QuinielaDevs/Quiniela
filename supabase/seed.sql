@@ -2685,5 +2685,5 @@ values
 ('2026-101', 'Por definir', 'Por definir', null, null, null, null, '2026-07-14T19:00:00.000Z', 'scheduled', null, 'semi', null, 101, 'W97', 'W98', 'Dallas Stadium'),
 ('2026-102', 'Por definir', 'Por definir', null, null, null, null, '2026-07-15T19:00:00.000Z', 'scheduled', null, 'semi', null, 102, 'W99', 'W100', 'Atlanta Stadium'),
 ('2026-103', 'Por definir', 'Por definir', null, null, null, null, '2026-07-18T21:00:00.000Z', 'scheduled', null, 'third-place', null, 103, 'L101', 'L102', 'Miami Stadium'),
-('2026-104', 'Por definir', 'Por definir', null, null, null, null, '2026-07-19T19:00:00.000Z', 'scheduled', null, 'final', null, 104, 'W101', 'W102', 'New York/New Jersey Stadium')
+('2026-104', 'Por definir', 'Por definir', null, null, null, null, '2026-12-31T19:00:00.000Z', 'scheduled', null, 'final', null, 104, 'W101', 'W102', 'New York/New Jersey Stadium')
 on conflict (external_ref) do nothing;

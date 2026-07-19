@@ -48,6 +48,7 @@ export async function LiveBoard() {
     { data: duelRows },
     { data: specialPreds },
     { data: isAwardsLocked },
+    { data: dbPhases },
   ] = await Promise.all([
     supabase
       .from("league_members")
@@ -64,9 +65,13 @@ export async function LiveBoard() {
     supabase.rpc("fn_get_league_duel_points", { p_league_id: leagueId }),
     supabase
       .from("special_predictions")
-      .select("user_id, category, candidate_id, award_candidates(name)")
+      .select("user_id, category, candidate_id, predicted_at, award_candidates(name)")
       .eq("league_id", leagueId),
     supabase.rpc("fn_are_special_predictions_locked"),
+    supabase
+      .from("tournament_phases")
+      .select("phase_code, reward_points, starts_at, ends_at, label")
+      .order("sort_order", { ascending: true }),
   ]);
 
   const awardPointsByUser = new Map(
@@ -134,9 +139,17 @@ export async function LiveBoard() {
         user_id: string;
         category: string;
         candidate_id: string;
+        predicted_at: string;
         award_candidates: { name: string } | null;
       }>}
       isAwardsLocked={!!isAwardsLocked}
+      phases={(dbPhases ?? []) as Array<{
+        phase_code: string;
+        reward_points: number;
+        starts_at: string | null;
+        ends_at: string | null;
+        label: string;
+      }>}
     />
   );
 }

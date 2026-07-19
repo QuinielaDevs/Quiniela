@@ -17,6 +17,13 @@ const admin = createServiceRoleClient();
 const createdUserIds: string[] = [];
 const createdCandidateIds: string[] = [];
 
+beforeAll(async () => {
+  await admin
+    .from("matches")
+    .update({ match_time: new Date(Date.now() + 86400 * 30 * 1000).toISOString() })
+    .eq("stage", "final");
+});
+
 afterAll(async () => {
   // Borrar usuarios cascadea profiles → leagues/league_members/special_predictions.
   while (createdUserIds.length > 0) {
