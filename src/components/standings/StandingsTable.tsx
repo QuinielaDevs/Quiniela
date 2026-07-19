@@ -13,6 +13,7 @@ import {
   calculateBasePoints,
   calculatePredictionPoints,
 } from "@/utils/scoring";
+import { resolvePhase } from "@/utils/awardsScoring";
 import { phaseKeyForMatch, buildPhases, stageLabel } from "@/utils/tournament";
 import { PaymentStatusBadge } from "@/components/standings/PaymentStatusBadge";
 import { ScrollableTabs } from "@/components/ui/ScrollableTabs";
@@ -26,9 +27,17 @@ type StandingsTableProps = {
     user_id: string;
     category: string;
     candidate_id: string;
+    predicted_at: string;
     award_candidates: { name: string } | null;
   }>;
   isAwardsLocked?: boolean;
+  phases?: Array<{
+    phase_code: string;
+    reward_points: number;
+    starts_at: string | null;
+    ends_at: string | null;
+    label: string;
+  }>;
 };
 
 type Tab = { key: string; label: string };
@@ -171,12 +180,13 @@ export function StandingsTable({
   predictions,
   specialPredictions,
   isAwardsLocked = false,
+  phases,
 }: StandingsTableProps) {
   const [activeKey, setActiveKey] = useState("general");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   const specialPredsByUser = useMemo(() => {
-    const map = new Map<string, Record<string, string>>();
+    const map = new Map<string, Record<string, { name: string; points: number }>>();
     if (!specialPredictions) return map;
     for (const sp of specialPredictions) {
       let userRec = map.get(sp.user_id);
@@ -184,10 +194,39 @@ export function StandingsTable({
         userRec = {};
         map.set(sp.user_id, userRec);
       }
-      userRec[sp.category] = sp.award_candidates?.name ?? "Candidato Desconocido";
+
+      let points = 0;
+      if (sp.predicted_at) {
+        let formatted = sp.predicted_at.includes(" ") ? sp.predicted_at.replace(" ", "T") : sp.predicted_at;
+        formatted = formatted.replace(/([+-]\d{2})$/, "$1:00");
+        const time = new Date(formatted).getTime();
+        if (!Number.isNaN(time)) {
+          if (phases && phases.length > 0) {
+            const matched = phases.find((phase) => {
+              const start = phase.starts_at ? new Date(phase.starts_at.includes(" ") ? phase.starts_at.replace(" ", "T") : phase.starts_at).getTime() : null;
+              const end = phase.ends_at ? new Date(phase.ends_at.includes(" ") ? phase.ends_at.replace(" ", "T") : phase.ends_at).getTime() : null;
+              const matchesStart = start === null || Number.isNaN(start) || time >= start;
+              const matchesEnd = end === null || Number.isNaN(end) || time < end;
+              return matchesStart && matchesEnd;
+            });
+            if (matched) points = matched.reward_points;
+          } else {
+            try {
+              points = resolvePhase(new Date(formatted)).rewardPoints;
+            } catch (e) {
+              console.error("Error calculating points for prediction:", e);
+            }
+          }
+        }
+      }
+
+      userRec[sp.category] = {
+        name: sp.award_candidates?.name ?? "Candidato Desconocido",
+        points,
+      };
     }
     return map;
-  }, [specialPredictions]);
+  }, [specialPredictions, phases]);
 
   const tabs = useMemo<Tab[]>(
     () => [
@@ -475,18 +514,45 @@ export function StandingsTable({
                       <div className="font-semibold text-accent mb-1.5 flex items-center gap-1.5">
                         <span>🏆</span> Premios Especiales Elegidos:
                       </div>
-                      <div className="grid grid-cols-3 gap-2 mt-1">
-                        <div className="flex flex-col rounded bg-card/45 p-1.5 border border-border/20">
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold">Campeón</span>
-                          <span className="font-semibold mt-0.5 truncate text-foreground">{specialPredsByUser.get(row.userId)?.champion ?? "Sin pronóstico"}</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                        <div className="flex items-center justify-between sm:flex-col sm:items-start rounded bg-card/45 p-2 border border-border/20 gap-1.5">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold shrink-0">Campeón</span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-semibold text-foreground text-xs truncate">
+                              {specialPredsByUser.get(row.userId)?.champion?.name ?? "Sin pronóstico"}
+                            </span>
+                            {specialPredsByUser.get(row.userId)?.champion && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent/15 text-accent border border-accent/20 shrink-0">
+                                {` (+${specialPredsByUser.get(row.userId)?.champion?.points} pts)`}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-col rounded bg-card/45 p-1.5 border border-border/20">
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold">Goleador</span>
-                          <span className="font-semibold mt-0.5 truncate text-foreground">{specialPredsByUser.get(row.userId)?.top_scorer ?? "Sin pronóstico"}</span>
+                        <div className="flex items-center justify-between sm:flex-col sm:items-start rounded bg-card/45 p-2 border border-border/20 gap-1.5">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold shrink-0">Goleador</span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-semibold text-foreground text-xs truncate">
+                              {specialPredsByUser.get(row.userId)?.top_scorer?.name ?? "Sin pronóstico"}
+                            </span>
+                            {specialPredsByUser.get(row.userId)?.top_scorer && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent/15 text-accent border border-accent/20 shrink-0">
+                                {` (+${specialPredsByUser.get(row.userId)?.top_scorer?.points} pts)`}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-col rounded bg-card/45 p-1.5 border border-border/20">
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold">MVP</span>
-                          <span className="font-semibold mt-0.5 truncate text-foreground">{specialPredsByUser.get(row.userId)?.mvp ?? "Sin pronóstico"}</span>
+                        <div className="flex items-center justify-between sm:flex-col sm:items-start rounded bg-card/45 p-2 border border-border/20 gap-1.5">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold shrink-0">MVP</span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-semibold text-foreground text-xs truncate">
+                              {specialPredsByUser.get(row.userId)?.mvp?.name ?? "Sin pronóstico"}
+                            </span>
+                            {specialPredsByUser.get(row.userId)?.mvp && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent/15 text-accent border border-accent/20 shrink-0">
+                                {` (+${specialPredsByUser.get(row.userId)?.mvp?.points} pts)`}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
